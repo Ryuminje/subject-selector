@@ -30,9 +30,16 @@ interface ProcessedStudent {
   socialCount: number;
   scienceCount: number;
   duplicateSubjects: string[];
-  hierarchyViolations: { subject: string; message: string }[];
+  hierarchyViolations: { subject: string; prereq: string; message: string }[];
   originalRow: any;
   completedBefore?: string[];
+}
+
+interface SubjectStat {
+  group: string;
+  semester: string;
+  subject: string;
+  applicants: number;
 }
 
 export default function Home() {
@@ -50,6 +57,9 @@ export default function Home() {
   const [previousHistoryFiles, setPreviousHistoryFiles] = useState<{ [key in GradeKey]: { name: string, size: number, data: string } | null }>({ grade1: null, grade2: null });
   const [previousSubjectMap, setPreviousSubjectMap] = useState<{ [key in GradeKey]: { [studentId: string]: { name: string, subjects: string[] } } }>({ grade1: {}, grade2: {} });
 
+  const [subjectStats, setSubjectStats] = useState<{ [key in GradeKey]: SubjectStat[] }>({ grade1: [], grade2: [] });
+  const [standardClassSize, setStandardClassSize] = useState<{ [key in GradeKey]: number }>({ grade1: 25, grade2: 25 });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSaveBackup = () => {
@@ -62,7 +72,9 @@ export default function Home() {
       processedData,
       rawSheetData,
       previousHistoryFiles,
-      previousSubjectMap
+      previousSubjectMap,
+      subjectStats,
+      standardClassSize
     };
     const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -93,6 +105,8 @@ export default function Home() {
         if (parsed.rawSheetData) setRawSheetData(parsed.rawSheetData);
         if (parsed.previousHistoryFiles) setPreviousHistoryFiles(parsed.previousHistoryFiles);
         if (parsed.previousSubjectMap) setPreviousSubjectMap(parsed.previousSubjectMap);
+        if (parsed.subjectStats) setSubjectStats(parsed.subjectStats);
+        if (parsed.standardClassSize) setStandardClassSize(parsed.standardClassSize);
         alert("작업 내역을 성공적으로 불러왔습니다.");
       } catch (e) {
         alert("올바르지 않은 백업 파일입니다.");
@@ -504,9 +518,41 @@ export default function Home() {
     return "기타";
   };
 
+  const parseGroupAndSemester = (header: string) => {
+    let group = "";
+    let semester = "";
+    
+    // Extract Group (e.g. 선택군 A, 선택군 B, or fallback A군, B군)
+    const selectGroupMatch = header.match(/선택군\s*([A-Za-z0-9가-힣])/i);
+    const letterGroupMatch = header.match(/([A-Za-z0-9])군/i);
+    
+    if (selectGroupMatch) {
+      group = selectGroupMatch[1].toUpperCase();
+    } else if (letterGroupMatch) {
+      group = letterGroupMatch[1].toUpperCase();
+    } else {
+      group = "기타";
+    }
+
+    // Extract Semester
+    if (header.includes("1~2학기") || header.includes("1-2학기")) {
+      semester = "1~2학기";
+    } else if (header.includes("1학기")) {
+      semester = "1학기";
+    } else if (header.includes("2학기")) {
+      semester = "2학기";
+    } else {
+      semester = "공통/기타";
+    }
+
+    return { group, semester };
+  };
+
   const processData = (data: any[]) => {
     const processed: ProcessedStudent[] = [];
     const historyMap = previousSubjectMap[activeGrade] || {};
+    
+    const statsMap: Record<string, { group: string; semester: string; count: number }> = {};
 
     data.forEach((row, index) => {
       const keys = Object.keys(row);
@@ -583,6 +629,7 @@ export default function Home() {
 
         const chosenSubjectRaw = val.trim();
         const subjects = chosenSubjectRaw.split(",").map(s => s.trim());
+        const { group, semester } = parseGroupAndSemester(k);
         
         subjects.forEach((subject, idx) => {
           if (!subject) return;
@@ -606,6 +653,10 @@ export default function Home() {
           if (matchedCategory === "기초") basicCount++;
           if (matchedCategory === "사회") socialCount++;
           if (matchedCategory === "과학") scienceCount++;
+          
+          const statKey = `${group}|${semester}|${subject}`;
+          if (!statsMap[statKey]) statsMap[statKey] = { group, semester, count: 0 };
+          statsMap[statKey].count++;
         });
       });
 
@@ -616,7 +667,7 @@ export default function Home() {
       });
       const duplicateSubjects = Object.keys(subjectCounts).filter(s => subjectCounts[s] > 1);
 
-      const hierarchyViolations: { subject: string; message: string }[] = [];
+      const hierarchyViolations: { subject: string; prereq: string; message: string }[] = [];
       const currentRules = hierarchyRules[activeGrade] || [];
       
       const getSemester = (subj: string) => {
@@ -639,13 +690,13 @@ export default function Home() {
 
           if (prereqSem === 0) {
             // Not completed before and not enrolled this year
-            hierarchyViolations.push({ subject: rule.advanced, message: `선행 미이수(${rule.prereq})` });
+            hierarchyViolations.push({ subject: rule.advanced, prereq: rule.prereq, message: `권장 이수 순서: ${rule.prereq} -> ${rule.advanced}` });
           } else if (prereqSem > advancedSem) {
             // Enrolled in later semester this year
-            hierarchyViolations.push({ subject: rule.advanced, message: `선후수 역전(${rule.prereq}가 후순위)` });
+            hierarchyViolations.push({ subject: rule.advanced, prereq: rule.prereq, message: `권장 이수 순서: ${rule.prereq} -> ${rule.advanced}` });
           } else if (prereqSem === advancedSem) {
             // Enrolled in same semester this year (simultaneous)
-            hierarchyViolations.push({ subject: rule.advanced, message: `선후수 동시선택(${rule.prereq})` });
+            hierarchyViolations.push({ subject: rule.advanced, prereq: rule.prereq, message: `권장 이수 순서: ${rule.prereq} -> ${rule.advanced}` });
           }
         }
       });
@@ -669,7 +720,25 @@ export default function Home() {
       });
     });
 
+    const newStats: SubjectStat[] = Object.entries(statsMap).map(([key, data]) => {
+      const subject = key.split("|")[2];
+      return {
+        group: data.group,
+        semester: data.semester,
+        subject,
+        applicants: data.count
+      };
+    });
+    
+    // Sort logic: by Group first, then Semester, then applicants descending
+    newStats.sort((a, b) => {
+      if (a.group !== b.group) return a.group.localeCompare(b.group);
+      if (a.semester !== b.semester) return a.semester.localeCompare(b.semester);
+      return b.applicants - a.applicants;
+    });
+
     setProcessedData(prev => ({ ...prev, [activeGrade]: processed }));
+    setSubjectStats(prev => ({ ...prev, [activeGrade]: newStats }));
   };
 
   useEffect(() => {
@@ -716,8 +785,9 @@ export default function Home() {
         for (let i = 0; i < maxSem1; i++) row.push(student.semester1[i] || "");
         for (let i = 0; i < maxSem2; i++) row.push(student.semester2[i] || "");
         const remarks: string[] = [];
+        if (student.basicCount >= 10) remarks.push("기초과목 최대학점 초과");
         if (student.duplicateSubjects?.length) remarks.push(`중복선택: ${student.duplicateSubjects.join(", ")}`);
-        if (student.hierarchyViolations?.length) remarks.push(`위계위반: ${student.hierarchyViolations.map(v => v.message).join(", ")}`);
+        if (student.hierarchyViolations?.length) remarks.push(student.hierarchyViolations.map(v => v.message).join(", "));
         
         row.push(student.basicCount || 0, student.socialCount || 0, student.scienceCount || 0, remarks.join(" / "));
         
@@ -747,6 +817,22 @@ export default function Home() {
           if (R === 0) {
             ws[cellAddress].s.fill = { fgColor: { rgb: "E0E0E0" } };
             ws[cellAddress].s.font = { bold: true };
+          } else {
+            // 데이터 행 조건부 스타일링
+            const student = classData[R - 1];
+            if (student) {
+              const basicColIndex = 3 + maxSem1 + maxSem2;
+              const socialColIndex = basicColIndex + 1;
+              const scienceColIndex = basicColIndex + 2;
+
+              if (C === basicColIndex && (student.basicCount || 0) >= 10) {
+                ws[cellAddress].s.fill = { fgColor: { rgb: "F18448" } };
+              } else if (C === socialColIndex && (student.socialCount || 0) === 0) {
+                ws[cellAddress].s.fill = { fgColor: { rgb: "6AAADE" } };
+              } else if (C === scienceColIndex && (student.scienceCount || 0) === 0) {
+                ws[cellAddress].s.fill = { fgColor: { rgb: "6AAADE" } };
+              }
+            }
           }
         }
       }
@@ -771,6 +857,176 @@ export default function Home() {
     });
 
     XLSX.writeFile(wb, `Subject_Selection_${activeGrade === "grade1" ? "1학년" : "2학년"}_Processed.xlsx`);
+  };
+
+  const getClassRecommendation = (applicants: number, standardSize: number) => {
+    if (applicants < 5) return "폐강";
+    if (applicants < 0.7 * standardSize) return "논의";
+    
+    const k = Math.round(applicants / standardSize);
+    const nominalClasses = k < 1 ? 1 : k;
+    
+    if (nominalClasses >= 2) {
+      const avgSize = applicants / nominalClasses;
+      if (avgSize > 1.12 * standardSize) {
+        return `${nominalClasses}~${nominalClasses + 1}`;
+      }
+    }
+    
+    return `${nominalClasses}`;
+  };
+
+  const handleExportStep5 = () => {
+    const stats = subjectStats[activeGrade] || [];
+    if (stats.length === 0) return;
+
+    const standardSize = standardClassSize[activeGrade] || 25;
+    const wb = XLSX.utils.book_new();
+
+    const titleText = `2026학년도 ${activeGrade === "grade1" ? "1학년" : "2학년(현 1학년)"} 선택과목 수요조사 결과`;
+
+    const aoa: any[][] = [
+      [titleText, "", "", "", ""],
+      ["", "", "", "", ""],
+      ["선택군", "학기", "과목", "신청자수", "비고"]
+    ];
+
+    stats.forEach(s => {
+      const remark = getClassRecommendation(s.applicants, standardSize);
+      aoa.push([
+        s.group,
+        s.semester,
+        s.subject,
+        s.applicants,
+        remark
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    const merges: any[] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }
+    ];
+
+    const dataStartRowIndex = 3;
+
+    let i = 0;
+    while (i < stats.length) {
+      let j = i + 1;
+      while (j < stats.length && stats[j].group === stats[i].group) {
+        j++;
+      }
+      if (j - i > 1) {
+        merges.push({
+          s: { r: dataStartRowIndex + i, c: 0 },
+          e: { r: dataStartRowIndex + j - 1, c: 0 }
+        });
+      }
+      i = j;
+    }
+
+    i = 0;
+    while (i < stats.length) {
+      let j = i + 1;
+      while (j < stats.length && stats[j].group === stats[i].group && stats[j].semester === stats[i].semester) {
+        j++;
+      }
+      if (j - i > 1) {
+        merges.push({
+          s: { r: dataStartRowIndex + i, c: 1 },
+          e: { r: dataStartRowIndex + j - 1, c: 1 }
+        });
+      }
+      i = j;
+    }
+
+    ws["!merges"] = merges;
+
+    const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        if (!ws[cellAddress]) ws[cellAddress] = { t: "s", v: "" };
+
+        const cell = ws[cellAddress];
+
+        if (R === 0) {
+          cell.s = {
+            font: { name: "맑은 고딕", size: 16, bold: true },
+            alignment: { horizontal: "center", vertical: "center" }
+          };
+        } else if (R === 1) {
+          cell.s = {};
+        } else if (R === 2) {
+          cell.s = {
+            font: { name: "맑은 고딕", size: 11, bold: true },
+            fill: { fgColor: { rgb: "F2F2F2" } },
+            alignment: { horizontal: "center", vertical: "center" },
+            border: {
+              top: { style: "medium", color: { rgb: "000000" } },
+              bottom: { style: "medium", color: { rgb: "000000" } },
+              left: { style: "thin", color: { rgb: "A6A6A6" } },
+              right: { style: "thin", color: { rgb: "A6A6A6" } }
+            }
+          };
+        } else {
+          const remarkVal = cell.v ? String(cell.v) : "";
+          
+          let remarkFontColor = "000000";
+          let remarkFontBold = false;
+          if (remarkVal === "폐강") {
+            remarkFontColor = "FF0000";
+            remarkFontBold = true;
+          } else if (remarkVal === "논의") {
+            remarkFontColor = "FF9900";
+            remarkFontBold = true;
+          } else if (remarkVal !== "개설" && remarkVal !== "") {
+            remarkFontColor = "008000";
+            remarkFontBold = true;
+          }
+
+          cell.s = {
+            font: { 
+              name: "맑은 고딕", 
+              size: 10,
+              color: C === 4 ? { rgb: remarkFontColor } : { rgb: "000000" },
+              bold: C === 4 ? remarkFontBold : false
+            },
+            alignment: { 
+              horizontal: C === 2 ? "left" : "center", 
+              vertical: "center" 
+            },
+            border: {
+              top: { style: "thin", color: { rgb: "D9D9D9" } },
+              bottom: { style: "thin", color: { rgb: "D9D9D9" } },
+              left: { style: "thin", color: { rgb: "D9D9D9" } },
+              right: { style: "thin", color: { rgb: "D9D9D9" } }
+            }
+          };
+        }
+      }
+    }
+
+    const rows = [
+      { hpx: 40 },
+      { hpx: 15 },
+      { hpx: 28 }
+    ];
+    for (let r = 0; r < stats.length; r++) {
+      rows.push({ hpx: 22 });
+    }
+    ws["!rows"] = rows;
+
+    ws["!cols"] = [
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 30 },
+      { wch: 15 },
+      { wch: 15 }
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, "과목 개설 여부");
+    XLSX.writeFile(wb, `Subject_Opening_${activeGrade === "grade1" ? "1학년" : "2학년"}_Analysis.xlsx`);
   };
 
   const activeData = processedData[activeGrade];
@@ -873,6 +1129,20 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4" />
               <span>수요조사 결과</span>
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab("classOpening")}
+            className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+              activeTab === "classOpening"
+                ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+            }`}
+          >
+            <span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>과목 개설 여부</span>
             </div>
           </button>
         </div>
@@ -1281,10 +1551,11 @@ export default function Home() {
                             <td className="px-2 py-2.5 text-center text-rose-400 font-medium whitespace-nowrap">{row.socialCount}</td>
                             <td className="px-2 py-2.5 text-center text-emerald-400 font-medium whitespace-nowrap">{row.scienceCount}</td>
                             <td className="px-2 py-2.5 font-medium flex flex-col gap-1 whitespace-nowrap">
-                              {row.duplicateSubjects?.length > 0 && <span className="text-rose-400 whitespace-nowrap">중복: {row.duplicateSubjects.join(", ")}</span>}
+                              {row.basicCount >= 10 && <span className="text-rose-400 whitespace-nowrap">기초과목 최대학점 초과</span>}
+                              {row.duplicateSubjects?.length > 0 && <span className="text-rose-400 whitespace-nowrap">중복선택: {row.duplicateSubjects.join(", ")}</span>}
                               {row.hierarchyViolations?.length > 0 && (
                                 <span className="text-amber-400 text-xs whitespace-nowrap">
-                                  {row.hierarchyViolations.map(v => `위반: ${v.subject}(${v.message})`).join(", ")}
+                                  {row.hierarchyViolations.map(v => v.message).join(", ")}
                                 </span>
                               )}
                             </td>
@@ -1295,6 +1566,152 @@ export default function Home() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === "classOpening" && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+                <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                  <CheckCircle2 className="w-6 h-6 text-indigo-400" />
+                  5단계: 과목 개설 여부 및 학급 분반 추천
+                </h2>
+                <button 
+                  onClick={handleExportStep5}
+                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-500/25 flex items-center gap-2"
+                  disabled={subjectStats[activeGrade].length === 0}
+                >
+                  <Download className="w-4 h-4" />
+                  {activeGrade === "grade1" ? "1학년" : "2학년"} 개설 여부 엑셀 다운로드
+                </button>
+              </div>
+
+              {renderGradeTabs()}
+
+              {/* 학급 기준 인원 설정 */}
+              <div className="p-5 bg-slate-950/40 border border-slate-800/80 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold text-slate-200">학급 분반 및 개설 기준 설정</h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    설정된 학급 기준 인원에 따라 개설(70% 이상), 논의(70% 미만), 분반 추천(120% 초과) 및 폐강(5명 미만) 여부를 자동으로 판단합니다.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <label htmlFor="standardSizeInput" className="text-sm text-slate-300 font-medium whitespace-nowrap">학급 기준 인원:</label>
+                  <input
+                    id="standardSizeInput"
+                    type="number"
+                    min={10}
+                    max={50}
+                    value={standardClassSize[activeGrade]}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 25;
+                      setStandardClassSize(prev => ({ ...prev, [activeGrade]: val }));
+                    }}
+                    className="w-20 bg-slate-950 border border-slate-700 text-center rounded-lg px-2 py-1.5 text-white font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm text-slate-400">명</span>
+                </div>
+              </div>
+
+              {subjectStats[activeGrade].length === 0 ? (
+                <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-8 text-center">
+                  <p className="text-slate-500">선택하신 학년의 데이터가 아직 없습니다. 교육과정 설정과 파일 업로드를 진행해 주세요.</p>
+                </div>
+              ) : (() => {
+                const stats = subjectStats[activeGrade] || [];
+                const standardSize = standardClassSize[activeGrade] || 25;
+
+                // Precompute group and semester rowSpans
+                const groupSpans: number[] = [];
+                const semSpans: number[] = [];
+
+                for (let idx = 0; idx < stats.length; idx++) {
+                  if (idx === 0 || stats[idx].group !== stats[idx - 1].group) {
+                    let count = 1;
+                    while (idx + count < stats.length && stats[idx + count].group === stats[idx].group) {
+                      count++;
+                    }
+                    groupSpans.push(count);
+                  } else {
+                    groupSpans.push(0);
+                  }
+
+                  if (idx === 0 || stats[idx].group !== stats[idx - 1].group || stats[idx].semester !== stats[idx - 1].semester) {
+                    let count = 1;
+                    while (idx + count < stats.length && stats[idx + count].group === stats[idx].group && stats[idx + count].semester === stats[idx].semester) {
+                      count++;
+                    }
+                    semSpans.push(count);
+                  } else {
+                    semSpans.push(0);
+                  }
+                }
+
+                return (
+                  <div className="bg-slate-950/50 border border-slate-800 rounded-2xl overflow-hidden">
+                    <div className="overflow-auto max-h-[650px]">
+                      <table className="w-full text-sm text-left text-slate-300 border-collapse">
+                        <thead className="text-xs text-slate-400 uppercase bg-slate-900 border-b border-slate-800">
+                          <tr>
+                            <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[100px]">선택군</th>
+                            <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">학기</th>
+                            <th className="px-6 py-3 border-r border-slate-800/60">과목</th>
+                            <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">신청자 수</th>
+                            <th className="px-4 py-3 text-center min-w-[120px]">비고</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {stats.map((row, idx) => {
+                            const remark = getClassRecommendation(row.applicants, standardSize);
+                            
+                            let remarkStyle = "text-slate-300 font-medium";
+                            if (remark === "폐강") {
+                              remarkStyle = "text-rose-400 font-bold bg-rose-500/10 px-2.5 py-1 rounded-md inline-block";
+                            } else if (remark === "논의") {
+                              remarkStyle = "text-amber-400 font-bold bg-amber-500/10 px-2.5 py-1 rounded-md inline-block";
+                            } else if (remark !== "개설" && remark !== "") {
+                              remarkStyle = "text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-md inline-block";
+                            }
+
+                            return (
+                              <tr key={idx} className="border-b border-slate-800/50 hover:bg-slate-900/20 transition-colors">
+                                {groupSpans[idx] > 0 && (
+                                  <td 
+                                    rowSpan={groupSpans[idx]} 
+                                    className="px-4 py-3.5 text-center font-bold text-slate-200 border-r border-slate-800/50 bg-slate-950/60 align-middle"
+                                  >
+                                    {row.group}
+                                  </td>
+                                )}
+                                {semSpans[idx] > 0 && (
+                                  <td 
+                                    rowSpan={semSpans[idx]} 
+                                    className="px-4 py-3.5 text-center font-semibold text-slate-300 border-r border-slate-800/50 bg-slate-950/40 align-middle"
+                                  >
+                                    {row.semester}
+                                  </td>
+                                )}
+                                <td className="px-6 py-3.5 border-r border-slate-800/50 font-medium text-white">
+                                  {row.subject}
+                                </td>
+                                <td className="px-4 py-3.5 text-center border-r border-slate-800/50 font-semibold text-indigo-400">
+                                  {row.applicants}명
+                                </td>
+                                <td className="px-4 py-3.5 text-center align-middle">
+                                  <span className={remarkStyle}>
+                                    {remark}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
