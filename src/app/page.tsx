@@ -173,12 +173,13 @@ export default function Home() {
       let sem1 = 0;
       let sem2 = 0;
       if (nums.length >= 6) {
+        const sems = nums.slice(-6);
         if (grade === "grade1") {
-          sem1 = nums[2] || 0;
-          sem2 = nums[3] || 0;
+          sem1 = sems[2] || 0;
+          sem2 = sems[3] || 0;
         } else {
-          sem1 = nums[4] || 0;
-          sem2 = nums[5] || 0;
+          sem1 = sems[4] || 0;
+          sem2 = sems[5] || 0;
         }
       } else if (nums.length >= 4) {
         if (grade === "grade1") {
