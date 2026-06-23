@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Fragment } from "react";
 import { Upload, FileText, Settings, Download, CheckCircle2, ChevronRight, Trash2, File as FileIcon, Save, FolderOpen, GitBranch, Plus } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 
@@ -42,6 +42,20 @@ interface SubjectStat {
   applicants: number;
 }
 
+interface DesignatedSubject {
+  subject: string;
+  category: SubjectCategory;
+  sem1: number;
+  sem2: number;
+}
+
+interface SelectedSubjectHours {
+  subject: string;
+  category: SubjectCategory;
+  sem1: number;
+  sem2: number;
+}
+
 export default function Home() {
   const [activeTab, setActiveTab] = useState("curriculum");
   const [activeGrade, setActiveGrade] = useState<GradeKey>("grade1");
@@ -59,6 +73,12 @@ export default function Home() {
 
   const [subjectStats, setSubjectStats] = useState<{ [key in GradeKey]: SubjectStat[] }>({ grade1: [], grade2: [] });
   const [standardClassSize, setStandardClassSize] = useState<{ [key in GradeKey]: number }>({ grade1: 25, grade2: 25 });
+  const [designatedSubjects, setDesignatedSubjects] = useState<{ [key in GradeKey]: DesignatedSubject[] }>({ grade1: [], grade2: [] });
+  const [selectedSubjectHours, setSelectedSubjectHours] = useState<{ [key in GradeKey]: SelectedSubjectHours[] }>({ grade1: [], grade2: [] });
+  const [teacherCounts, setTeacherCounts] = useState<{ [key in GradeKey]: Record<string, number> }>({
+    grade1: {},
+    grade2: {}
+  });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -74,7 +94,10 @@ export default function Home() {
       previousHistoryFiles,
       previousSubjectMap,
       subjectStats,
-      standardClassSize
+      standardClassSize,
+      designatedSubjects,
+      selectedSubjectHours,
+      teacherCounts
     };
     const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -107,6 +130,9 @@ export default function Home() {
         if (parsed.previousSubjectMap) setPreviousSubjectMap(parsed.previousSubjectMap);
         if (parsed.subjectStats) setSubjectStats(parsed.subjectStats);
         if (parsed.standardClassSize) setStandardClassSize(parsed.standardClassSize);
+        if (parsed.designatedSubjects) setDesignatedSubjects(parsed.designatedSubjects);
+        if (parsed.selectedSubjectHours) setSelectedSubjectHours(parsed.selectedSubjectHours);
+        if (parsed.teacherCounts) setTeacherCounts(parsed.teacherCounts);
         alert("작업 내역을 성공적으로 불러왔습니다.");
       } catch (e) {
         alert("올바르지 않은 백업 파일입니다.");
@@ -140,13 +166,44 @@ export default function Home() {
   const parseCurriculum = () => {
     const lines = curriculumText[activeGrade].split("\n").filter(Boolean);
     const newMap: SubjectMap = {};
+    const newDesignated: DesignatedSubject[] = [];
+    const newSelected: SelectedSubjectHours[] = [];
 
     let currentGroup = "";
     
     for (let line of lines) {
       line = line.replace(/\r/g, "");
-      const parts = line.trim().split(/\s+/);
       
+      if (line.includes("학교지정과목") || line.includes("지정과목")) {
+        const parts = line.split(/[,\t\s]+/).map(s => s.trim()).filter(Boolean);
+        const nums: number[] = [];
+        for (let i = parts.length - 1; i >= 0; i--) {
+          if (!isNaN(Number(parts[i]))) {
+            nums.unshift(Number(parts[i]));
+          } else {
+            break;
+          }
+        }
+        
+        const subjectNameParts = parts.filter(p => !p.includes("학교지정과목") && !p.includes("지정과목여부") && isNaN(Number(p)));
+        const subjectName = subjectNameParts.join(" ");
+
+        const sem1 = nums[0] || 0;
+        const sem2 = nums[1] || 0;
+
+        let cat: SubjectCategory = "기타";
+        if ((subjectName.includes("국어") && !subjectName.includes("외국어") && !subjectName.includes("중국어")) || subjectName.includes("수학") || subjectName.includes("영어") || subjectName.includes("독서") || subjectName.includes("문학")) cat = "기초";
+        else if (subjectName.includes("사회") || subjectName.includes("역사") || subjectName.includes("도덕") || subjectName.includes("한국사")) cat = "사회";
+        else if (subjectName.includes("과학") || subjectName.includes("탐구실험")) cat = "과학";
+        else if (subjectName.includes("체육") || subjectName.includes("예술") || subjectName.includes("정보") || subjectName.includes("한문") || subjectName.includes("기술") || subjectName.includes("가정") || subjectName.includes("외국어") || subjectName.includes("일본어") || subjectName.includes("중국어")) cat = "기타";
+
+        if (subjectName) {
+          newDesignated.push({ subject: subjectName, category: cat, sem1, sem2 });
+        }
+        continue;
+      }
+
+      const parts = line.trim().split(/\s+/);
       const columns = line.split("\t").map(c => c.trim());
       const checkArea = columns.length > 1 
         ? columns.slice(0, Math.min(3, columns.length)).join(" ") 
@@ -188,9 +245,24 @@ export default function Home() {
 
           if (subjectName && subjectName.length > 1) {
              const individualSubjects = subjectName.split("↔").map(s => s.trim());
+             
+             // Extract numbers
+             const lineParts = line.split(/[,\t\s]+/).map(s => s.trim()).filter(Boolean);
+             const nums: number[] = [];
+             for (let i = lineParts.length - 1; i >= 0; i--) {
+               if (!isNaN(Number(lineParts[i]))) {
+                 nums.unshift(Number(lineParts[i]));
+               } else {
+                 break;
+               }
+             }
+             const sem1 = nums[0] || 0;
+             const sem2 = nums[1] || 0;
+
              individualSubjects.forEach(sub => {
                if (sub && sub.length > 1) {
                  newMap[sub] = currentGroup as SubjectCategory;
+                 newSelected.push({ subject: sub, category: currentGroup as SubjectCategory, sem1, sem2 });
                }
              });
           }
@@ -198,6 +270,8 @@ export default function Home() {
       }
     }
 
+    setDesignatedSubjects(prev => ({ ...prev, [activeGrade]: newDesignated }));
+    setSelectedSubjectHours(prev => ({ ...prev, [activeGrade]: newSelected }));
     setSubjectMap(prev => ({ ...prev, [activeGrade]: newMap }));
     setIsCurriculumParsed(prev => ({ ...prev, [activeGrade]: true }));
   };
@@ -1075,6 +1149,212 @@ export default function Home() {
   const maxSem1 = activeData.length > 0 ? Math.max(4, ...activeData.map(d => d.semester1.length)) : 4;
   const maxSem2 = activeData.length > 0 ? Math.max(4, ...activeData.map(d => d.semester2.length)) : 4;
 
+  const getDetailedCategory = (subject: string, cat: SubjectCategory) => {
+    if (cat === "기초") {
+      if (subject.includes("국어") || subject.includes("독서") || subject.includes("문학") || subject.includes("화법") || subject.includes("언어")) return "국어";
+      if (subject.includes("수학") || subject.includes("기하") || subject.includes("미적분")) return "수학";
+      if (subject.includes("영어")) return "영어";
+      return "기초기타";
+    }
+    return cat;
+  };
+
+  const renderStep6 = () => {
+    const totalClasses = processedData[activeGrade].length > 0 
+      ? new Set(processedData[activeGrade].map(d => d.classNum)).size 
+      : 1;
+
+    const allSubjectsList: { subject: string, catName: string, sem1: number, sem2: number, classes: number }[] = [];
+
+    designatedSubjects[activeGrade]?.forEach(ds => {
+      allSubjectsList.push({
+        subject: ds.subject,
+        catName: getDetailedCategory(ds.subject, ds.category),
+        sem1: ds.sem1,
+        sem2: ds.sem2,
+        classes: totalClasses
+      });
+    });
+
+    const currentStats = subjectStats[activeGrade] || [];
+    const standardSize = standardClassSize[activeGrade] || 25;
+
+    selectedSubjectHours[activeGrade]?.forEach(ss => {
+      let applicants = 0;
+      const stat = currentStats.find(s => normalizeSubjectName(s.subject) === normalizeSubjectName(ss.subject));
+      if (stat) applicants = stat.applicants;
+
+      let classes = 0;
+      if (applicants >= 5) {
+        const k = Math.round(applicants / standardSize);
+        classes = k < 1 && applicants >= 0.7 * standardSize ? 1 : k;
+      }
+      
+      if (classes > 0) {
+        allSubjectsList.push({
+          subject: ss.subject,
+          catName: getDetailedCategory(ss.subject, ss.category),
+          sem1: ss.sem1,
+          sem2: ss.sem2,
+          classes: classes
+        });
+      }
+    });
+
+    const catDataMap: Record<string, { sem1Items: any[], sem2Items: any[] }> = {};
+    allSubjectsList.forEach(item => {
+      if (!catDataMap[item.catName]) catDataMap[item.catName] = { sem1Items: [], sem2Items: [] };
+      if (item.sem1 > 0) catDataMap[item.catName].sem1Items.push({ subject: item.subject, hours: item.sem1, classes: item.classes, total: item.sem1 * item.classes });
+      if (item.sem2 > 0) catDataMap[item.catName].sem2Items.push({ subject: item.subject, hours: item.sem2, classes: item.classes, total: item.sem2 * item.classes });
+    });
+
+    const finalData: any[] = [];
+    Object.keys(catDataMap).sort().forEach(catName => {
+      const { sem1Items, sem2Items } = catDataMap[catName];
+      const maxRows = Math.max(sem1Items.length, sem2Items.length) || 1;
+      
+      const rows = [];
+      let sem1Total = 0;
+      let sem2Total = 0;
+
+      for (let i = 0; i < maxRows; i++) {
+        const s1 = sem1Items[i];
+        const s2 = sem2Items[i];
+        if (s1) sem1Total += s1.total;
+        if (s2) sem2Total += s2.total;
+        rows.push({
+          sem1Subject: s1 ? s1.subject : "", sem1Hours: s1 ? s1.hours : "", sem1Classes: s1 ? s1.classes : "", sem1Total: s1 ? s1.total : "",
+          sem2Subject: s2 ? s2.subject : "", sem2Hours: s2 ? s2.hours : "", sem2Classes: s2 ? s2.classes : "", sem2Total: s2 ? s2.total : ""
+        });
+      }
+
+      finalData.push({ catName, rows, sem1CategoryTotal: sem1Total, sem2CategoryTotal: sem2Total });
+    });
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+            <FileIcon className="w-6 h-6 text-emerald-400" />
+            6단계: 교과별 평균 시수
+          </h2>
+        </div>
+        {renderGradeTabs()}
+        
+        <div className="bg-slate-950/50 border border-slate-800 rounded-2xl overflow-hidden">
+          <div className="overflow-auto max-h-[800px] border-collapse">
+            <table className="w-full text-xs text-center text-slate-300">
+              <thead className="text-slate-400 bg-slate-900 border-b border-slate-800">
+                <tr>
+                  <th rowSpan={2} className="px-2 py-2 border-r border-slate-800/60 min-w-[50px]">교과</th>
+                  <th rowSpan={2} className="px-2 py-2 border-r border-slate-800/60 min-w-[60px]">교사수</th>
+                  <th colSpan={6} className="px-2 py-2 border-r border-slate-800/60 border-b">1학기</th>
+                  <th colSpan={6} className="px-2 py-2 border-r border-slate-800/60 border-b">2학기</th>
+                  <th rowSpan={2} className="px-2 py-2 border-r border-slate-800/60 min-w-[60px]">교과별<br/>1년 시수</th>
+                  <th rowSpan={2} className="px-2 py-2 min-w-[80px]">교과별<br/>1년 평균<br/>(학기당 평균)</th>
+                </tr>
+                <tr>
+                  <th className="px-2 py-1 border-r border-slate-800/60 border-b">과목명</th>
+                  <th className="px-2 py-1 border-r border-slate-800/60 border-b min-w-[40px]">시수</th>
+                  <th className="px-2 py-1 border-r border-slate-800/60 border-b min-w-[40px]">반</th>
+                  <th className="px-2 py-1 border-r border-slate-800/60 border-b min-w-[50px]">과목별<br/>시수</th>
+                  <th className="px-2 py-1 border-r border-slate-800/60 border-b min-w-[50px]">교과별<br/>총 시수</th>
+                  <th className="px-2 py-1 border-r border-slate-800/60 border-b min-w-[50px]">교과별<br/>평균시수</th>
+                  <th className="px-2 py-1 border-r border-slate-800/60 border-b">과목명</th>
+                  <th className="px-2 py-1 border-r border-slate-800/60 border-b min-w-[40px]">시수</th>
+                  <th className="px-2 py-1 border-r border-slate-800/60 border-b min-w-[40px]">반</th>
+                  <th className="px-2 py-1 border-r border-slate-800/60 border-b min-w-[50px]">과목별<br/>시수</th>
+                  <th className="px-2 py-1 border-r border-slate-800/60 border-b min-w-[50px]">교과별<br/>총 시수</th>
+                  <th className="px-2 py-1 border-r border-slate-800/60 border-b min-w-[50px]">교과별<br/>평균시수</th>
+                </tr>
+              </thead>
+              <tbody>
+                {finalData.length === 0 ? (
+                  <tr>
+                    <td colSpan={16} className="py-8 text-slate-500">데이터가 없습니다. 1단계와 5단계를 확인해 주세요.</td>
+                  </tr>
+                ) : finalData.map((cat, catIdx) => {
+                  const teacherCount = teacherCounts[activeGrade][cat.catName] || 1;
+                  const sem1Avg = (cat.sem1CategoryTotal / teacherCount).toFixed(2);
+                  const sem2Avg = (cat.sem2CategoryTotal / teacherCount).toFixed(2);
+                  const yearTotal = cat.sem1CategoryTotal + cat.sem2CategoryTotal;
+                  const yearAvg = (yearTotal / teacherCount).toFixed(1);
+                  const semAvgForYear = (yearTotal / teacherCount / 2).toFixed(2);
+
+                  return (
+                    <Fragment key={cat.catName}>
+                      {cat.rows.map((row: any, rowIdx: number) => (
+                        <tr key={`${cat.catName}-${rowIdx}`} className="border-b border-slate-800/50 hover:bg-slate-900/20 transition-colors">
+                          {rowIdx === 0 && (
+                            <>
+                              <td rowSpan={cat.rows.length} className="border-r border-slate-800/50 font-bold bg-slate-950/60 align-middle px-2">
+                                {cat.catName}
+                              </td>
+                              <td rowSpan={cat.rows.length} className="border-r border-slate-800/50 bg-slate-950/40 align-middle px-1">
+                                <input 
+                                  type="number" 
+                                  min={1} 
+                                  value={teacherCounts[activeGrade][cat.catName] || ""}
+                                  onChange={(e) => setTeacherCounts(prev => ({
+                                    ...prev,
+                                    [activeGrade]: { ...prev[activeGrade], [cat.catName]: parseInt(e.target.value) || 1 }
+                                  }))}
+                                  className="w-10 md:w-14 bg-slate-900 border border-slate-700 text-center rounded px-1 py-1 text-slate-200 focus:ring-1 focus:ring-indigo-500"
+                                />
+                              </td>
+                            </>
+                          )}
+                          <td className="border-r border-slate-800/50 px-2 py-1.5 text-left whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">{row.sem1Subject}</td>
+                          <td className="border-r border-slate-800/50 px-2 py-1.5">{row.sem1Hours}</td>
+                          <td className="border-r border-slate-800/50 px-2 py-1.5">{row.sem1Classes}</td>
+                          <td className="border-r border-slate-800/50 px-2 py-1.5 text-indigo-200 font-medium">{row.sem1Total}</td>
+                          {rowIdx === 0 && (
+                            <>
+                              <td rowSpan={cat.rows.length} className="border-r border-slate-800/50 bg-slate-900/20 align-middle px-2 font-semibold">
+                                {cat.sem1CategoryTotal}
+                              </td>
+                              <td rowSpan={cat.rows.length} className="border-r border-slate-800/50 bg-slate-900/40 align-middle px-2 text-indigo-300">
+                                {sem1Avg}
+                              </td>
+                            </>
+                          )}
+                          <td className="border-r border-slate-800/50 px-2 py-1.5 text-left whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">{row.sem2Subject}</td>
+                          <td className="border-r border-slate-800/50 px-2 py-1.5">{row.sem2Hours}</td>
+                          <td className="border-r border-slate-800/50 px-2 py-1.5">{row.sem2Classes}</td>
+                          <td className="border-r border-slate-800/50 px-2 py-1.5 text-indigo-200 font-medium">{row.sem2Total}</td>
+                          {rowIdx === 0 && (
+                            <>
+                              <td rowSpan={cat.rows.length} className="border-r border-slate-800/50 bg-slate-900/20 align-middle px-2 font-semibold">
+                                {cat.sem2CategoryTotal}
+                              </td>
+                              <td rowSpan={cat.rows.length} className="border-r border-slate-800/50 bg-slate-900/40 align-middle px-2 text-indigo-300">
+                                {sem2Avg}
+                              </td>
+                            </>
+                          )}
+                          {rowIdx === 0 && (
+                            <>
+                              <td rowSpan={cat.rows.length} className="border-r border-slate-800/50 font-bold text-amber-300 bg-slate-950/60 align-middle px-2">
+                                {yearTotal}
+                              </td>
+                              <td rowSpan={cat.rows.length} className="font-bold text-emerald-300 bg-slate-950/60 align-middle px-2">
+                                {yearAvg}({semAvgForYear})
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30 font-sans pb-20">
       {/* Background Gradients */}
@@ -1185,6 +1465,20 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" />
               <span>과목 개설 여부</span>
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab("stats")}
+            className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+              activeTab === "stats"
+                ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+            }`}
+          >
+            <span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span>
+            <div className="flex items-center gap-2">
+              <FileIcon className="w-4 h-4" />
+              <span>교과별 평균 시수</span>
             </div>
           </button>
         </div>
@@ -1756,6 +2050,8 @@ export default function Home() {
               })()}
             </div>
           )}
+
+          {activeTab === "stats" && renderStep6()}
         </div>
       </main>
     </div>
