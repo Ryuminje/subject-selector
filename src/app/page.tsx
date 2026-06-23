@@ -169,6 +169,32 @@ export default function Home() {
     const newDesignated: DesignatedSubject[] = [];
     const newSelected: SelectedSubjectHours[] = [];
 
+    const extractSemesters = (nums: number[], grade: GradeKey) => {
+      let sem1 = 0;
+      let sem2 = 0;
+      if (nums.length >= 6) {
+        if (grade === "grade1") {
+          sem1 = nums[2] || 0;
+          sem2 = nums[3] || 0;
+        } else {
+          sem1 = nums[4] || 0;
+          sem2 = nums[5] || 0;
+        }
+      } else if (nums.length >= 4) {
+        if (grade === "grade1") {
+          sem1 = nums[0] || 0;
+          sem2 = nums[1] || 0;
+        } else {
+          sem1 = nums[2] || 0;
+          sem2 = nums[3] || 0;
+        }
+      } else {
+        sem1 = nums[0] || 0;
+        sem2 = nums[1] || 0;
+      }
+      return { sem1, sem2 };
+    };
+
     let currentGroup = "";
     
     for (let line of lines) {
@@ -188,8 +214,7 @@ export default function Home() {
         const subjectNameParts = parts.filter(p => !p.includes("학교지정과목") && !p.includes("지정과목여부") && isNaN(Number(p)));
         const subjectName = subjectNameParts.join(" ");
 
-        const sem1 = nums[0] || 0;
-        const sem2 = nums[1] || 0;
+        const { sem1, sem2 } = extractSemesters(nums, activeGrade);
 
         let cat: SubjectCategory = "기타";
         if ((subjectName.includes("국어") && !subjectName.includes("외국어") && !subjectName.includes("중국어")) || subjectName.includes("수학") || subjectName.includes("영어") || subjectName.includes("독서") || subjectName.includes("문학")) cat = "기초";
@@ -197,7 +222,7 @@ export default function Home() {
         else if (subjectName.includes("과학") || subjectName.includes("탐구실험")) cat = "과학";
         else if (subjectName.includes("체육") || subjectName.includes("예술") || subjectName.includes("정보") || subjectName.includes("한문") || subjectName.includes("기술") || subjectName.includes("가정") || subjectName.includes("외국어") || subjectName.includes("일본어") || subjectName.includes("중국어")) cat = "기타";
 
-        if (subjectName) {
+        if (subjectName && (sem1 > 0 || sem2 > 0)) {
           newDesignated.push({ subject: subjectName, category: cat, sem1, sem2 });
         }
         continue;
@@ -256,13 +281,14 @@ export default function Home() {
                  break;
                }
              }
-             const sem1 = nums[0] || 0;
-             const sem2 = nums[1] || 0;
+             const { sem1, sem2 } = extractSemesters(nums, activeGrade);
 
              individualSubjects.forEach(sub => {
                if (sub && sub.length > 1) {
                  newMap[sub] = currentGroup as SubjectCategory;
-                 newSelected.push({ subject: sub, category: currentGroup as SubjectCategory, sem1, sem2 });
+                 if (sem1 > 0 || sem2 > 0) {
+                   newSelected.push({ subject: sub, category: currentGroup as SubjectCategory, sem1, sem2 });
+                 }
                }
              });
           }
