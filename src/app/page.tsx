@@ -798,13 +798,18 @@ export default function Home() {
 
       // Apply Styles
       const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+      const remarksColIndex = 3 + maxSem1 + maxSem2 + 3;
+
       for (let R = range.s.r; R <= range.e.r; ++R) {
         for (let C = range.s.c; C <= range.e.c; ++C) {
           const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
           if (!ws[cellAddress]) ws[cellAddress] = { t: "s", v: "" }; // Create empty cell if not exists for border styling
           
           ws[cellAddress].s = {
-            alignment: { horizontal: "center", vertical: "center" },
+            alignment: { 
+              horizontal: (C === remarksColIndex && R > 0) ? "left" : "center", 
+              vertical: "center" 
+            },
             border: {
               top: { style: "thin", color: { rgb: "000000" } },
               bottom: { style: "thin", color: { rgb: "000000" } },
@@ -831,6 +836,35 @@ export default function Home() {
                 ws[cellAddress].s.fill = { fgColor: { rgb: "6AAADE" } };
               } else if (C === scienceColIndex && (student.scienceCount || 0) === 0) {
                 ws[cellAddress].s.fill = { fgColor: { rgb: "6AAADE" } };
+              } else if (C >= 3 && C < basicColIndex) {
+                // 과목 셀 채우기 색상 및 글자 색상 지정 (중복 및 위계 검사)
+                const isSem1 = C < 3 + maxSem1;
+                const subject = isSem1 ? student.semester1[C - 3] : student.semester2[C - 3 - maxSem1];
+                if (subject) {
+                  const isHierarchyViolation = student.hierarchyViolations?.some(v => v.subject === subject || v.prereq === subject);
+                  const isDuplicate = student.duplicateSubjects?.includes(subject);
+                  
+                  if (isHierarchyViolation) {
+                    ws[cellAddress].s.fill = { fgColor: { rgb: "E0F7FA" } }; // Soft Cyan
+                    ws[cellAddress].s.font = { name: "맑은 고딕", size: 10, bold: true, color: { rgb: "006064" } }; // Dark Cyan text
+                  } else if (isDuplicate) {
+                    ws[cellAddress].s.fill = { fgColor: { rgb: "FFF2CC" } }; // Soft Yellow
+                    ws[cellAddress].s.font = { name: "맑은 고딕", size: 10, bold: true, color: { rgb: "7F6000" } }; // Dark Gold text
+                  }
+                }
+              } else if (C === remarksColIndex) {
+                // 비고란 글자 색상 지정 (가독성 향상)
+                const hasExcessBasic = (student.basicCount || 0) >= 10;
+                const hasHierarchy = student.hierarchyViolations?.length > 0;
+                const hasDuplicate = student.duplicateSubjects?.length > 0;
+
+                if (hasExcessBasic || (hasHierarchy && hasDuplicate)) {
+                  ws[cellAddress].s.font = { name: "맑은 고딕", size: 10, bold: true, color: { rgb: "C00000" } }; // 진한 빨강
+                } else if (hasHierarchy) {
+                  ws[cellAddress].s.font = { name: "맑은 고딕", size: 10, bold: true, color: { rgb: "006064" } }; // 진한 청록
+                } else if (hasDuplicate) {
+                  ws[cellAddress].s.font = { name: "맑은 고딕", size: 10, bold: true, color: { rgb: "7F6000" } }; // 진한 금색/노랑
+                }
               }
             }
           }
@@ -842,6 +876,14 @@ export default function Home() {
       ws["!merges"].push({ s: { r: 0, c: 3 }, e: { r: 0, c: 3 + maxSem1 - 1 } });
       ws["!merges"].push({ s: { r: 0, c: 3 + maxSem1 }, e: { r: 0, c: 3 + maxSem1 + maxSem2 - 1 } });
 
+      // Add row heights for spacing
+      const rowHeights = [];
+      rowHeights.push({ hpx: 30 }); // Header row height in pixels
+      for (let r = 1; r < aoa.length; r++) {
+        rowHeights.push({ hpx: 24 }); // Data row height in pixels (increased from ~18-20 for better layout)
+      }
+      ws["!rows"] = rowHeights;
+
       // Add column widths
       const cols = [
         { wch: 5 },  // 순번
@@ -850,7 +892,7 @@ export default function Home() {
       ];
       for (let i = 0; i < maxSem1; i++) cols.push({ wch: 15 });
       for (let i = 0; i < maxSem2; i++) cols.push({ wch: 15 });
-      cols.push({ wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 20 });
+      cols.push({ wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 35 }); // Increased remarks width to 35
       ws["!cols"] = cols;
 
       XLSX.utils.book_append_sheet(wb, ws, cls);
@@ -1522,10 +1564,10 @@ export default function Home() {
                             {Array.from({length: maxSem1}).map((_, i) => {
                                const subject = row.semester1[i] || "";
                                const isDuplicate = subject && row.duplicateSubjects?.includes(subject);
-                               const isHierarchyViolation = subject && row.hierarchyViolations?.some(v => v.subject === subject);
+                               const isHierarchyViolation = subject && row.hierarchyViolations?.some(v => v.subject === subject || v.prereq === subject);
                                let cellClass = "px-2 py-2.5 whitespace-nowrap ";
-                               if (isHierarchyViolation) cellClass += "text-amber-400 font-bold bg-amber-500/10 rounded-md";
-                               else if (isDuplicate) cellClass += "text-rose-400 font-bold bg-rose-500/10 rounded-md";
+                               if (isHierarchyViolation) cellClass += "text-cyan-400 font-bold bg-cyan-400/10 rounded-md";
+                               else if (isDuplicate) cellClass += "text-yellow-400 font-bold bg-yellow-400/10 rounded-md";
 
                                return (
                                  <td key={`s1-${i}`} className={cellClass}>
@@ -1536,10 +1578,10 @@ export default function Home() {
                             {Array.from({length: maxSem2}).map((_, i) => {
                                const subject = row.semester2[i] || "";
                                const isDuplicate = subject && row.duplicateSubjects?.includes(subject);
-                               const isHierarchyViolation = subject && row.hierarchyViolations?.some(v => v.subject === subject);
+                               const isHierarchyViolation = subject && row.hierarchyViolations?.some(v => v.subject === subject || v.prereq === subject);
                                let cellClass = "px-2 py-2.5 whitespace-nowrap ";
-                               if (isHierarchyViolation) cellClass += "text-amber-400 font-bold bg-amber-500/10 rounded-md";
-                               else if (isDuplicate) cellClass += "text-rose-400 font-bold bg-rose-500/10 rounded-md";
+                               if (isHierarchyViolation) cellClass += "text-cyan-400 font-bold bg-cyan-400/10 rounded-md";
+                               else if (isDuplicate) cellClass += "text-yellow-400 font-bold bg-yellow-400/10 rounded-md";
 
                                return (
                                  <td key={`s2-${i}`} className={cellClass}>
@@ -1552,12 +1594,12 @@ export default function Home() {
                             <td className="px-2 py-2.5 text-center text-emerald-400 font-medium whitespace-nowrap">{row.scienceCount}</td>
                             <td className="px-2 py-2.5 font-medium flex flex-col gap-1 whitespace-nowrap">
                               {row.basicCount >= 10 && <span className="text-rose-400 whitespace-nowrap">기초과목 최대학점 초과</span>}
-                              {row.duplicateSubjects?.length > 0 && <span className="text-rose-400 whitespace-nowrap">중복선택: {row.duplicateSubjects.join(", ")}</span>}
-                              {row.hierarchyViolations?.length > 0 && (
-                                <span className="text-amber-400 text-xs whitespace-nowrap">
-                                  {row.hierarchyViolations.map(v => v.message).join(", ")}
+                              {row.duplicateSubjects?.length > 0 && <span className="text-yellow-400 whitespace-nowrap">중복선택: {row.duplicateSubjects.join(", ")}</span>}
+                              {row.hierarchyViolations?.map((v, i) => (
+                                <span key={i} className="text-cyan-400 text-xs whitespace-nowrap">
+                                  {v.message}
                                 </span>
-                              )}
+                              ))}
                             </td>
                           </tr>
                         ))}
