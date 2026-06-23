@@ -1,24 +1,19 @@
-# Subject Selector (수강 신청 데이터 처리기) 프로젝트 컨텍스트
+# Subject Selector Project Agent Guidelines
 
-이 문서는 다른 환경(다른 PC 등)의 Antigravity 에이전트가 이 프로젝트를 처음 열었을 때, 이전 에이전트가 진행했던 작업의 문맥과 방향성을 즉시 파악할 수 있도록 돕는 인계장입니다.
+This project is a Next.js application for High School Subject Selection ("수강신청").
+It uses:
+- React (Next.js)
+- Tailwind CSS
+- xlsx-js-style for Excel Parsing and Exporting
+- Lucide React for Icons
 
-## 1. 프로젝트 목적
-* **대상**: 고등학교 교사
-* **기능**: 학생들의 수강 신청 엑셀 파일을 업로드하면, 교육과정 편제표를 바탕으로 기초/사회/과학/기타 과목을 자동으로 분류하고, 통계 및 중복/위계 위반 검사를 수행하여 가공된 엑셀 파일로 추출하는 Next.js 기반 클라이언트 사이드 웹 어플리케이션.
-* **배포**: Vercel을 통해 배포됨 (https://subject-selector.vercel.app/)
+## Features
+- **1단계 (Curriculum)**: Parses curriculum tables. Expects headers like "학교지정과목" or "지정과목여부" with hours.
+- **2단계 (Hierarchy)**: Sets prerequisite hierarchies.
+- **3단계 (Upload)**: Uploads 리로스쿨 Excel data.
+- **4단계 (Preview)**: Previews data, calculating basic hours (기초 10과목 초과 시 경고), hierarchy violations, duplicates.
+- **5단계 (Class Opening)**: Analyzes selected subjects, recommends class counts based on standard class size. Highlights cells during export (`#F18448`, `#6AAADE`).
+- **6단계 (Average Hours)**: Combines designated and selected subjects to compute total/average hours by category based on number of teachers.
 
-## 2. 주요 기능 및 상태
-* **로컬 스토리지 미사용**: 브라우저 용량 제한 이슈로 인해 로컬 스토리지 자동 저장 기능을 완전히 제거함.
-* **JSON 백업 시스템**: 현재 작업 중인 모든 상태(설정, 파일 원본 데이터, 처리 데이터 등)를 `.json` 파일로 다운로드(저장하기) 및 복구(불러오기) 가능.
-* **1학년/2학년 분리**: 학년별 탭을 사용하여 설정을 분리하고 파일도 분리하여 업로드함.
-* **위계 검증 (Hierarchy)**: 선수 과목과 후행 과목의 수강 순서를 검증하여 엑셀과 UI에서 노란색 배경으로 시각화하고, 비고란에 `권장 이수 순서: 선행과목명 -> 선택과목명` 형태로 가이드라인을 출력함.
-* **기초과목 최대학점 초과 검증**: 4단계 결과에서 기초과목 수가 10과목 이상이면 비고란에 `기초과목 최대학점 초과` 경고를 노출함.
-* **엑셀 추출 스타일링**: `xlsx-js-style`을 사용하여 내보내는 엑셀의 모든 셀에 테두리와 가운데 정렬을 적용하고, 기초과목 10개 이상인 셀은 `#F18448` 색상, 사회/과학 0개인 셀은 `#6AAADE` 색상으로 채움.
-* **5단계: 과목 개설 여부 및 분반 추천**: 5단계 탭에서 과목별 신청인원을 집계하고, 사용자가 입력한 학급 기준 인원(기본값 25)에 맞춰 개설 여부(70% 이상), 논의(70% 미만), 폐강(5명 미만), 그리고 분반 수 범위(120% 초과 시)를 산출 및 추천함. 결과물은 그룹(선택군) 및 학기 단위로 병합된 표와 커스텀 스타일이 입혀진 엑셀 파일로 추출 가능.
-
-## 3. 에이전트 주의사항 및 작업 규칙 (Guidelines)
-1. **서버 사이드 렌더링(SSR) 및 API 라우트 사용 금지**: 모든 데이터 처리(`processData`)와 엑셀 파싱(`xlsx`)은 교사의 개인정보 보호를 위해 **오직 클라이언트 사이드(브라우저)에서만 작동**해야 합니다. 데이터가 외부 서버로 전송되는 코드를 작성하지 마세요.
-2. **테일윈드 및 Lucide React**: UI 컴포넌트 추가 시 Tailwind CSS와 `lucide-react` 아이콘을 활용하여 디자인의 통일성을 유지하세요.
-3. **사용자 친화적 피드백**: 코드 수정 시 항상 사용자에게 친절한 한국어로 결과를 안내하세요.
-4. 이 파일(`AGENTS.md`)의 내용은 프로젝트의 헌법과 같으므로, 코드를 수정하기 전 항상 이 문서를 참고하여 전체적인 아키텍처와 의도를 훼손하지 않도록 하세요.
-
+## Running Locally
+Run `npm run dev` to start. Or run `cmd /c npm run build` to verify correctness on Windows.
