@@ -1,19 +1,26 @@
-# Subject Selector Project Agent Guidelines
+# Subject Selector (교육과정 및 수요조사 파싱 웹 애플리케이션)
 
-This project is a Next.js application for High School Subject Selection ("수강신청").
-It uses:
-- React (Next.js)
-- Tailwind CSS
-- xlsx-js-style for Excel Parsing and Exporting
-- Lucide React for Icons
+## 1. 프로젝트 목적 및 기능 개요
+이 프로젝트는 고등학교 학생들의 3개년 교육과정 편성표 엑셀 파일과 4단계 수요조사 결과 엑셀 파일을 읽어들여, 데이터를 웹 UI 상에 표시하고 통계(기초, 사회, 과학, 기타 학점 등)를 자동으로 계산해 주는 시스템입니다.
 
-## Features
-- **1단계 (Curriculum)**: Parses curriculum tables. Expects headers like "학교지정과목" or "지정과목여부" with hours.
-- **2단계 (Hierarchy)**: Sets prerequisite hierarchies.
-- **3단계 (Upload)**: Uploads 리로스쿨 Excel data.
-- **4단계 (Preview)**: Previews data, calculating basic hours (기초 10과목 초과 시 경고), hierarchy violations, duplicates.
-- **5단계 (Class Opening)**: Analyzes selected subjects, recommends class counts based on standard class size. Highlights cells during export (`#F18448`, `#6AAADE`).
-- **6단계 (Average Hours)**: Combines designated and selected subjects to compute total/average hours by category based on number of teachers.
+## 2. 주요 로직 및 정책 (History)
 
-## Running Locally
-Run `npm run dev` to start. Or run `cmd /c npm run build` to verify correctness on Windows.
+### 2.1 교육과정 편성표 (1단계) 파싱 규칙
+- **동적 열 탐색:** 엑셀 파일의 양식이 학교마다 조금씩 다를 수 있으므로, 헤더에서 `구분`, `교과(군)`, `과목`, `운영학점`을 동적으로 찾아냅니다. 가장 먼저 등장하는 해당 명칭의 열을 최우선으로 스캔합니다 (오른쪽에 중복 열이 있어도 무시).
+- **특수 기호 분리:** 과목명에 `↔` 기호가 있는 경우(예: `물리학Ⅰ↔화학Ⅰ`), 해당 과목을 두 개의 개별 과목으로 분리하여 각각 취급합니다.
+- **원본 과목명 유지:** 로마자(Ⅰ, Ⅱ 등)를 숫자로 강제 변환하지 않고 엑셀에 기재된 원본 과목명 그대로 표기합니다.
+- **운영학점 산출 기준:** '운영학점' 열에 적힌 숫자를 가져오지 않습니다. 대신, `1학년 1학기`, `2학년 2학기` 등 실제 학기가 적힌 열 아래에 기재된 숫자(예: 3)를 찾아 해당 과목의 **운영학점(실제 학점)**으로 간주합니다.
+- **미지정 과목 처리:** 학기 열에 숫자가 없는(빈칸인) 과목들도 누락시키지 않고 파싱하되, 개설학기를 `미지정 (엑셀 빈칸)`으로 명확히 표시하여 사용자가 쉽게 인지하고 수정할 수 있도록 유도합니다.
+
+### 2.2 수요조사 결과 (4단계) 통계 규칙
+- **교과군 판별 원칙:** 4단계에서 학생별로 선택한 과목이 '기초', '사회', '과학' 중 어디에 해당하는지 카운트할 때, 프로그램 내부의 하드코딩된 규칙을 쓰지 않습니다.
+- **1단계 원본 데이터 연동:** 오직 1단계에서 추출된 엑셀 데이터 원본(교과군 및 비고란 기준)을 최우선으로 참고합니다.
+  - **기초:** 1단계 데이터의 교과(군)가 `국어`, `수학`, `영어`인 경우.
+  - **사회:** 1단계 데이터의 교과(군) 이름에 `사회`, `역사`, `도덕`이 포함된 경우.
+  - **과학:** 1단계 데이터의 교과(군) 이름에 `과학`이 포함된 경우.
+- **오분류 방지:** 과거에 있었던 '제2외국어 및 외국어 과목을 과학으로 임의 카운트' 하던 하드코딩된 규칙은 제거되었습니다. 철저하게 1단계 원본 교과군 데이터만 참조하여 집계합니다.
+
+## 3. 개발 및 형상 관리
+- **프레임워크:** Next.js (TypeScript, Tailwind CSS)
+- **주요 라이브러리:** `xlsx` (엑셀 파싱), `lucide-react` (아이콘)
+- **저장소:** https://github.com/Ryuminje/subject-selector
