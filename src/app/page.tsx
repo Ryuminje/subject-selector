@@ -57,12 +57,23 @@ interface SelectedSubjectHours {
   sem1: number;
   sem2: number;
 }
+export interface ParsedCurriculumSubject {
+  type: "지정" | "선택";
+  subject: string;
+  category: string;
+  credits: number;
+  sem1: number;
+  sem2: number;
+  semesters: string;
+}
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("curriculum");
   const [activeGrade, setActiveGrade] = useState<GradeKey>("grade1");
 
-  const [curriculumText, setCurriculumText] = useState<{ [key in GradeKey]: string }>({ grade1: "", grade2: "" });
+
+
+  const [parsedCurriculumList, setParsedCurriculumList] = useState<{ [key in GradeKey]: ParsedCurriculumSubject[] }>({ grade1: [], grade2: [] });
   const [subjectMap, setSubjectMap] = useState<{ [key in GradeKey]: SubjectMap }>({ grade1: {}, grade2: {} });
   const [isCurriculumParsed, setIsCurriculumParsed] = useState<{ [key in GradeKey]: boolean }>({ grade1: false, grade2: false });
   const [hierarchyRules, setHierarchyRules] = useState<{ [key in GradeKey]: HierarchyRule[] }>({ grade1: [], grade2: [] });
@@ -83,7 +94,7 @@ export default function Home() {
 
   const handleSaveBackup = () => {
     const backupData = { 
-      curriculumText, 
+      parsedCurriculumList, 
       subjectMap, 
       isCurriculumParsed, 
       hierarchyRules, 
@@ -117,7 +128,7 @@ export default function Home() {
       try {
         const content = evt.target?.result as string;
         const parsed = JSON.parse(content);
-        if (parsed.curriculumText) setCurriculumText(parsed.curriculumText);
+        if (parsed.parsedCurriculumList) setParsedCurriculumList(parsed.parsedCurriculumList);
         if (parsed.subjectMap) setSubjectMap(parsed.subjectMap);
         if (parsed.isCurriculumParsed) setIsCurriculumParsed(parsed.isCurriculumParsed);
         if (parsed.hierarchyRules) setHierarchyRules(parsed.hierarchyRules);
@@ -161,167 +172,156 @@ export default function Home() {
     </div>
   );
 
-  const parseCurriculum = () => {
-    // Strip all \r to avoid CRLF issues, then split by \n
-    const rawLines = curriculumText[activeGrade].replace(/\r/g, "").split("\n");
-    const processedText = curriculumText[activeGrade].replace(/\r/g, "");
-    const newMap: SubjectMap = {};
-    const newDesignated: DesignatedSubject[] = [];
-    const newSelected: SelectedSubjectHours[] = [];
 
-    // Pre-process: merge multi-line Excel cells
-    // When Excel cells contain newlines (e.g., "학\n교\n지\n정\n과\n목"), 
-    // they get split into separate lines. Lines WITHOUT tabs are part of 
-    // a multi-line cell and should be prepended to the next tab-containing line.
-    const lines: string[] = [];
-    let buffer = "";
-    for (const rawLine of rawLines) {
-      if (rawLine.includes("\t")) {
-        if (buffer) {
-          // Prepend accumulated buffer text (strip quotes) to the first cell of this line
-          const cleanBuffer = buffer.replace(/"/g, "");
-          lines.push(cleanBuffer + rawLine.replace(/"/g, ""));
-          buffer = "";
-        } else {
-          lines.push(rawLine.replace(/"/g, ""));
-        }
-      } else {
-        buffer += rawLine;
+
+  const handleCurriculumUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const data = evt.target?.result;
+      if (!data) return;
+
+      const workbook = XLSX.read(data, { type: "binary" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+
+      // Resolve merges
+      if (sheet['!merges']) {
+        sheet['!merges'].forEach((m: any) => {
+          const val = json[m.s.r]?.[m.s.c];
+          if (val !== undefined) {
+            for (let r = m.s.r; r <= m.e.r; r++) {
+              if (!json[r]) json[r] = [];
+              for (let c = m.s.c; c <= m.e.c; c++) json[r][c] = val;
+            }
+          }
+        });
       }
-    }
-    if (buffer) lines.push(buffer.replace(/"/g, ""));
 
-    // Detect if the table is a 3-year table (has 기본학점/운영학점 columns)
-    const isThreeYearTable = processedText.includes("기본학점") || processedText.includes("운영학점") || processedText.includes("기본 학점") || processedText.includes("운영 학점") || (processedText.includes("1학년") && processedText.includes("2학년"));
+      // Find header row indices dynamically for all columns
+      let typeIdx = -1, catIdx = -1, subjIdx = -1, credIdx = -1;
+      let grade1Idx = -1, grade2Idx = -1, grade3Idx = -1;
+      
+      for (let r = 0; r < Math.min(6, json.length); r++) {
+        if (json[r]) {
+          for (let c = 0; c < json[r].length; c++) {
+            const val = String(json[r][c] || "").replace(/\s+/g, "");
+            if (val === "1학년" && grade1Idx === -1) grade1Idx = c;
+            if (val === "2학년" && grade2Idx === -1) grade2Idx = c;
+            if (val === "3학년" && grade3Idx === -1) grade3Idx = c;
+            
+            if (val.includes("구분") && typeIdx === -1) typeIdx = c;
+            if ((val.includes("교과(군)") || val === "교과군") && catIdx === -1) catIdx = c;
+            if ((val === "과목" || val.includes("과목명")) && subjIdx === -1) subjIdx = c;
+            if (val.includes("운영학점") && credIdx === -1) credIdx = c;
+          }
+        }
+      }
 
-    // Standard 3-year table columns (0-indexed after tab split):
-    // 0: 구분, 1: 교과영역, 2: 교과(군), 3: 과목유형, 4: 과목명,
-    // 5: 기본학점, 6: 운영학점,
-    // 7: 1학년1학기, 8: 1학년2학기, 9: 2학년1학기, 10: 2학년2학기, 11: 3학년1학기, 12: 3학년2학기
-    // 13: 편성학점합(교과군), 14: 편성학점합(교과영역), 15: 성적처리유형
+      // Fallback defaults if columns not found
+      if (typeIdx === -1) typeIdx = 0;
+      if (catIdx === -1) catIdx = 1;
+      if (subjIdx === -1) subjIdx = 3;
+      if (credIdx === -1) credIdx = 5;
 
-    let isDesignatedBlock = false;
-    let lastKnownCategory = ""; // Track column 2 (교과군) across merged cells
-    let lastKnownArea = "";     // Track column 1 (교과영역) across merged cells
+      // Fallback defaults if grade headers not found
+      if (grade1Idx === -1) grade1Idx = 6;
+      if (grade2Idx === -1) grade2Idx = 8;
+      if (grade3Idx === -1) grade3Idx = 10;
 
-    const broadCategoryFromDetailed = (cat: string): SubjectCategory => {
-      if (["국어", "수학", "영어"].includes(cat)) return "기초";
-      if (["사회", "역사", "도덕"].includes(cat)) return "사회";
-      if (["과학"].includes(cat)) return "과학";
-      return "기타";
+      const newParsed: ParsedCurriculumSubject[] = [];
+      const newMap: SubjectMap = {};
+      const newDesignated: DesignatedSubject[] = [];
+      const newSelected: SelectedSubjectHours[] = [];
+
+      for (let r = 0; r < json.length; r++) {
+        const row = json[r];
+        if (!row) continue;
+        
+        const typeStr = String(row[typeIdx] || "").replace(/\s+/g, "");
+        let category = String(row[catIdx] || "").replace(/\s+/g, "");
+        category = category.replace(/\(역사\/도덕포함\)/g, "").trim();
+        const subjectNameRaw = String(row[subjIdx] || "").trim();
+
+        if (subjectNameRaw && subjectNameRaw.length > 1 && subjectNameRaw !== "과목" && !subjectNameRaw.includes("소계") && !subjectNameRaw.includes("합계")) {
+          if (["공통", "일반", "진로", "융합"].includes(subjectNameRaw)) continue;
+          
+          let type: "지정" | "선택" | null = null;
+          if (typeStr.includes("지정")) type = "지정";
+          else if (typeStr.includes("선택")) type = "선택";
+          
+          if (type) {
+            let sem1_1 = Number(row[grade1Idx]) || 0;
+            let sem1_2 = Number(row[grade1Idx + 1]) || 0;
+            let sem2_1 = Number(row[grade2Idx]) || 0;
+            let sem2_2 = Number(row[grade2Idx + 1]) || 0;
+            let sem3_1 = Number(row[grade3Idx]) || 0;
+            let sem3_2 = Number(row[grade3Idx + 1]) || 0;
+
+            const sems: string[] = [];
+            if (sem1_1) sems.push("1학년 1학기");
+            if (sem1_2) sems.push("1학년 2학기");
+            if (sem2_1) sems.push("2학년 1학기");
+            if (sem2_2) sems.push("2학년 2학기");
+            if (sem3_1) sems.push("3학년 1학기");
+            if (sem3_2) sems.push("3학년 2학기");
+
+            const individualSubjects = subjectNameRaw.split("↔").map(s => s.trim());
+            
+            individualSubjects.forEach(sub => {
+              if (sub && sub.length > 1) {
+                const actualCredits = sem1_1 || sem1_2 || sem2_1 || sem2_2 || sem3_1 || sem3_2 || 0;
+                newParsed.push({
+                  type,
+                  subject: sub,
+                  category,
+                  credits: actualCredits,
+                  sem1: activeGrade === "grade1" ? sem1_1 : activeGrade === "grade2" ? sem2_1 : 0,
+                  sem2: activeGrade === "grade1" ? sem1_2 : activeGrade === "grade2" ? sem2_2 : 0,
+                  semesters: sems.length > 0 ? sems.join(", ") : "미지정 (엑셀 빈칸)"
+                });
+
+                // Populate backward compatibility states for the chosen grade
+                let sem1ForGrade = 0, sem2ForGrade = 0;
+                if (activeGrade === "grade1") {
+                  sem1ForGrade = sem1_1; sem2ForGrade = sem1_2;
+                } else {
+                  sem1ForGrade = sem2_1; sem2ForGrade = sem2_2;
+                }
+
+                // Determine broad category
+                let broadCat: SubjectCategory = "기타";
+                if (["국어", "수학", "영어"].includes(category)) broadCat = "기초";
+                else if (["사회", "역사", "도덕", "사회(역사/도덕포함)"].includes(category)) broadCat = "사회";
+                else if (["과학"].includes(category)) broadCat = "과학";
+
+                if (type === "지정") {
+                  if (sem1ForGrade > 0 || sem2ForGrade > 0) {
+                    newDesignated.push({ subject: sub, category: broadCat, detailedCategory: category, sem1: sem1ForGrade, sem2: sem2ForGrade });
+                  }
+                } else {
+                  newMap[sub] = broadCat;
+                  if (sem1ForGrade > 0 || sem2ForGrade > 0) {
+                    newSelected.push({ subject: sub, category: broadCat, detailedCategory: category, sem1: sem1ForGrade, sem2: sem2ForGrade });
+                  }
+                }
+              }
+            });
+          }
+        }
+      }
+
+      setParsedCurriculumList(prev => ({ ...prev, [activeGrade]: newParsed }));
+      setDesignatedSubjects(prev => ({ ...prev, [activeGrade]: newDesignated }));
+      setSelectedSubjectHours(prev => ({ ...prev, [activeGrade]: newSelected }));
+      setSubjectMap(prev => ({ ...prev, [activeGrade]: newMap }));
+      setIsCurriculumParsed(prev => ({ ...prev, [activeGrade]: true }));
+      alert("교육과정 엑셀 파일이 성공적으로 업로드되었습니다!");
     };
-
-    for (const line of lines) {
-      // Track designated vs elective sections
-      if (line.includes("학교지정과목") || line.includes("학교\n지정\n과목") || line.includes("지정과목")) {
-        isDesignatedBlock = true;
-      }
-      if (line.includes("선택군") || line.includes("선택 과목") || line.includes("선택과목")) {
-        isDesignatedBlock = false;
-        lastKnownCategory = ""; // Reset category tracking when entering elective section
-        lastKnownArea = "";
-      }
-
-      // Skip header/summary/non-data rows
-      if (line.includes("합계") || line.includes("소계") || line.includes("총계") || 
-          line.includes("교과(군)") || line.includes("과목유형") ||
-          line.includes("성적처리") || line.includes("편성학점")) {
-        continue;
-      }
-
-      const cells = line.split("\t").map(c => c.trim().replace(/(\d+)↔(\d+)/g, "$1"));
-      
-      // For a proper data row, we expect at least 6 cells and at least one number
-      if (cells.length < 6) continue;
-      const hasNumber = cells.some(c => c !== "" && !isNaN(Number(c)));
-      if (!hasNumber) continue;
-
-      // Update tracked categories from columns that may have values (merged cells leave them empty)
-      // Column 1: 교과영역 (기초, 탐구, 생활·교양 etc)
-      if (cells[1] && cells[1].length > 0) {
-        lastKnownArea = cells[1];
-      }
-      // Column 2: 교과(군) - THIS is the key category: 국어, 수학, 영어, 사회, 과학, 체육, 음악, 미술, 정보, 한문 etc
-      if (cells[2] && cells[2].length > 0) {
-        lastKnownCategory = cells[2];
-      }
-
-      // Column 4: 과목명
-      const subjectName = (cells[4] || "").trim();
-      // Column 3: 과목유형 (공통, 일반, 진로, 융합)
-      const subjectType = (cells[3] || "").trim();
-
-      // Skip if no subject name or it's a category label
-      if (!subjectName || subjectName.length < 2) continue;
-      if (["공통", "일반", "진로", "융합"].includes(subjectName)) continue;
-
-      // Determine the detailed category (교과군)
-      // For designated subjects, use the tracked lastKnownCategory (reliable from merged cells)
-      // For elective subjects, if cells[2] was empty (no explicit category), 
-      // fall back to getDetailedCategory which infers from subject name
-      let detailedCat = lastKnownCategory || "";
-      if (!detailedCat && !isDesignatedBlock) {
-        // Infer category from subject name for electives
-        detailedCat = getDetailedCategory(subjectName, "기타");
-      }
-      if (!detailedCat) detailedCat = "기타";
-      const broadCat = broadCategoryFromDetailed(detailedCat);
-
-      // Extract semester hours
-      // For 3-year table: cells[5]=기본학점, cells[6]=운영학점, 
-      //   cells[7..12] = 1학년1학기, 1학년2학기, 2학년1학기, 2학년2학기, 3학년1학기, 3학년2학기
-      let sem1 = 0, sem2 = 0;
-      
-      if (isThreeYearTable && cells.length >= 13) {
-        // For grade1 (current 1학년 → need to look at NEXT grade, which is 2학년):
-        // 2학년 columns: cells[9]=2학년1학기, cells[10]=2학년2학기
-        // For grade2 (current 2학년 → need to look at NEXT grade, which is 3학년):
-        // 3학년 columns: cells[11]=3학년1학기, cells[12]=3학년2학기
-        if (activeGrade === "grade1") {
-          sem1 = Number(cells[9]) || 0;
-          sem2 = Number(cells[10]) || 0;
-        } else {
-          sem1 = Number(cells[11]) || 0;
-          sem2 = Number(cells[12]) || 0;
-        }
-      } else {
-        // Fallback: find first number index
-        let firstNumIdx = -1;
-        for (let i = 0; i < cells.length; i++) {
-          if (cells[i] !== "" && !isNaN(Number(cells[i]))) {
-            firstNumIdx = i;
-            break;
-          }
-        }
-        if (firstNumIdx !== -1) {
-          sem1 = Number(cells[firstNumIdx]) || 0;
-          sem2 = Number(cells[firstNumIdx + 1]) || 0;
-        }
-      }
-
-      // Handle ↔ split subjects (e.g., "물리학Ⅰ↔화학Ⅰ")
-      const individualSubjects = subjectName.split("↔").map(s => s.trim());
-
-      individualSubjects.forEach(sub => {
-        if (sub && sub.length > 1) {
-          if (isDesignatedBlock) {
-            if (sem1 > 0 || sem2 > 0) {
-              newDesignated.push({ subject: sub, category: broadCat, detailedCategory: detailedCat, sem1, sem2 });
-            }
-          } else {
-            newMap[sub] = broadCat;
-            if (sem1 > 0 || sem2 > 0) {
-              newSelected.push({ subject: sub, category: broadCat, detailedCategory: detailedCat, sem1, sem2 });
-            }
-          }
-        }
-      });
-    }
-
-    setDesignatedSubjects(prev => ({ ...prev, [activeGrade]: newDesignated }));
-    setSelectedSubjectHours(prev => ({ ...prev, [activeGrade]: newSelected }));
-    setSubjectMap(prev => ({ ...prev, [activeGrade]: newMap }));
-    setIsCurriculumParsed(prev => ({ ...prev, [activeGrade]: true }));
+    reader.readAsBinaryString(file);
   };
 
   const handleCategoryChange = (subject: string, category: SubjectCategory) => {
@@ -620,6 +620,27 @@ export default function Home() {
   const getSubjectCategory = (subjName: string, targetGrade: GradeKey): SubjectCategory => {
     const normalizedSubject = normalizeSubjectName(subjName);
     
+    const findCategoryFromParsed = (grade: GradeKey): SubjectCategory | null => {
+      const list = parsedCurriculumList[grade] || [];
+      for (const subj of list) {
+        if (normalizeSubjectName(subj.subject) === normalizedSubject) {
+          if (["국어", "수학", "영어"].includes(subj.category)) return "기초";
+          if (subj.category.includes("사회") || subj.category.includes("역사") || subj.category.includes("도덕")) return "사회";
+          if (subj.category.includes("과학")) return "과학";
+          return "기타";
+        }
+      }
+      return null;
+    };
+
+    let cat = findCategoryFromParsed(targetGrade);
+    if (cat) return cat;
+    
+    const otherGradeKey: GradeKey = targetGrade === "grade2" ? "grade1" : "grade2";
+    cat = findCategoryFromParsed(otherGradeKey);
+    if (cat) return cat;
+    
+    // Fallback to subjectMap
     // 1. Check target grade's subjectMap first
     const targetSubjectMap = subjectMap[targetGrade] || {};
     const sortedTargetMapEntries = Object.entries(targetSubjectMap).sort((a, b) => b[0].replace(/\s+/g, "").length - a[0].replace(/\s+/g, "").length);
@@ -629,7 +650,6 @@ export default function Home() {
     }
     
     // 2. Check other grade's subjectMap as fallback
-    const otherGradeKey: GradeKey = targetGrade === "grade2" ? "grade1" : "grade2";
     const otherSubjectMap = subjectMap[otherGradeKey] || {};
     const sortedOtherMapEntries = Object.entries(otherSubjectMap).sort((a, b) => b[0].replace(/\s+/g, "").length - a[0].replace(/\s+/g, "").length);
     for (const [mapSubj, mapCat] of sortedOtherMapEntries) {
@@ -766,10 +786,6 @@ export default function Home() {
             if (k.includes("1학기")) semester1.push(subject);
             else if (k.includes("2학기")) semester2.push(subject);
             else semester1.push(subject);
-          }
-
-          if (k.includes("제2외국어") || k.includes("외국어")) {
-            scienceCount++;
           }
 
           if (matchedCategory === "기초") basicCount++;
@@ -1350,52 +1366,72 @@ export default function Home() {
               {renderGradeTabs()}
 
               <p className="text-slate-400">
-                선택하신 학년의 교육과정 편성표를 복사하여 붙여넣어 주세요. 과목을 자동으로 추출하여 매핑합니다.
+                선택하신 학년의 교육과정 편성표 엑셀 파일을 업로드해 주세요. 3개년 데이터가 모두 포함된 원본 엑셀 파일을 그대로 올리시면 됩니다.
               </p>
               
-              <textarea
-                className="w-full h-64 bg-slate-950/50 border border-slate-800 rounded-xl p-4 text-sm font-mono text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all resize-none placeholder:text-slate-600"
-                placeholder={`${activeGrade === "grade1" ? "1학년" : "2학년"} 교육과정 편성표 텍스트를 붙여넣으세요...`}
-                value={curriculumText[activeGrade]}
-                onChange={(e) => setCurriculumText(prev => ({ ...prev, [activeGrade]: e.target.value }))}
-              ></textarea>
-              
-              <div className="flex justify-end">
-                <button 
-                  onClick={parseCurriculum}
-                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-indigo-500/25 flex items-center gap-2"
-                >
-                  <Settings className="w-4 h-4" />
-                  {activeGrade === "grade1" ? "1학년" : "2학년"} 교육과정 분석 및 추출
-                </button>
+              <div className="relative group">
+                <input
+                  type="file"
+                  accept=".xlsx, .xls"
+                  onChange={handleCurriculumUpload}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
+                <div className="flex flex-col items-center justify-center w-full h-40 bg-slate-900/50 border-2 border-dashed border-slate-700 rounded-xl group-hover:border-indigo-500/50 group-hover:bg-indigo-500/5 transition-all">
+                  <Upload className="w-10 h-10 text-slate-500 group-hover:text-indigo-400 mb-3 transition-colors" />
+                  <p className="text-slate-300 font-medium">클릭하거나 엑셀 파일을 드래그하여 업로드하세요</p>
+                  <p className="text-slate-500 text-sm mt-1">.xlsx, .xls 파일 지원</p>
+                </div>
               </div>
 
-              {isCurriculumParsed[activeGrade] && Object.keys(subjectMap[activeGrade]).length > 0 && (
+              {isCurriculumParsed[activeGrade] && parsedCurriculumList[activeGrade]?.length > 0 && (
                 <div className="mt-8 p-6 bg-slate-950/50 border border-slate-800 rounded-2xl animate-in fade-in">
                   <h3 className="text-xl font-medium text-slate-200 mb-4 flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                    추출된 과목 자동 매핑 결과 ({activeGrade === "grade1" ? "1학년" : "2학년"})
+                    추출된 교육과정 데이터 ({activeGrade === "grade1" ? "1학년 탭" : "2학년 탭"})
                   </h3>
                   <p className="text-sm text-slate-400 mb-6">
-                    매핑이 정확한지 확인하시고, 필요한 경우 직접 수정해 주세요. '기초, 사회, 과학'으로 매핑된 과목들만 이수 통계에 반영됩니다.
+                    업로드된 엑셀 파일에서 1~3학년 전체 교육과정을 자동으로 분석했습니다. 내부적으로 기초/사회/과학 과목 매핑도 완료되었습니다.
                   </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {Object.entries(subjectMap[activeGrade]).map(([subject, category]) => (
-                      <div key={subject} className="flex items-center justify-between p-3 bg-slate-900 border border-slate-700/50 rounded-lg">
-                        <span className="font-medium text-slate-300 truncate mr-2" title={subject}>{subject}</span>
-                        <select 
-                          value={category}
-                          onChange={(e) => handleCategoryChange(subject, e.target.value as SubjectCategory)}
-                          className="bg-slate-950 border border-slate-700 text-sm rounded-md px-2 py-1 text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        >
-                          <option value="기초">기초</option>
-                          <option value="사회">사회</option>
-                          <option value="과학">과학</option>
-                          <option value="기타">기타</option>
-                        </select>
-                      </div>
-                    ))}
+                  
+                  <div className="overflow-x-auto rounded-lg border border-slate-800">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-xs text-slate-400 uppercase bg-slate-900/80">
+                        <tr>
+                          <th className="px-4 py-3 font-medium">구분</th>
+                          <th className="px-4 py-3 font-medium">과목명</th>
+                          <th className="px-4 py-3 font-medium">교과(군)</th>
+                          <th className="px-4 py-3 font-medium text-center">운영학점</th>
+                          <th className="px-4 py-3 font-medium">개설학기</th>
+                          <th className="px-4 py-3 font-medium text-center">비고</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/50">
+                        {parsedCurriculumList[activeGrade].map((subj, idx) => (
+                          <tr key={idx} className="bg-slate-950/30 hover:bg-slate-900/50 transition-colors">
+                            <td className="px-4 py-3">
+                              <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider ${
+                                subj.type === "지정" ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                              }`}>
+                                {subj.type}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 font-medium text-slate-200">{subj.subject}</td>
+                            <td className="px-4 py-3 text-slate-400">{subj.category}</td>
+                            <td className="px-4 py-3 text-center text-amber-400/90 font-mono">{subj.credits}</td>
+                            <td className="px-4 py-3 text-slate-500 text-xs">{subj.semesters}</td>
+                            <td className="px-4 py-3 text-center">
+                              {["국어", "수학", "영어"].includes(subj.category) && (
+                                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-medium">
+                                  기초
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
+                  
                   <div className="mt-8 flex justify-end">
                      <button 
                         onClick={() => setActiveTab("hierarchy")}
