@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, Fragment } from "react";
-import { Upload, FileText, Settings, Download, CheckCircle2, ChevronRight, Trash2, File as FileIcon, Save, FolderOpen, GitBranch, Plus } from "lucide-react";
+import { Upload, FileText, Settings, Download, CheckCircle2, ChevronRight, Trash2, File as FileIcon, Save, FolderOpen, GitBranch, Plus, Users } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 
 type SubjectCategory = "기초" | "사회" | "과학" | "기타";
@@ -33,6 +33,12 @@ interface ProcessedStudent {
   hierarchyViolations: { subject: string; prereq: string; message: string }[];
   originalRow: any;
   completedBefore?: string[];
+}
+
+export interface StudentTimeData {
+  id: string;
+  name: string;
+  timeSlotMap: Record<string, string>;
 }
 
 interface SubjectStat {
@@ -69,14 +75,165 @@ export interface ParsedCurriculumSubject {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("curriculum");
+  const [activeSidebarTab, setActiveSidebarTab] = useState<"survey" | "change">("survey");
   const [activeGrade, setActiveGrade] = useState<GradeKey>("grade1");
 
+  const [changeActiveTab, setChangeActiveTab] = useState("upload");
+  const [changeActiveGrade, setChangeActiveGrade] = useState<"grade2" | "grade3">("grade2");
+  const [changeRosterTimeSlot, setChangeRosterTimeSlot] = useState("A");
 
+  const initialTimeSlots = ["A", "B", "C", "D", "E", "F", "G"];
+  const initialColsG2 = Array.from({length: 9}, (_, i) => `2-${i + 1}`);
+  const initialColsG3 = Array.from({length: 9}, (_, i) => `3-${i + 1}`);
+
+  const [timeSlots, setTimeSlots] = useState<{grade2: string[], grade3: string[]}>({
+    grade2: [...initialTimeSlots], grade3: [...initialTimeSlots]
+  });
+  const [classCols, setClassCols] = useState<{grade2: string[], grade3: string[]}>({
+    grade2: [...initialColsG2], grade3: [...initialColsG3]
+  });
+  const [timetableData, setTimetableData] = useState<{
+    grade2: Record<string, Record<string, { subject: string, teacher: string }>>,
+    grade3: Record<string, Record<string, { subject: string, teacher: string }>>
+  }>({ grade2: {}, grade3: {} });
+  
+  const [parsedSampleData, setParsedSampleData] = useState<{
+    grade2: StudentTimeData[],
+    grade3: StudentTimeData[]
+  }>({ grade2: [], grade3: [] });
+
+
+  const handleTimetablePaste = (e: React.ClipboardEvent, startRowIndex: number, startColIndex: number, field: "subject" | "teacher") => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData("Text");
+    if (!pastedText) return;
+
+    const rows = pastedText.split(/\r\n|\n|\r/).filter(row => row.trim() !== "");
+    const newData = { ...timetableData[changeActiveGrade] };
+
+    const currentCols = classCols[changeActiveGrade];
+    const currentRows = timeSlots[changeActiveGrade];
+
+    rows.forEach((row, rIdx) => {
+      const cells = row.split('\t');
+      const targetRow = currentRows[startRowIndex + rIdx];
+      if (targetRow) {
+        if (!newData[targetRow]) newData[targetRow] = {};
+        cells.forEach((cell, cIdx) => {
+          const targetCol = currentCols[startColIndex + cIdx];
+          if (targetCol) {
+            const existingCell = newData[targetRow][targetCol] || { subject: "", teacher: "" };
+            newData[targetRow][targetCol] = { ...existingCell, [field]: cell.trim() };
+          }
+        });
+      }
+    });
+
+    setTimetableData(prev => ({
+      ...prev,
+      [changeActiveGrade]: newData
+    }));
+  };
+
+  const addTimeSlot = () => {
+    setTimeSlots(prev => {
+      const current = prev[changeActiveGrade];
+      const nextChar = String.fromCharCode(65 + current.length); // A, B, C...
+      return { ...prev, [changeActiveGrade]: [...current, nextChar] };
+    });
+  };
+
+  const addClassCol = () => {
+    setClassCols(prev => {
+      const current = prev[changeActiveGrade];
+      const prefix = changeActiveGrade === "grade2" ? "2-" : "3-";
+      return { ...prev, [changeActiveGrade]: [...current, `${prefix}${current.length + 1}`] };
+    });
+  };
+
+  const removeTimeSlot = (idx: number) => {
+    setTimeSlots(prev => {
+      const current = [...prev[changeActiveGrade]];
+      current.splice(idx, 1);
+      return { ...prev, [changeActiveGrade]: current };
+    });
+  };
+
+  const removeClassCol = (idx: number) => {
+    setClassCols(prev => {
+      const current = [...prev[changeActiveGrade]];
+      current.splice(idx, 1);
+      return { ...prev, [changeActiveGrade]: current };
+    });
+  };
+
+  const updateTimetableCell = (row: string, col: string, field: "subject" | "teacher", value: string) => {
+    setTimetableData(prev => ({
+      ...prev,
+      [changeActiveGrade]: {
+        ...prev[changeActiveGrade],
+        [row]: {
+          ...(prev[changeActiveGrade][row] || {}),
+          [col]: {
+            ...(prev[changeActiveGrade][row]?.[col] || { subject: "", teacher: "" }),
+            [field]: value
+          }
+        }
+      }
+    }));
+  };
 
   const [parsedCurriculumList, setParsedCurriculumList] = useState<{ [key in GradeKey]: ParsedCurriculumSubject[] }>({ grade1: [], grade2: [] });
   const [subjectMap, setSubjectMap] = useState<{ [key in GradeKey]: SubjectMap }>({ grade1: {}, grade2: {} });
   const [isCurriculumParsed, setIsCurriculumParsed] = useState<{ [key in GradeKey]: boolean }>({ grade1: false, grade2: false });
   const [hierarchyRules, setHierarchyRules] = useState<{ [key in GradeKey]: HierarchyRule[] }>({ grade1: [], grade2: [] });
+
+  const handleChangeSampleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: "binary" });
+      const sheetName = wb.SheetNames[0];
+      const sheet = wb.Sheets[sheetName];
+      
+      const json = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+      if (json.length < 2) return;
+
+      const subjectHeaders = json[1];
+      const students: StudentTimeData[] = [];
+
+      for (let r = 2; r < json.length; r++) {
+        const row = json[r];
+        if (!row || row.length === 0 || !row[1]) continue;
+
+        const id = String(row[1]);
+        const name = String(row[2] || "");
+        
+        const timeSlotMap: Record<string, string> = {};
+        for (let c = 8; c < row.length; c++) {
+          const timeVal = row[c];
+          if (timeVal && typeof timeVal === 'string' && subjectHeaders[c]) {
+            const timeKey = timeVal.trim();
+            timeSlotMap[timeKey] = String(subjectHeaders[c]).trim();
+          }
+        }
+
+        students.push({ id, name, timeSlotMap });
+      }
+
+      setParsedSampleData(prev => ({
+        ...prev,
+        [changeActiveGrade]: students
+      }));
+
+      alert(`${changeActiveGrade === "grade2" ? "2학년" : "3학년"} 학생 데이터 ${students.length}명 파싱 완료!`);
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = "";
+  };
   
   const [uploadedFiles, setUploadedFiles] = useState<{ [key in GradeKey]: { name: string, size: number, data: string } | null }>({ grade1: null, grade2: null });
   const [processedData, setProcessedData] = useState<{ [key in GradeKey]: ProcessedStudent[] }>({ grade1: [], grade2: [] });
@@ -1239,16 +1396,62 @@ export default function Home() {
 
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30 font-sans pb-20">
+    <div className="flex min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30 font-sans">
       {/* Background Gradients */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/20 blur-[120px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-rose-600/20 blur-[120px]" />
       </div>
 
-      <main className="relative z-10 max-w-[95%] 2xl:max-w-[1600px] mx-auto px-6 py-12">
-        <header className="mb-12 text-center relative">
-          <div className="absolute top-0 right-0 flex gap-2">
+      {/* Sidebar */}
+      <aside className="relative z-20 w-64 bg-slate-900/80 backdrop-blur-xl border-r border-slate-800/80 flex flex-col shrink-0 shadow-2xl">
+        <div className="p-6 pb-8 border-b border-slate-800/50">
+          <h2 className="text-xl font-extrabold bg-gradient-to-r from-indigo-400 to-purple-400 text-transparent bg-clip-text">
+            데이터 처리기
+          </h2>
+        </div>
+        
+        <div className="flex flex-col gap-2 p-4">
+          <button 
+            onClick={() => setActiveSidebarTab("survey")}
+            className={`flex items-center gap-3 px-4 py-3.5 rounded-xl font-semibold transition-all duration-300 ${
+              activeSidebarTab === "survey" 
+                ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]" 
+                : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 border border-transparent"
+            }`}
+          >
+            <FileText className="w-5 h-5" />
+            <span>수요조사</span>
+          </button>
+          <button 
+            onClick={() => setActiveSidebarTab("change")}
+            className={`flex items-center gap-3 px-4 py-3.5 rounded-xl font-semibold transition-all duration-300 ${
+              activeSidebarTab === "change" 
+                ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]" 
+                : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 border border-transparent"
+            }`}
+          >
+            <GitBranch className="w-5 h-5" />
+            <span>선택과목 변경</span>
+          </button>
+        </div>
+      </aside>
+
+      <main className="relative z-10 flex-1 flex flex-col max-h-screen overflow-hidden">
+        {/* Global Header */}
+        <header className="flex-none px-10 py-6 border-b border-slate-800/30 bg-slate-950/40 backdrop-blur-sm flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-white mb-2">
+              {activeSidebarTab === "survey" ? "수강 신청 데이터 처리기" : "선택과목 변경 시스템"}
+            </h1>
+            <p className="text-slate-400 text-sm max-w-2xl">
+              {activeSidebarTab === "survey" 
+                ? "학생 수강 신청 엑셀 파일을 업로드하면, 학급별 시트 분리 및 기초/사회/과학 과목 통계가 계산된 엑셀 파일로 변환해 드립니다." 
+                : "수요조사 이후 선택과목을 변경하는 학생들의 데이터를 관리합니다."}
+            </p>
+          </div>
+          
+          <div className="flex gap-2 shrink-0">
             <input 
               type="file" 
               accept=".json" 
@@ -1258,28 +1461,28 @@ export default function Home() {
             />
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-800 text-slate-300 text-sm font-medium rounded-lg transition-colors border border-slate-700/50"
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 text-sm font-medium rounded-xl transition-all border border-slate-700/60 shadow-sm"
             >
               <FolderOpen className="w-4 h-4" />
               불러오기
             </button>
             <button 
               onClick={handleSaveBackup}
-              className="flex items-center gap-2 px-3 py-1.5 bg-slate-800/50 hover:bg-slate-800 text-slate-300 text-sm font-medium rounded-lg transition-colors border border-slate-700/50"
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all border border-indigo-500/50 shadow-md shadow-indigo-500/20"
             >
               <Save className="w-4 h-4" />
               저장하기
             </button>
           </div>
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-rose-400 text-transparent bg-clip-text mb-4">
-            수강 신청 데이터 처리기
-          </h1>
-          <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-            학생 수강 신청 엑셀 파일을 업로드하면, 학급별 시트 분리 및 기초/사회/과학 과목 통계가 계산된 엑셀 파일로 변환해 드립니다.
-          </p>
         </header>
 
-        <div className="flex gap-3 mb-8 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit mx-auto">
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto p-10 pb-24">
+          <div className="max-w-[95%] 2xl:max-w-[1600px] mx-auto">
+            
+            {activeSidebarTab === "survey" && (
+              <Fragment>
+                <div className="flex gap-3 mb-8 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit mx-auto">
           <button
             onClick={() => setActiveTab("curriculum")}
             className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
@@ -1940,8 +2143,427 @@ export default function Home() {
               })()}
             </div>
           )}
+        </div>
+      </Fragment>
+    )}
 
+            {activeSidebarTab === "change" && (
+              <Fragment>
+                <div className="flex gap-3 mb-8 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit mx-auto">
+                  <button
+                    onClick={() => setChangeActiveTab("upload")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+                      changeActiveTab === "upload"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                    }`}
+                  >
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span>
+                    <div className="flex items-center gap-2">
+                      <Upload className="w-4 h-4" />
+                      <span>학생 선택 데이터 업로드</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setChangeActiveTab("timetable")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+                      changeActiveTab === "timetable"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                    }`}
+                  >
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span>
+                    <div className="flex items-center gap-2">
+                      <Settings className="w-4 h-4" />
+                      <span>타임별 시간표 입력</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setChangeActiveTab("roster")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+                      changeActiveTab === "roster"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                    }`}
+                  >
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      <span>타임별 선택과목 명단</span>
+                    </div>
+                  </button>
+                </div>
 
+                <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 rounded-3xl p-8 shadow-2xl">
+                  {changeActiveTab === "upload" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex justify-between items-center mb-2">
+                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                          <Upload className="w-6 h-6 text-indigo-400" />
+                          학생 선택 데이터 업로드
+                        </h2>
+                        
+                        <div className="flex bg-slate-800/50 p-1 rounded-xl">
+                          <button
+                            onClick={() => setChangeActiveGrade("grade2")}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                              changeActiveGrade === "grade2"
+                                ? "bg-indigo-500 text-white shadow-md"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            2학년
+                          </button>
+                          <button
+                            onClick={() => setChangeActiveGrade("grade3")}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                              changeActiveGrade === "grade3"
+                                ? "bg-indigo-500 text-white shadow-md"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            3학년
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-slate-800/30 rounded-2xl p-6 border border-slate-700/50 flex flex-col items-center justify-center min-h-[300px]">
+                        <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                          <FileIcon className="w-10 h-10 text-indigo-400" />
+                        </div>
+                        <h3 className="text-xl font-medium text-slate-200 mb-2">학생 선택 데이터 파일 (sample3) 업로드</h3>
+                        <p className="text-slate-400 mb-6 text-center max-w-md">
+                          과목명이 열 헤더로 지정되어 있고, 셀 값으로 A, B, C, D 등의 선택 그룹이 명시된 수요조사 결과 파일을 업로드해 주세요.
+                        </p>
+                        
+                        <label className="cursor-pointer flex items-center gap-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/20">
+                          <Upload className="w-5 h-5" />
+                          엑셀 파일 선택
+                          <input
+                            type="file"
+                            accept=".xlsx, .xls"
+                            className="hidden"
+                            onChange={handleChangeSampleUpload}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
+                  {changeActiveTab === "timetable" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex justify-between items-center mb-2">
+                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                          <Settings className="w-6 h-6 text-indigo-400" />
+                          타임별 시간표 입력
+                        </h2>
+                        
+                        <div className="flex bg-slate-800/50 p-1 rounded-xl">
+                          <button
+                            onClick={() => setChangeActiveGrade("grade2")}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                              changeActiveGrade === "grade2"
+                                ? "bg-indigo-500 text-white shadow-md"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            2학년
+                          </button>
+                          <button
+                            onClick={() => setChangeActiveGrade("grade3")}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                              changeActiveGrade === "grade3"
+                                ? "bg-indigo-500 text-white shadow-md"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            3학년
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-slate-900 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl">
+                        <div className="p-4 border-b border-slate-800/80 bg-slate-800/30 flex justify-between items-center">
+                          <div className="text-sm text-slate-400">
+                            엑셀에서 복사한 데이터를 칸에 클릭 후 붙여넣기(Ctrl+V) 하시면 한 번에 자동으로 채워집니다.
+                          </div>
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={addTimeSlot}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 rounded-lg font-medium text-sm transition-colors border border-indigo-500/30"
+                            >
+                              <Plus className="w-4 h-4" /> 타임 추가
+                            </button>
+                            <button 
+                              onClick={addClassCol}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 rounded-lg font-medium text-sm transition-colors border border-rose-500/30"
+                            >
+                              <Plus className="w-4 h-4" /> 반 추가
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <div className="overflow-x-auto pb-4">
+                          <table className="w-full text-sm text-left whitespace-nowrap">
+                            <thead className="text-xs text-slate-300 uppercase bg-slate-800/80">
+                              <tr>
+                                <th className="px-4 py-3 border-r border-slate-700/50 w-24 text-center">타임</th>
+                                {classCols[changeActiveGrade].map((col, cIdx) => (
+                                  <th key={cIdx} className="px-4 py-3 border-r border-slate-700/50 min-w-[100px] text-center relative group">
+                                    {col}
+                                    <button 
+                                      onClick={() => removeClassCol(cIdx)}
+                                      className="absolute top-1/2 -translate-y-1/2 right-2 text-rose-400 opacity-0 group-hover:opacity-100 hover:text-rose-300 transition-opacity"
+                                      title="열 삭제"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {timeSlots[changeActiveGrade].map((row, rIdx) => (
+                                <tr key={rIdx} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                                  <th className="px-4 py-3 border-r border-slate-700/50 font-medium text-slate-300 text-center bg-slate-800/20 relative group">
+                                    {row}타임
+                                    <button 
+                                      onClick={() => removeTimeSlot(rIdx)}
+                                      className="absolute top-1/2 -translate-y-1/2 right-2 text-rose-400 opacity-0 group-hover:opacity-100 hover:text-rose-300 transition-opacity"
+                                      title="행 삭제"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </th>
+                                  {classCols[changeActiveGrade].map((col, cIdx) => (
+                                    <td key={`${rIdx}-${cIdx}`} className="p-0 border-r border-slate-800/50 relative">
+                                      <div className="flex flex-col h-full min-h-[64px]">
+                                        <input
+                                          type="text"
+                                          className="w-full flex-1 bg-transparent text-slate-200 px-2 text-center text-sm font-medium focus:outline-none focus:bg-indigo-500/10 focus:ring-1 focus:ring-indigo-500/50 border-b border-slate-800/50"
+                                          value={timetableData[changeActiveGrade]?.[row]?.[col]?.subject || ""}
+                                          onChange={(e) => updateTimetableCell(row, col, "subject", e.target.value)}
+                                          onPaste={(e) => handleTimetablePaste(e, rIdx, cIdx, "subject")}
+                                          placeholder="과목명"
+                                        />
+                                        <input
+                                          type="text"
+                                          className="w-full flex-1 bg-transparent text-slate-400 px-2 text-center text-xs focus:outline-none focus:bg-indigo-500/10 focus:ring-1 focus:ring-indigo-500/50"
+                                          value={timetableData[changeActiveGrade]?.[row]?.[col]?.teacher || ""}
+                                          onChange={(e) => updateTimetableCell(row, col, "teacher", e.target.value)}
+                                          onPaste={(e) => handleTimetablePaste(e, rIdx, cIdx, "teacher")}
+                                          placeholder="교사명"
+                                        />
+                                      </div>
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {changeActiveTab === "roster" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex justify-between items-center mb-2">
+                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                          <Users className="w-6 h-6 text-indigo-400" />
+                          타임별 선택과목 명단
+                        </h2>
+                        
+                        <div className="flex bg-slate-800/50 p-1 rounded-xl">
+                          <button
+                            onClick={() => setChangeActiveGrade("grade2")}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                              changeActiveGrade === "grade2"
+                                ? "bg-indigo-500 text-white shadow-md"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            2학년
+                          </button>
+                          <button
+                            onClick={() => setChangeActiveGrade("grade3")}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                              changeActiveGrade === "grade3"
+                                ? "bg-indigo-500 text-white shadow-md"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            3학년
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 flex-wrap mb-4">
+                        {timeSlots[changeActiveGrade].map(slot => (
+                          <button
+                            key={slot}
+                            onClick={() => setChangeRosterTimeSlot(slot)}
+                            className={`px-5 py-2 rounded-lg font-medium transition-all ${
+                              changeRosterTimeSlot === slot
+                                ? "bg-indigo-600 text-white shadow-md"
+                                : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                            }`}
+                          >
+                            {slot}타임
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="bg-slate-900 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm text-left border-collapse">
+                            <thead>
+                              <tr className="bg-amber-400/20 text-amber-200 border-b-2 border-slate-700">
+                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-bold min-w-[80px]">과목명</th>
+                                {classCols[changeActiveGrade].map(col => (
+                                  <th key={col} colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-bold min-w-[120px]">
+                                    {timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject || "-"}
+                                  </th>
+                                ))}
+                              </tr>
+                              <tr className="bg-slate-800 border-b border-slate-700">
+                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">강의실</th>
+                                {classCols[changeActiveGrade].map(col => (
+                                  <Fragment key={`room-${col}`}>
+                                    <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300 bg-slate-800/80">
+                                      {col}
+                                    </th>
+                                  </Fragment>
+                                ))}
+                              </tr>
+                              <tr className="bg-slate-800/50 border-b border-slate-700">
+                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">교사</th>
+                                {classCols[changeActiveGrade].map(col => (
+                                  <Fragment key={`teacher-${col}`}>
+                                    <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center text-slate-400">
+                                      {timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.teacher || "-"}
+                                    </th>
+                                  </Fragment>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(() => {
+                                const colStudents: Record<string, StudentTimeData[]> = {};
+                                classCols[changeActiveGrade].forEach(col => {
+                                  colStudents[col] = [];
+                                });
+                                
+                                const allStudents = parsedSampleData[changeActiveGrade] || [];
+                                 // 1. Group columns by base subject
+                                 const subjectGroups: Record<string, { col: string, num: number, original: string }[]> = {};
+                                 classCols[changeActiveGrade].forEach(col => {
+                                   const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
+                                   if (!cellSubject) return;
+                                   
+                                   const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
+                                   const base = match ? match[1].trim() : cellSubject;
+                                   const numMatch = cellSubject.match(/\d+/);
+                                   const num = numMatch ? parseInt(numMatch[0], 10) : 1;
+                                   
+                                   if (!subjectGroups[base]) subjectGroups[base] = [];
+                                   subjectGroups[base].push({ col, num, original: cellSubject });
+                                 });
+
+                                 // Sort each group by num (so class 1 gets the remainder if odd)
+                                 Object.values(subjectGroups).forEach(group => {
+                                   group.sort((a, b) => a.num - b.num);
+                                 });
+
+                                 // 2. Map students to their base subjects
+                                 const studentsByBase: Record<string, StudentTimeData[]> = {};
+                                 allStudents.forEach(student => {
+                                   const chosenSubject = student.timeSlotMap[changeRosterTimeSlot];
+                                   if (!chosenSubject) return;
+                                   
+                                   let matchedBase = Object.keys(subjectGroups).find(base => {
+                                     const cleanChosen = chosenSubject.replace(/\s+/g, '');
+                                     const cleanBase = base.replace(/\s+/g, '');
+                                     if (!cleanBase) return false;
+                                     return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
+                                   });
+
+                                   if (matchedBase) {
+                                     if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
+                                     studentsByBase[matchedBase].push(student);
+                                   }
+                                 });
+
+                                 // 3. Distribute students into columns
+                                 Object.keys(studentsByBase).forEach(base => {
+                                   const students = studentsByBase[base].sort((a, b) => {
+                                     return a.id.localeCompare(b.id, undefined, { numeric: true });
+                                   });
+                                   const cols = subjectGroups[base];
+                                   
+                                   const baseCount = Math.floor(students.length / cols.length);
+                                   const remainder = students.length % cols.length;
+
+                                   let sIdx = 0;
+                                   cols.forEach((colObj, idx) => {
+                                     const count = baseCount + (idx < remainder ? 1 : 0);
+                                     const assigned = students.slice(sIdx, sIdx + count);
+                                     colStudents[colObj.col].push(...assigned);
+                                     sIdx += count;
+                                   });
+                                 });
+                                let maxStudents = 0;
+                                classCols[changeActiveGrade].forEach(col => {
+                                  if (colStudents[col].length > maxStudents) maxStudents = colStudents[col].length;
+                                });
+                                
+                                const rows = [];
+                                for (let r = 0; r < maxStudents; r++) {
+                                  rows.push(
+                                    <tr key={r} className="border-b border-slate-800/30 hover:bg-slate-800/20">
+                                      <td className="px-3 py-1.5 border-r border-slate-700/50 text-center text-slate-500 bg-slate-900/50">{r + 1}</td>
+                                      {classCols[changeActiveGrade].map(col => {
+                                        const student = colStudents[col][r];
+                                        return (
+                                          <Fragment key={`data-${col}-${r}`}>
+                                            <td className="px-2 py-1.5 border-r border-slate-700/50 text-center text-slate-400 border-r-slate-800/30 text-xs">
+                                              {student ? student.id : ""}
+                                            </td>
+                                            <td className="px-2 py-1.5 border-r border-slate-700/50 text-center text-slate-300 font-medium text-xs">
+                                              {student ? student.name : ""}
+                                            </td>
+                                          </Fragment>
+                                        );
+                                      })}
+                                    </tr>
+                                  );
+                                }
+                                
+                                return (
+                                  <>
+                                    {rows}
+                                    <tr className="bg-indigo-900/20 border-t-2 border-indigo-500/30">
+                                      <td className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">총 인원</td>
+                                      {classCols[changeActiveGrade].map(col => (
+                                        <td key={`total-${col}`} colSpan={2} className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">
+                                          {colStudents[col].length}명
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  </>
+                                );
+                              })()}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Fragment>
+            )}
+            
+          </div>
         </div>
       </main>
     </div>
