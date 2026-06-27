@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, Fragment } from "react";
+import React, { useState, useEffect, useRef, Fragment, useMemo } from "react";
 import { Upload, FileText, Settings, Download, CheckCircle2, ChevronRight, Trash2, File as FileIcon, Save, FolderOpen, GitBranch, Plus, Users } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 
@@ -78,7 +78,7 @@ export default function Home() {
   const [activeSidebarTab, setActiveSidebarTab] = useState<"survey" | "change">("survey");
   const [activeGrade, setActiveGrade] = useState<GradeKey>("grade1");
 
-  const [changeActiveTab, setChangeActiveTab] = useState("upload");
+  const [changeActiveTab, setChangeActiveTab] = useState<"upload" | "timetable" | "roster" | "application" | "roster_after">("upload");
   const [changeActiveGrade, setChangeActiveGrade] = useState<"grade2" | "grade3">("grade2");
   const [changeRosterTimeSlot, setChangeRosterTimeSlot] = useState("A");
 
@@ -102,7 +102,7 @@ export default function Home() {
     grade3: StudentTimeData[]
   }>({ grade2: [], grade3: [] });
 
-
+  const [electiveChanges, setElectiveChanges] = useState<Record<string, any[]>>({ grade2: [], grade3: [] });
   const handleTimetablePaste = (e: React.ClipboardEvent, startRowIndex: number, startColIndex: number, field: "subject" | "teacher") => {
     e.preventDefault();
     const pastedText = e.clipboardData.getData("Text");
@@ -215,9 +215,11 @@ export default function Home() {
         const timeSlotMap: Record<string, string> = {};
         for (let c = 8; c < row.length; c++) {
           const timeVal = row[c];
-          if (timeVal && typeof timeVal === 'string' && subjectHeaders[c]) {
-            const timeKey = timeVal.trim();
-            timeSlotMap[timeKey] = String(subjectHeaders[c]).trim();
+          if (timeVal !== undefined && timeVal !== null && subjectHeaders[c]) {
+            const timeKey = String(timeVal).trim();
+            if (timeKey) {
+              timeSlotMap[timeKey] = String(subjectHeaders[c]).trim();
+            }
           }
         }
 
@@ -263,7 +265,12 @@ export default function Home() {
       subjectStats,
       standardClassSize,
       designatedSubjects,
-      selectedSubjectHours
+      selectedSubjectHours,
+      parsedSampleData,
+      timetableData,
+      electiveChanges,
+      timeSlots,
+      classCols
     };
     const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -298,6 +305,11 @@ export default function Home() {
         if (parsed.standardClassSize) setStandardClassSize(parsed.standardClassSize);
         if (parsed.designatedSubjects) setDesignatedSubjects(parsed.designatedSubjects);
         if (parsed.selectedSubjectHours) setSelectedSubjectHours(parsed.selectedSubjectHours);
+        if (parsed.parsedSampleData) setParsedSampleData(parsed.parsedSampleData);
+        if (parsed.timetableData) setTimetableData(parsed.timetableData);
+        if (parsed.electiveChanges) setElectiveChanges(parsed.electiveChanges);
+        if (parsed.timeSlots) setTimeSlots(parsed.timeSlots);
+        if (parsed.classCols) setClassCols(parsed.classCols);
   
         alert("작업 내역을 성공적으로 불러왔습니다.");
       } catch (e) {
@@ -1395,6 +1407,171 @@ export default function Home() {
 
 
 
+    const adjustmentLog = useMemo(() => {
+    const log: Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string }[]> = {};
+    if (!parsedSampleData || (!parsedSampleData.grade2.length && !parsedSampleData.grade3.length) || !electiveChanges) return log;
+    
+    (['grade2', 'grade3'] as ('grade2' | 'grade3')[]).forEach(grade => {
+      const changes = electiveChanges[grade] || [];
+      const studentsInGrade = parsedSampleData[grade] || [];
+      const gradeTimetable = timetableData[grade] || {};
+      const gradeTimeSlots = timeSlots[grade] || [];
+      const gradeCols = classCols[grade] || [];
+
+      // Build a map: timeslot -> Set of subjects available in that timeslot
+      const subjectsInTimeSlot: Record<string, Set<string>> = {};
+      gradeTimeSlots.forEach((slot: string) => {
+        subjectsInTimeSlot[slot] = new Set<string>();
+        gradeCols.forEach((col: string) => {
+          const subj = gradeTimetable[slot]?.[col]?.subject?.trim();
+          if (subj) {
+            subjectsInTimeSlot[slot].add(subj);
+          }
+        });
+      });
+
+      // Normalize subject names for fuzzy matching (handle Roman numeral vs English letter I, II, etc.)
+      const normalizeSubject = (subject: string): string => {
+        return subject.replace(/\s+/g, '')
+                      .replace(/Ⅰ/g, 'I')
+                      .replace(/Ⅱ/g, 'II')
+                      .replace(/Ⅲ/g, 'III')
+                      .replace(/Ⅳ/g, 'IV');
+      };
+
+      // Helper: check if a subject exists in a given timeslot (fuzzy match)
+      const subjectExistsInSlot = (subject: string, slot: string): boolean => {
+        const subjects = subjectsInTimeSlot[slot];
+        if (!subjects) return false;
+        const clean = normalizeSubject(subject);
+        for (const s of subjects) {
+          const cleanS = normalizeSubject(s);
+          if (cleanS === clean || cleanS.includes(clean) || clean.includes(cleanS)) return true;
+        }
+        return false;
+      };
+
+      // Helper: find which timeslots have a given subject
+      const findSlotsWithSubject = (subject: string): string[] => {
+        const slots: string[] = [];
+        for (const slot of gradeTimeSlots) {
+          if (subjectExistsInSlot(subject, slot)) {
+            slots.push(slot);
+          }
+        }
+        return slots;
+      };
+      
+      // We need to maintain a working copy of each student's schedule to handle sequential changes properly
+      const studentSchedules: Record<string, Record<string, string>> = {};
+
+      changes.forEach(c => {
+        if (!c.studentId || !c.beforeSubject || !c.afterSubject) return;
+        
+        const targetStudent = studentsInGrade.find(s => s.id === c.studentId);
+        if (!targetStudent) {
+          if (!log[c.studentId]) log[c.studentId] = [];
+          log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: '학생을 찾을 수 없음' });
+          return;
+        }
+        
+        // Initialize working copy if it doesn't exist
+        if (!studentSchedules[c.studentId]) {
+          studentSchedules[c.studentId] = { ...targetStudent.timeSlotMap };
+        }
+        const currentSchedule = studentSchedules[c.studentId];
+        
+        // Find which timeslot the student currently has the beforeSubject
+        let beforeSlot: string | null = null;
+        const cleanBefore = normalizeSubject(c.beforeSubject);
+        for (const [slot, subject] of Object.entries(currentSchedule)) {
+          const cleanSubject = normalizeSubject(subject);
+          if (cleanSubject === cleanBefore || cleanSubject.includes(cleanBefore) || cleanBefore.includes(cleanSubject)) {
+            beforeSlot = slot;
+            break;
+          }
+        }
+        if (!beforeSlot) {
+          if (!log[c.studentId]) log[c.studentId] = [];
+          log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `현재 수강중인 과목이 아님 (이전 변경으로 사라졌을 수 있음)` });
+          return;
+        }
+
+        // Case 1: afterSubject exists in the SAME timeslot → direct swap
+        if (subjectExistsInSlot(c.afterSubject, beforeSlot)) {
+          if (!log[c.studentId]) log[c.studentId] = [];
+          log[c.studentId].push({
+            beforeStr: `${c.beforeSubject}(${beforeSlot})`,
+            afterStr: `${c.afterSubject}(${beforeSlot})`,
+            status: 'success'
+          });
+          // Update the working schedule
+          currentSchedule[beforeSlot] = c.afterSubject;
+          return;
+        }
+
+        // Case 2: afterSubject is in a DIFFERENT timeslot → 2-step change
+        const afterSlots = findSlotsWithSubject(c.afterSubject);
+        if (afterSlots.length === 0) {
+          if (!log[c.studentId]) log[c.studentId] = [];
+          log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목` });
+          return;
+        }
+
+        let swapSuccess = false;
+        let lastFailedReason = "";
+
+        for (const afterSlot of afterSlots) {
+          // Check what the student currently has in the afterSlot
+          const studentSubjectInAfterSlot = currentSchedule[afterSlot];
+          if (!studentSubjectInAfterSlot) {
+            lastFailedReason = `${afterSlot}타임 수강 과목 없음`;
+            continue;
+          }
+
+          // Check if the student's subject from afterSlot can be moved to beforeSlot
+          if (subjectExistsInSlot(studentSubjectInAfterSlot, beforeSlot)) {
+            if (!log[c.studentId]) log[c.studentId] = [];
+            // Step 1: move the conflicting subject to the original timeslot
+            log[c.studentId].push({
+              beforeStr: `${studentSubjectInAfterSlot}(${afterSlot})`,
+              afterStr: `${studentSubjectInAfterSlot}(${beforeSlot})`,
+              status: 'success'
+            });
+            // Step 2: move the beforeSubject's slot to the afterSubject
+            log[c.studentId].push({
+              beforeStr: `${c.beforeSubject}(${beforeSlot})`,
+              afterStr: `${c.afterSubject}(${afterSlot})`,
+              status: 'success'
+            });
+            
+            // Update the working schedule
+            currentSchedule[beforeSlot] = studentSubjectInAfterSlot;
+            currentSchedule[afterSlot] = c.afterSubject;
+            
+            swapSuccess = true;
+            break; // Stop searching once we find a valid path
+          } else {
+            lastFailedReason = `2단계 변경 불가: '${studentSubjectInAfterSlot}' 과목이 ${beforeSlot}타임에 개설되지 않음`;
+          }
+        }
+
+        if (!swapSuccess) {
+          if (!log[c.studentId]) log[c.studentId] = [];
+          log[c.studentId].push({ 
+            beforeStr: c.beforeSubject, 
+            afterStr: c.afterSubject, 
+            status: 'failed', 
+            // If multiple slots were checked, we show the reason for the last one we checked, or a generic one.
+            reason: afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 2단계 교환 실패` : lastFailedReason
+          });
+        }
+      });
+    });
+    
+    return log;
+  }, [parsedSampleData, electiveChanges, timetableData, timeSlots, classCols]);
+
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30 font-sans">
       {/* Background Gradients */}
@@ -2189,7 +2366,35 @@ export default function Home() {
                     <span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span>
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4" />
-                      <span>타임별 선택과목 명단</span>
+                      <span>3단계: 타임별 선택과목 명단</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setChangeActiveTab("application")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+                      changeActiveTab === "application"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                    }`}
+                  >
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span>
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      <span>4단계: 선택과목 변경 신청</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setChangeActiveTab("roster_after")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+                      changeActiveTab === "roster_after"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                    }`}
+                  >
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      <span>5단계: 변경 후 명단</span>
                     </div>
                   </button>
                 </div>
@@ -2227,26 +2432,60 @@ export default function Home() {
                         </div>
                       </div>
                       
-                      <div className="bg-slate-800/30 rounded-2xl p-6 border border-slate-700/50 flex flex-col items-center justify-center min-h-[300px]">
-                        <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-4">
-                          <FileIcon className="w-10 h-10 text-indigo-400" />
+                      {parsedSampleData[changeActiveGrade] && parsedSampleData[changeActiveGrade].length > 0 ? (
+                        <div className="bg-slate-800/30 rounded-2xl p-8 border border-emerald-500/30 flex flex-col items-center justify-center min-h-[300px] text-center">
+                          <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">
+                            <CheckCircle2 className="w-10 h-10 text-emerald-400" />
+                          </div>
+                          <h3 className="text-xl font-semibold text-emerald-400 mb-2">업로드 및 파싱 완료</h3>
+                          <p className="text-slate-300 mb-2 font-medium">
+                            {changeActiveGrade === "grade2" ? "2학년" : "3학년"} 학생 선택 데이터: {parsedSampleData[changeActiveGrade].length}명
+                          </p>
+                          <p className="text-slate-400 text-sm mb-6 max-w-md">
+                            다음 단계인 '2단계: 타임별 시간표 입력' 탭으로 이동하여 시간표를 작성하거나 파일을 다시 업로드할 수 있습니다.
+                          </p>
+                          <div className="flex gap-4">
+                            <label className="cursor-pointer flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium rounded-xl transition-all">
+                              <Upload className="w-4 h-4" />
+                              재업로드
+                              <input
+                                type="file"
+                                accept=".xlsx, .xls"
+                                className="hidden"
+                                onChange={handleChangeSampleUpload}
+                              />
+                            </label>
+                            <button
+                              onClick={() => setChangeActiveTab("timetable")}
+                              className="flex items-center gap-2 px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/20"
+                            >
+                              시간표 입력으로 이동
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                        <h3 className="text-xl font-medium text-slate-200 mb-2">학생 선택 데이터 파일 (sample3) 업로드</h3>
-                        <p className="text-slate-400 mb-6 text-center max-w-md">
-                          과목명이 열 헤더로 지정되어 있고, 셀 값으로 A, B, C, D 등의 선택 그룹이 명시된 수요조사 결과 파일을 업로드해 주세요.
-                        </p>
-                        
-                        <label className="cursor-pointer flex items-center gap-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/20">
-                          <Upload className="w-5 h-5" />
-                          엑셀 파일 선택
-                          <input
-                            type="file"
-                            accept=".xlsx, .xls"
-                            className="hidden"
-                            onChange={handleChangeSampleUpload}
-                          />
-                        </label>
-                      </div>
+                      ) : (
+                        <div className="bg-slate-800/30 rounded-2xl p-6 border border-slate-700/50 flex flex-col items-center justify-center min-h-[300px]">
+                          <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                            <FileIcon className="w-10 h-10 text-indigo-400" />
+                          </div>
+                          <h3 className="text-xl font-medium text-slate-200 mb-2">학생 선택 데이터 파일 (sample3) 업로드</h3>
+                          <p className="text-slate-400 mb-6 text-center max-w-md">
+                            과목명이 열 헤더로 지정되어 있고, 셀 값으로 A, B, C, D 등의 선택 그룹이 명시된 수요조사 결과 파일을 업로드해 주세요.
+                          </p>
+                          
+                          <label className="cursor-pointer flex items-center gap-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/20">
+                            <Upload className="w-5 h-5" />
+                            엑셀 파일 선택
+                            <input
+                              type="file"
+                              accept=".xlsx, .xls"
+                              className="hidden"
+                              onChange={handleChangeSampleUpload}
+                            />
+                          </label>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -2365,6 +2604,530 @@ export default function Home() {
                       </div>
                     </div>
                   )}
+
+                  {changeActiveTab === "application" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex justify-between items-center mb-2">
+                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                          <FileText className="w-6 h-6 text-indigo-400" />
+                          4단계: 선택과목 변경 신청 내역
+                        </h2>
+                        <div className="flex bg-slate-800/50 p-1 rounded-xl">
+                          <button
+                            onClick={() => setChangeActiveGrade("grade2")}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                              changeActiveGrade === "grade2"
+                                ? "bg-indigo-500 text-white shadow-md"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            2학년
+                          </button>
+                          <button
+                            onClick={() => setChangeActiveGrade("grade3")}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                              changeActiveGrade === "grade3"
+                                ? "bg-indigo-500 text-white shadow-md"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            3학년
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-inner">
+                          <div className="p-4 bg-slate-800/80 border-b border-slate-700/50">
+                            <h3 className="font-semibold text-slate-200">변경 신청 입력</h3>
+                          </div>
+                          <div className="overflow-auto max-h-[600px] relative">
+                            <table className="w-full text-sm text-left text-slate-300 border-collapse">
+                              <thead className="text-xs text-slate-400 bg-slate-800 border-b border-slate-700 uppercase">
+                                <tr>
+                                  <th className="px-3 py-3 font-semibold text-center w-12 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">순번</th>
+                                  <th className="px-4 py-3 font-semibold text-center w-24 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">학번</th>
+                                  <th className="px-4 py-3 font-semibold text-center w-24 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">이름</th>
+                                  <th className="px-4 py-3 font-semibold text-center border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">변경전</th>
+                                  <th className="px-2 py-3 font-semibold text-center w-8 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">→</th>
+                                  <th className="px-4 py-3 font-semibold text-center border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">변경후</th>
+                                  <th className="px-2 py-3 font-semibold text-center w-12 sticky top-0 z-10 bg-slate-800 shadow-sm">
+                                    <button onClick={() => {
+                                      setElectiveChanges(prev => ({
+                                        ...prev,
+                                        [changeActiveGrade]: [...prev[changeActiveGrade], {
+                                          id: Date.now().toString() + Math.random().toString(36).substring(7),
+                                          studentId: "",
+                                          studentName: "",
+                                          beforeSubject: "",
+                                          afterSubject: ""
+                                        }]
+                                      }));
+                                    }} className="p-1 text-slate-400 hover:text-emerald-400 transition-colors">
+                                      <Plus className="w-5 h-5 mx-auto" />
+                                    </button>
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(() => {
+                                  const data = electiveChanges[changeActiveGrade];
+                                  if (data.length === 0) {
+                                    return (
+                                      <tr>
+                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                                          등록된 선택과목 변경 신청 내역이 없습니다.<br/>
+                                          우측 상단의 <Plus className="w-4 h-4 inline mx-1" /> 버튼을 눌러 추가하세요.
+                                        </td>
+                                      </tr>
+                                    );
+                                  }
+
+                                  const groupedData: any[] = [];
+                                  data.forEach(item => {
+                                    const lastGroup = groupedData[groupedData.length - 1];
+                                    if (lastGroup && lastGroup.studentId === item.studentId && lastGroup.studentId !== "") {
+                                      lastGroup.items.push(item);
+                                    } else {
+                                      groupedData.push({ studentId: item.studentId, items: [item] });
+                                    }
+                                  });
+
+                                  let globalIndex = 0;
+                                  return groupedData.map((group: any, groupIdx: number) => {
+                                    return group.items.map((item: any, itemIdx: number) => {
+                                      const currentIndex = globalIndex++;
+                                      const isFirstInGroup = itemIdx === 0;
+                                      const rowSpan = group.items.length;
+                                      
+                                      const updateItem = (field: string, value: string) => {
+                                        setElectiveChanges(prev => {
+                                          const newData = [...prev[changeActiveGrade]];
+                                          const index = newData.findIndex(x => x.id === item.id);
+                                          if (index > -1) newData[index] = { ...newData[index], [field]: value };
+                                          return { ...prev, [changeActiveGrade]: newData };
+                                        });
+                                      };
+
+                                      return (
+                                        <tr key={item.id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
+                                          <td className="px-3 py-2 text-center border-r border-slate-700/50 text-slate-500">{currentIndex + 1}</td>
+                                          {isFirstInGroup && (
+                                            <>
+                                              <td rowSpan={rowSpan} className="px-2 py-2 border-r border-slate-700/50 align-top">
+                                                <input
+                                                  type="text"
+                                                  value={item.studentId}
+                                                  onChange={e => {
+                                                    const val = e.target.value;
+                                                    setElectiveChanges(prev => {
+                                                      const newData = [...prev[changeActiveGrade]];
+                                                      group.items.forEach((gItem: any) => {
+                                                        const idx = newData.findIndex(x => x.id === gItem.id);
+                                                        if (idx > -1) newData[idx] = { ...newData[idx], studentId: val };
+                                                      });
+                                                      return { ...prev, [changeActiveGrade]: newData };
+                                                    });
+                                                  }}
+                                                  className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
+                                                  placeholder="학번"
+                                                />
+                                              </td>
+                                              <td rowSpan={rowSpan} className="px-2 py-2 border-r border-slate-700/50 align-top">
+                                                <input
+                                                  type="text"
+                                                  value={item.studentName}
+                                                  onChange={e => {
+                                                    const val = e.target.value;
+                                                    setElectiveChanges(prev => {
+                                                      const newData = [...prev[changeActiveGrade]];
+                                                      group.items.forEach((gItem: any) => {
+                                                        const idx = newData.findIndex(x => x.id === gItem.id);
+                                                        if (idx > -1) newData[idx] = { ...newData[idx], studentName: val };
+                                                      });
+                                                      return { ...prev, [changeActiveGrade]: newData };
+                                                    });
+                                                  }}
+                                                  className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
+                                                  placeholder="이름"
+                                                />
+                                              </td>
+                                            </>
+                                          )}
+                                          <td className="px-2 py-2 border-r border-slate-700/50">
+                                            <input
+                                              type="text"
+                                              value={item.beforeSubject}
+                                              onChange={e => updateItem("beforeSubject", e.target.value)}
+                                              className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
+                                            />
+                                          </td>
+                                          <td className="px-2 py-2 text-center text-slate-600 border-r border-slate-700/50">→</td>
+                                          <td className="px-2 py-2 border-r border-slate-700/50">
+                                            <input
+                                              type="text"
+                                              value={item.afterSubject}
+                                              onChange={e => updateItem("afterSubject", e.target.value)}
+                                              className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
+                                            />
+                                          </td>
+                                          <td className="px-2 py-2 text-center">
+                                            <div className="flex items-center justify-center gap-1">
+                                              <button onClick={() => {
+                                                setElectiveChanges(prev => {
+                                                  const newData = [...prev[changeActiveGrade]];
+                                                  const currentIdx = newData.findIndex(x => x.id === item.id);
+                                                  const newItem = {
+                                                    id: Date.now().toString() + Math.random().toString(36).substring(7),
+                                                    studentId: item.studentId,
+                                                    studentName: item.studentName,
+                                                    beforeSubject: "",
+                                                    afterSubject: ""
+                                                  };
+                                                  newData.splice(currentIdx + 1, 0, newItem);
+                                                  return { ...prev, [changeActiveGrade]: newData };
+                                                });
+                                              }} className="p-1 text-slate-500 hover:text-emerald-400 transition-colors" title="같은 학생 과목 추가">
+                                                <Plus className="w-3.5 h-3.5" />
+                                              </button>
+                                              <button onClick={() => {
+                                                setElectiveChanges(prev => ({
+                                                  ...prev,
+                                                  [changeActiveGrade]: prev[changeActiveGrade].filter(x => x.id !== item.id)
+                                                }));
+                                              }} className="p-1 text-slate-500 hover:text-red-400 transition-colors" title="삭제">
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    });
+                                  });
+                                })()}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-inner flex flex-col">
+                          <div className="p-4 bg-slate-800/80 border-b border-slate-700/50">
+                            <h3 className="font-semibold text-emerald-400">자동 변경 결과 내역</h3>
+                          </div>
+                          <div className="overflow-auto max-h-[600px] flex-1">
+                            <table className="w-full text-sm text-left text-slate-300 border-collapse">
+                              <thead className="text-xs text-slate-400 bg-slate-800/50 border-b border-slate-700 uppercase">
+                                <tr>
+                                  <th className="px-4 py-3 font-semibold text-center w-24 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800/90 backdrop-blur shadow-sm">학번</th>
+                                  <th className="px-4 py-3 font-semibold text-center w-24 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800/90 backdrop-blur shadow-sm">이름</th>
+                                  <th className="px-4 py-3 font-semibold text-center sticky top-0 z-10 bg-slate-800/90 backdrop-blur shadow-sm">변경 내역</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(() => {
+                                  const data = electiveChanges[changeActiveGrade];
+                                  if (data.length === 0) {
+                                    return (
+                                      <tr>
+                                        <td colSpan={3} className="px-6 py-12 text-center text-slate-500">
+                                          신청 내역을 입력하면 자동 변경 결과가 이곳에 표시됩니다.
+                                        </td>
+                                      </tr>
+                                    );
+                                  }
+
+                                  const studentsWithChanges = Array.from(new Set(data.map(d => d.studentId))).filter(id => id);
+                                  
+                                  if (studentsWithChanges.length === 0) {
+                                    return (
+                                      <tr>
+                                        <td colSpan={3} className="px-6 py-12 text-center text-slate-500">
+                                          유효한 학번이 입력되지 않았습니다.
+                                        </td>
+                                      </tr>
+                                    );
+                                  }
+
+                                  return studentsWithChanges.map(studentId => {
+                                    const logs = adjustmentLog[studentId] || [];
+                                    const studentName = data.find(d => d.studentId === studentId)?.studentName || "";
+                                    
+                                    return (
+                                      <tr key={studentId} className="border-b border-slate-800/50 hover:bg-slate-800/20">
+                                        <td className="px-4 py-3 text-center border-r border-slate-700/50 font-medium">{studentId}</td>
+                                        <td className="px-4 py-3 text-center border-r border-slate-700/50">{studentName}</td>
+                                        <td className="px-4 py-3">
+                                          {logs.length > 0 ? (
+                                            <div className="space-y-1">
+                                              {logs.map((log, i) => (
+                                                <div 
+                                                  key={i} 
+                                                  className={`inline-block px-2 py-1 rounded border text-xs mr-2 mb-1 ${
+                                                    log.status === 'success' 
+                                                      ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20' 
+                                                      : 'text-rose-300 bg-rose-500/10 border-rose-500/20 cursor-help'
+                                                  }`}
+                                                  title={log.reason}
+                                                >
+                                                  {log.beforeStr} → {log.afterStr}
+                                                  {log.status === 'failed' && <span className="ml-1 font-bold">(불가)</span>}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            <span className="text-slate-500 italic text-xs">일치하는 수강 명단 없음</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    );
+                                  });
+                                })()}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {changeActiveTab === "roster_after" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex justify-between items-center mb-2">
+                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                          <Users className="w-6 h-6 text-indigo-400" />
+                          5단계: 타임별 선택과목 명단(변경 후)
+                        </h2>
+                        
+                        <div className="flex bg-slate-800/50 p-1 rounded-xl">
+                          <button
+                            onClick={() => setChangeActiveGrade("grade2")}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                              changeActiveGrade === "grade2"
+                                ? "bg-indigo-500 text-white shadow-md"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            2학년
+                          </button>
+                          <button
+                            onClick={() => setChangeActiveGrade("grade3")}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                              changeActiveGrade === "grade3"
+                                ? "bg-indigo-500 text-white shadow-md"
+                                : "text-slate-400 hover:text-slate-200"
+                            }`}
+                          >
+                            3학년
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 flex-wrap mb-4">
+                        {timeSlots[changeActiveGrade].map(slot => (
+                          <button
+                            key={slot}
+                            onClick={() => setChangeRosterTimeSlot(slot)}
+                            className={`px-5 py-2 rounded-lg font-medium transition-all ${
+                              changeRosterTimeSlot === slot
+                                ? "bg-indigo-600 text-white shadow-md"
+                                : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                            }`}
+                          >
+                            {slot}타임
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="bg-slate-900 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm text-left border-collapse">
+                            <thead>
+                              <tr className="bg-amber-400/20 text-amber-200 border-b-2 border-slate-700">
+                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-bold min-w-[80px]">과목명</th>
+                                {classCols[changeActiveGrade].map(col => (
+                                  <th key={col} colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-bold min-w-[120px]">
+                                    {timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject || "-"}
+                                  </th>
+                                ))}
+                              </tr>
+                              <tr className="bg-slate-800 border-b border-slate-700">
+                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">강의실</th>
+                                {classCols[changeActiveGrade].map(col => (
+                                  <Fragment key={`room-${col}`}>
+                                    <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300 bg-slate-800/80">
+                                      {col}
+                                    </th>
+                                  </Fragment>
+                                ))}
+                              </tr>
+                              <tr className="bg-slate-800/50 border-b border-slate-700">
+                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">교사</th>
+                                {classCols[changeActiveGrade].map(col => (
+                                  <Fragment key={`teacher-${col}`}>
+                                    <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center text-slate-400">
+                                      {timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.teacher || "-"}
+                                    </th>
+                                  </Fragment>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(() => {
+                                const colStudents: Record<string, any[]> = {};
+                                classCols[changeActiveGrade].forEach(col => {
+                                  colStudents[col] = [];
+                                });
+                                
+                                const allStudents = parsedSampleData[changeActiveGrade] || [];
+                                 // 1. Group columns by base subject
+                                 const subjectGroups: Record<string, { col: string, num: number, original: string }[]> = {};
+                                 classCols[changeActiveGrade].forEach(col => {
+                                   const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
+                                   if (!cellSubject) return;
+                                   
+                                   const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
+                                   const base = match ? match[1].trim() : cellSubject;
+                                   const numMatch = cellSubject.match(/\d+/);
+                                   const num = numMatch ? parseInt(numMatch[0], 10) : 1;
+                                   
+                                   if (!subjectGroups[base]) subjectGroups[base] = [];
+                                   subjectGroups[base].push({ col, num, original: cellSubject });
+                                 });
+
+                                 // Sort each group by num (so class 1 gets the remainder if odd)
+                                 Object.values(subjectGroups).forEach(group => {
+                                   group.sort((a, b) => a.num - b.num);
+                                 });
+
+                                 // 2. Map students to their base subjects WITH VALIDATED CHANGES
+                                 const studentsByBase: Record<string, any[]> = {};
+                                 
+                                 allStudents.forEach(student => {
+                                   const chosenSubject = student.timeSlotMap[changeRosterTimeSlot];
+                                   if (!chosenSubject) return;
+                                   
+                                   // Use adjustmentLog to apply only validated changes
+                                   let effectiveSubject = chosenSubject;
+                                   let isModified = false;
+                                   const studentLogs = adjustmentLog[student.id];
+                                   if (studentLogs) {
+                                     // Check if any log entry changes this student's subject in this timeslot
+                                     for (const entry of studentLogs) {
+                                       // Parse the slot from beforeStr like "수학과제탐구(B)"
+                                       const beforeMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
+                                       const afterMatch = entry.afterStr.match(/^(.+)\(([^)]+)\)$/);
+                                       if (beforeMatch && afterMatch) {
+                                         const logBeforeSubject = beforeMatch[1];
+                                         const logBeforeSlot = beforeMatch[2];
+                                         const logAfterSubject = afterMatch[1];
+                                         const logAfterSlot = afterMatch[2];
+                                         
+                                         // If this log moves the student OUT of this timeslot's subject
+                                         if (logBeforeSlot === changeRosterTimeSlot && logBeforeSubject === chosenSubject) {
+                                           // Student leaves this timeslot for this subject (removed)
+                                           effectiveSubject = '__REMOVED__';
+                                           isModified = true;
+                                         }
+                                         // If this log moves a subject INTO this timeslot
+                                         if (logAfterSlot === changeRosterTimeSlot) {
+                                           effectiveSubject = logAfterSubject;
+                                           isModified = true;
+                                         }
+                                       }
+                                     }
+                                   }
+                                   
+                                   if (effectiveSubject === '__REMOVED__') return;
+                                   
+                                   let matchedBase = Object.keys(subjectGroups).find(base => {
+                                     const cleanChosen = effectiveSubject.replace(/\s+/g, '');
+                                     const cleanBase = base.replace(/\s+/g, '');
+                                     if (!cleanBase) return false;
+                                     return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
+                                   });
+
+                                   if (matchedBase) {
+                                     if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
+                                     studentsByBase[matchedBase].push({ ...student, isModified });
+                                   }
+                                 });
+
+                                 // 3. Distribute students into columns
+                                 Object.keys(studentsByBase).forEach(base => {
+                                   const students = studentsByBase[base].sort((a, b) => {
+                                     return a.id.localeCompare(b.id, undefined, { numeric: true });
+                                   });
+                                   const cols = subjectGroups[base];
+                                   
+                                   const baseCount = Math.floor(students.length / cols.length);
+                                   const remainder = students.length % cols.length;
+
+                                   let sIdx = 0;
+                                   cols.forEach((colObj, idx) => {
+                                     const count = baseCount + (idx < remainder ? 1 : 0);
+                                     const assigned = students.slice(sIdx, sIdx + count);
+                                     colStudents[colObj.col].push(...assigned);
+                                     sIdx += count;
+                                   });
+                                 });
+                                let maxStudents = 0;
+                                classCols[changeActiveGrade].forEach(col => {
+                                  if (colStudents[col].length > maxStudents) maxStudents = colStudents[col].length;
+                                });
+                                
+                                const rows = [];
+                                for (let r = 0; r < maxStudents; r++) {
+                                  rows.push(
+                                    <tr key={r} className="border-b border-slate-800/30 hover:bg-slate-800/20">
+                                      <td className="px-3 py-1.5 border-r border-slate-700/50 text-center text-slate-500 bg-slate-900/50">{r + 1}</td>
+                                      {classCols[changeActiveGrade].map(col => {
+                                        const student = colStudents[col][r];
+                                        const isModified = student?.isModified;
+                                        const studentChangeLogs = student ? (adjustmentLog[student.id] || []) : [];
+                                        const tooltipText = studentChangeLogs.map(l => `${l.beforeStr} → ${l.afterStr}`).join('\n');
+                                        return (
+                                          <Fragment key={`data-${col}-${r}`}>
+                                            <td className={`px-2 py-1.5 border-r border-slate-700/50 text-center border-r-slate-800/30 text-xs ${
+                                              isModified ? 'bg-amber-500/10 text-amber-300 font-bold' : 'text-slate-400'
+                                            }`}>
+                                              {student ? student.id : ""}
+                                            </td>
+                                            <td
+                                              className={`px-2 py-1.5 border-r border-slate-700/50 text-center text-xs ${
+                                                isModified ? 'bg-amber-500/10 text-amber-400 font-bold cursor-help' : 'text-slate-300 font-medium'
+                                              }`}
+                                              title={isModified && tooltipText ? tooltipText : undefined}
+                                            >
+                                              {student ? student.name : ""}
+                                            </td>
+                                          </Fragment>
+                                        );
+                                      })}
+                                    </tr>
+                                  );
+                                }
+                                
+                                return (
+                                  <>
+                                    {rows}
+                                    <tr className="bg-indigo-900/20 border-t-2 border-indigo-500/30">
+                                      <td className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">총 인원</td>
+                                      {classCols[changeActiveGrade].map(col => (
+                                        <td key={`total-${col}`} colSpan={2} className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">
+                                          {colStudents[col].length}명
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  </>
+                                );
+                              })()}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
 
                   {changeActiveTab === "roster" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
