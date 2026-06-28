@@ -102,6 +102,77 @@ export default function Home() {
     grade3: StudentTimeData[]
   }>({ grade2: [], grade3: [] });
 
+  const [grade2HistoryData, setGrade2HistoryData] = useState<Record<string, string[]>>({});
+  const [grade3Sem1HistoryData, setGrade3Sem1HistoryData] = useState<Record<string, string[]>>({});
+  const [extraUploads, setExtraUploads] = useState({ grade2Optional: false, grade3Sem1: false });
+
+  const handleExtraUpload = (key: 'grade2Optional' | 'grade3Sem1') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const bstr = evt.target?.result;
+      const wb = XLSX.read(bstr, { type: "binary" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+      
+      const parsedData: Record<string, string[]> = {};
+      
+      if (key === 'grade2Optional') {
+        if (json.length >= 2) {
+          const headers = json[1];
+          for (let i = 2; i < json.length; i++) {
+            const row = json[i];
+            if (!row || row.length === 0 || !row[1] || String(row[1]) === '합계') continue;
+            const studentId = String(row[1]);
+            const subjects: string[] = [];
+            for (let c = 7; c < headers.length; c++) {
+              if (row[c] && headers[c]) {
+                const subj = String(headers[c]).trim();
+                if (subj) subjects.push(subj);
+              }
+            }
+            parsedData[studentId] = subjects;
+          }
+          setGrade2HistoryData(parsedData);
+        }
+      } else if (key === 'grade3Sem1') {
+        if (json.length >= 2) {
+          const superHeaders = json[0];
+          const headers = json[1];
+          let lastSuperHeader = "";
+          
+          for (let i = 2; i < json.length; i++) {
+            const row = json[i];
+            if (!row || row.length === 0 || !row[1] || String(row[1]) === '합계') continue;
+            const studentId = String(row[1]);
+            const subjects: string[] = [];
+            
+            let currentSuper = "";
+            for (let c = 7; c < headers.length; c++) {
+              const sHeader = String(superHeaders[c] || "").trim();
+              if (sHeader) currentSuper = sHeader;
+              
+              if (currentSuper.includes('1학기') || currentSuper.includes('1,2학기')) {
+                if (row[c] && headers[c]) {
+                  const subj = String(headers[c]).trim();
+                  if (subj) subjects.push(subj);
+                }
+              }
+            }
+            parsedData[studentId] = subjects;
+          }
+          setGrade3Sem1HistoryData(parsedData);
+        }
+      }
+      
+      setExtraUploads(prev => ({ ...prev, [key]: true }));
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = "";
+  };
+
   const [electiveChanges, setElectiveChanges] = useState<Record<string, any[]>>({ grade2: [], grade3: [] });
   const handleTimetablePaste = (e: React.ClipboardEvent, startRowIndex: number, startColIndex: number, field: "subject" | "teacher") => {
     e.preventDefault();
@@ -1616,6 +1687,8 @@ export default function Home() {
         if (isAfter) {
           const studentLogs = adjustmentLog[student.id];
           if (studentLogs) {
+            let movedInto = null;
+            let movedOut = false;
             for (const entry of studentLogs) {
               if (entry.status !== 'success') continue;
               const beforeMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
@@ -1627,12 +1700,17 @@ export default function Home() {
                 const logAfterSlot = afterMatch[2];
                 
                 if (logBeforeSlot === timeSlot && logBeforeSubject === chosenSubject) {
-                  effectiveSubject = '__REMOVED__';
+                  movedOut = true;
                 }
                 if (logAfterSlot === timeSlot) {
-                  effectiveSubject = logAfterSubject;
+                  movedInto = logAfterSubject;
                 }
               }
+            }
+            if (movedInto) {
+              effectiveSubject = movedInto;
+            } else if (movedOut) {
+              effectiveSubject = '__REMOVED__';
             }
           }
         }
@@ -1848,6 +1926,159 @@ export default function Home() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "변경내역");
     XLSX.writeFile(wb, `${gradeNum}학년_선택과목_변경내역.xlsx`);
+  };
+
+  const step6Data = useMemo(() => {
+    if (changeActiveTab !== "analysis") return [];
+    
+    const students = parsedSampleData[changeActiveGrade];
+    if (!students || students.length === 0) return [];
+    
+    const historyData = changeActiveGrade === "grade2" ? grade2HistoryData : grade3Sem1HistoryData;
+    const mappedGradeKey: GradeKey = changeActiveGrade === "grade2" ? "grade1" : "grade2";
+    const currentRules = hierarchyRules[mappedGradeKey] || [];
+    
+    const processed = students.map((student) => {
+      let completedBefore: string[] = [];
+      if (changeActiveGrade === "grade2") {
+        completedBefore = grade2HistoryData[student.id] || [];
+      } else {
+        const g2History = grade2HistoryData[student.id] || [];
+        const g3Sem1History = grade3Sem1HistoryData[student.id] || [];
+        completedBefore = [...g2History, ...g3Sem1History];
+      }
+      
+      const currentSubjects: string[] = [];
+      const timeSlotsForGrade = timeSlots[changeActiveGrade];
+      
+      timeSlotsForGrade.forEach(slot => {
+        let chosenSubject = student.timeSlotMap[slot];
+        if (!chosenSubject) return;
+        
+        let effectiveSubject = chosenSubject;
+        const studentLogs = adjustmentLog[student.id];
+        if (studentLogs) {
+          let movedInto = null;
+          let movedOut = false;
+          for (const entry of studentLogs) {
+            if (entry.status !== 'success') continue;
+            const beforeMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
+            const afterMatch = entry.afterStr.match(/^(.+)\(([^)]+)\)$/);
+            if (beforeMatch && afterMatch) {
+              const logBeforeSubject = beforeMatch[1];
+              const logBeforeSlot = beforeMatch[2];
+              const logAfterSubject = afterMatch[1];
+              const logAfterSlot = afterMatch[2];
+              if (logBeforeSlot === slot && logBeforeSubject === chosenSubject) movedOut = true;
+              if (logAfterSlot === slot) movedInto = logAfterSubject;
+            }
+          }
+          if (movedInto) effectiveSubject = movedInto;
+          else if (movedOut) effectiveSubject = '__REMOVED__';
+        }
+        
+        if (effectiveSubject !== '__REMOVED__') {
+          currentSubjects.push(effectiveSubject);
+        }
+      });
+      
+      let basicCount = 0;
+      let socialCount = 0;
+      let scienceCount = 0;
+      
+      const prevGradeKey = changeActiveGrade === "grade2" ? "grade1" : "grade2";
+      completedBefore.forEach(prevSubj => {
+        const matchedCategory = getSubjectCategory(prevSubj, prevGradeKey);
+        if (matchedCategory === "기초") basicCount++;
+        if (matchedCategory === "사회") socialCount++;
+        if (matchedCategory === "과학") scienceCount++;
+      });
+      
+      currentSubjects.forEach(subject => {
+        const matchedCategory = getSubjectCategory(subject, changeActiveGrade);
+        if (matchedCategory === "기초") basicCount++;
+        if (matchedCategory === "사회") socialCount++;
+        if (matchedCategory === "과학") scienceCount++;
+      });
+      
+      const subjectCounts: Record<string, number> = {};
+      currentSubjects.forEach(s => {
+        subjectCounts[s] = (subjectCounts[s] || 0) + 1;
+      });
+      const duplicateSubjects = Object.keys(subjectCounts).filter(s => subjectCounts[s] > 1);
+      
+      const hierarchyViolations: { subject: string; prereq: string; message: string }[] = [];
+      
+      currentRules.forEach(rule => {
+        const normAdvanced = normalizeSubjectName(rule.advanced);
+        const normPrereq = normalizeSubjectName(rule.prereq);
+        
+        const hasAdvanced = currentSubjects.some(s => normalizeSubjectName(s) === normAdvanced) || 
+                            completedBefore.some(s => normalizeSubjectName(s) === normAdvanced);
+        
+        const hasPrereqInPast = completedBefore.some(s => normalizeSubjectName(s) === normPrereq);
+        
+        if (hasAdvanced && !hasPrereqInPast) {
+          hierarchyViolations.push({ subject: rule.advanced, prereq: rule.prereq, message: `권장 이수 순서: ${rule.prereq} -> ${rule.advanced}` });
+        }
+      });
+      
+      return {
+        id: student.id,
+        name: student.name,
+        completedBefore,
+        currentSubjects,
+        basicCount,
+        socialCount,
+        scienceCount,
+        duplicateSubjects,
+        hierarchyViolations
+      };
+    });
+    
+    processed.sort((a, b) => parseInt(a.id) - parseInt(b.id));
+    return processed;
+  }, [changeActiveTab, parsedSampleData, changeActiveGrade, grade2HistoryData, grade3Sem1HistoryData, adjustmentLog, hierarchyRules, timeSlots]);
+
+  const handleExportStep6 = () => {
+    if (step6Data.length === 0) return;
+    
+    const aoa: any[][] = [];
+    const gradeNum = changeActiveGrade === "grade2" ? 2 : 3;
+    
+    aoa.push([`${gradeNum}학년 다년도 분석 결과`]);
+    aoa.push([
+      "순번", "학번", "이름", "과거 이수 과목", "2학기 최종 과목", "기초과목", "사회", "과학", "비고(중복/위계)"
+    ]);
+
+    step6Data.forEach((student, idx) => {
+      const remarks: string[] = [];
+      if (student.basicCount >= 10) remarks.push("기초과목 최대학점 초과");
+      if (student.duplicateSubjects?.length) remarks.push(`중복: ${student.duplicateSubjects.join(", ")}`);
+      if (student.hierarchyViolations?.length) remarks.push(student.hierarchyViolations.map((v: any) => v.message).join(", "));
+      
+      aoa.push([
+        idx + 1,
+        student.id,
+        student.name,
+        student.completedBefore.join(", "),
+        student.currentSubjects.join(", "),
+        student.basicCount || 0,
+        student.socialCount || 0,
+        student.scienceCount || 0,
+        remarks.join(" / ")
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    
+    ws["!cols"] = [
+      { wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 40 }, { wch: 30 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 40 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "다년도분석");
+    XLSX.writeFile(wb, `${gradeNum}학년_다년도분석결과.xlsx`);
   };
 
   return (
@@ -2616,7 +2847,7 @@ export default function Home() {
                     <span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span>
                     <div className="flex items-center gap-2">
                       <Upload className="w-4 h-4" />
-                      <span>학생 선택 데이터 업로드</span>
+                      <span>2학기 타임별 선택과목 데이터 업로드</span>
                     </div>
                   </button>
                   <button
@@ -2675,6 +2906,20 @@ export default function Home() {
                       <span>5단계: 변경 후 명단</span>
                     </div>
                   </button>
+                  <button
+                    onClick={() => setChangeActiveTab("analysis")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
+                      changeActiveTab === "analysis"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                    }`}
+                  >
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span>
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      <span>6단계: 다년도 분석</span>
+                    </div>
+                  </button>
                 </div>
 
                 <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 rounded-3xl p-8 shadow-2xl">
@@ -2683,7 +2928,7 @@ export default function Home() {
                       <div className="flex justify-between items-center mb-2">
                         <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
                           <Upload className="w-6 h-6 text-indigo-400" />
-                          학생 선택 데이터 업로드
+                          2학기 타임별 선택과목 데이터 업로드
                         </h2>
                         
                         <div className="flex bg-slate-800/50 p-1 rounded-xl">
@@ -2764,6 +3009,66 @@ export default function Home() {
                           </label>
                         </div>
                       )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                        {/* 2학년 수강과목 데이터 업로드(선택) */}
+                        <div className="bg-slate-800/30 rounded-2xl p-6 border border-slate-700/50 flex flex-col items-center justify-center min-h-[250px]">
+                          {extraUploads.grade2Optional ? (
+                            <>
+                              <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">
+                                <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                              </div>
+                              <h3 className="text-lg font-semibold text-emerald-400 mb-4">업로드 완료</h3>
+                              <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium rounded-xl transition-all">
+                                <Upload className="w-4 h-4" />
+                                재업로드
+                                <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleExtraUpload('grade2Optional')} />
+                              </label>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                                <FileIcon className="w-8 h-8 text-indigo-400" />
+                              </div>
+                              <h3 className="text-lg font-medium text-slate-200 mb-6">2학년 수강과목 데이터 업로드(선택)</h3>
+                              <label className="cursor-pointer flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium rounded-xl transition-all shadow-sm">
+                                <Upload className="w-4 h-4" />
+                                파일 업로드
+                                <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleExtraUpload('grade2Optional')} />
+                              </label>
+                            </>
+                          )}
+                        </div>
+                        
+                        {/* 3학년 1학기 데이터 업로드 */}
+                        <div className="bg-slate-800/30 rounded-2xl p-6 border border-slate-700/50 flex flex-col items-center justify-center min-h-[250px]">
+                          {extraUploads.grade3Sem1 ? (
+                            <>
+                              <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">
+                                <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                              </div>
+                              <h3 className="text-lg font-semibold text-emerald-400 mb-4">업로드 완료</h3>
+                              <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium rounded-xl transition-all">
+                                <Upload className="w-4 h-4" />
+                                재업로드
+                                <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleExtraUpload('grade3Sem1')} />
+                              </label>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                                <FileIcon className="w-8 h-8 text-indigo-400" />
+                              </div>
+                              <h3 className="text-lg font-medium text-slate-200 mb-6">3학년 1학기 데이터 업로드</h3>
+                              <label className="cursor-pointer flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium rounded-xl transition-all shadow-sm">
+                                <Upload className="w-4 h-4" />
+                                파일 업로드
+                                <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleExtraUpload('grade3Sem1')} />
+                              </label>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -3305,8 +3610,11 @@ export default function Home() {
                                    let isModified = false;
                                    const studentLogs = adjustmentLog[student.id];
                                    if (studentLogs) {
+                                     let movedInto = null;
+                                     let movedOut = false;
                                      // Check if any log entry changes this student's subject in this timeslot
                                      for (const entry of studentLogs) {
+                                       if (entry.status !== 'success') continue;
                                        // Parse the slot from beforeStr like "수학과제탐구(B)"
                                        const beforeMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
                                        const afterMatch = entry.afterStr.match(/^(.+)\(([^)]+)\)$/);
@@ -3318,16 +3626,20 @@ export default function Home() {
                                          
                                          // If this log moves the student OUT of this timeslot's subject
                                          if (logBeforeSlot === changeRosterTimeSlot && logBeforeSubject === chosenSubject) {
-                                           // Student leaves this timeslot for this subject (removed)
-                                           effectiveSubject = '__REMOVED__';
-                                           isModified = true;
+                                           movedOut = true;
                                          }
                                          // If this log moves a subject INTO this timeslot
                                          if (logAfterSlot === changeRosterTimeSlot) {
-                                           effectiveSubject = logAfterSubject;
-                                           isModified = true;
+                                           movedInto = logAfterSubject;
                                          }
                                        }
+                                     }
+                                     if (movedInto) {
+                                       effectiveSubject = movedInto;
+                                       isModified = true;
+                                     } else if (movedOut) {
+                                       effectiveSubject = '__REMOVED__';
+                                       isModified = true;
                                      }
                                    }
                                    
@@ -3623,6 +3935,119 @@ export default function Home() {
                           </table>
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {changeActiveTab === "analysis" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex justify-between items-center mb-2">
+                        <div>
+                          <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                            <FileText className="w-6 h-6 text-indigo-400" />
+                            6단계: 다년도 수강 내역 위계 및 분석
+                          </h2>
+                          <p className="text-slate-400 text-sm mt-1 mb-4 ml-8">
+                            * 위계성 검사는 '수요조사' 탭의 2단계에서 설정한 위계 규칙을 공유하여 그대로 적용합니다.
+                          </p>
+                        </div>
+                        
+                        <div className="flex items-center gap-4 -mt-4">
+                          <button 
+                            onClick={handleExportStep6}
+                            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-500/25 flex items-center gap-2"
+                            disabled={step6Data.length === 0}
+                          >
+                            <Download className="w-4 h-4" />
+                            엑셀 다운로드
+                          </button>
+                          <div className="flex bg-slate-800/50 p-1 rounded-xl">
+                            <button
+                              onClick={() => setChangeActiveGrade("grade2")}
+                              className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                                changeActiveGrade === "grade2"
+                                  ? "bg-slate-700 text-white shadow"
+                                  : "text-slate-400 hover:text-slate-200"
+                              }`}
+                            >
+                              2학년
+                            </button>
+                            <button
+                              onClick={() => setChangeActiveGrade("grade3")}
+                              className={`px-6 py-2 rounded-lg font-medium transition-all ${
+                                changeActiveGrade === "grade3"
+                                  ? "bg-slate-700 text-white shadow"
+                                  : "text-slate-400 hover:text-slate-200"
+                              }`}
+                            >
+                              3학년
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {step6Data.length === 0 ? (
+                        <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-8 text-center">
+                          <p className="text-slate-500">선택하신 학년의 데이터가 아직 없습니다.</p>
+                        </div>
+                      ) : (
+                        <div className="bg-slate-950/50 border border-slate-800 rounded-2xl overflow-hidden">
+                          <div className="overflow-auto max-h-[650px] relative">
+                            <table className="w-full text-sm text-left text-slate-300 border-collapse">
+                              <thead className="text-xs text-slate-400 uppercase bg-slate-900 border-b border-slate-800">
+                                <tr>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-0 z-40 bg-slate-900 min-w-[50px] max-w-[50px] border-r border-slate-800 text-center">순번</th>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[50px] z-40 bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800 text-center">학번</th>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[130px] z-40 bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800/50 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)]">이름</th>
+                                  <th className="px-2 py-2.5 text-center whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-r border-slate-800">과거 이수 과목</th>
+                                  <th className="px-2 py-2.5 text-center whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-r border-slate-800">2학기 최종 과목</th>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 text-center">기초과목</th>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 text-center">사회</th>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 text-center">과학</th>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900">비고(중복/위계)</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {step6Data.map((row, idx) => (
+                                  <tr key={idx} className="group border-b border-slate-800/50 hover:bg-slate-900/50">
+                                    <td className="px-2 py-2.5 whitespace-nowrap sticky left-0 z-20 bg-slate-950 group-hover:bg-slate-900 min-w-[50px] max-w-[50px] border-r border-slate-800 text-center">{idx + 1}</td>
+                                    <td className="px-2 py-2.5 font-medium text-white whitespace-nowrap sticky left-[50px] z-20 bg-slate-950 group-hover:bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800 text-center">{row.id}</td>
+                                    <td className="px-2 py-2.5 whitespace-nowrap sticky left-[130px] z-20 bg-slate-950 group-hover:bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800/50 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)]">{row.name}</td>
+                                    <td className="px-2 py-2.5 border-r border-slate-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title={row.completedBefore.join(", ")}>
+                                      {row.completedBefore.length > 0 ? row.completedBefore.join(", ") : <span className="text-slate-600">-</span>}
+                                    </td>
+                                    <td className="px-2 py-2.5 border-r border-slate-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title={row.currentSubjects.join(", ")}>
+                                      {row.currentSubjects.map((subject, i) => {
+                                        const isDuplicate = subject && row.duplicateSubjects?.includes(subject);
+                                        const isHierarchyViolation = subject && row.hierarchyViolations?.some((v: any) => v.subject === subject || v.prereq === subject);
+                                        let cellClass = "inline-block mr-1.5 mb-1 px-1.5 py-0.5 rounded text-xs ";
+                                        if (isHierarchyViolation) cellClass += "text-cyan-400 font-bold bg-cyan-400/10";
+                                        else if (isDuplicate) cellClass += "text-yellow-400 font-bold bg-yellow-400/10";
+                                        else cellClass += "bg-slate-800 text-slate-300";
+                                        
+                                        return (
+                                          <span key={`cur-${i}`} className={cellClass}>{subject}</span>
+                                        );
+                                      })}
+                                    </td>
+                                    <td className="px-2 py-2.5 text-center text-indigo-400 font-medium whitespace-nowrap">{row.basicCount}</td>
+                                    <td className="px-2 py-2.5 text-center text-rose-400 font-medium whitespace-nowrap">{row.socialCount}</td>
+                                    <td className="px-2 py-2.5 text-center text-emerald-400 font-medium whitespace-nowrap">{row.scienceCount}</td>
+                                    <td className="px-2 py-2.5 font-medium flex flex-col gap-1 whitespace-nowrap">
+                                      {row.basicCount >= 10 && <span className="text-rose-400 whitespace-nowrap">기초과목 최대학점 초과</span>}
+                                      {row.duplicateSubjects?.length > 0 && <span className="text-yellow-400 whitespace-nowrap">중복선택: {row.duplicateSubjects.join(", ")}</span>}
+                                      {row.hierarchyViolations?.map((v: any, i: number) => (
+                                        <span key={i} className="text-cyan-400 text-xs whitespace-nowrap">
+                                          {v.message}
+                                        </span>
+                                      ))}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
