@@ -78,7 +78,7 @@ export default function Home() {
   const [activeSidebarTab, setActiveSidebarTab] = useState<"survey" | "change">("survey");
   const [activeGrade, setActiveGrade] = useState<GradeKey>("grade1");
 
-  const [changeActiveTab, setChangeActiveTab] = useState<"upload" | "timetable" | "roster" | "application" | "roster_after">("upload");
+  const [changeActiveTab, setChangeActiveTab] = useState<"upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis">("upload");
   const [changeActiveGrade, setChangeActiveGrade] = useState<"grade2" | "grade3">("grade2");
   const [changeRosterTimeSlot, setChangeRosterTimeSlot] = useState("A");
 
@@ -1995,7 +1995,7 @@ export default function Home() {
       });
       
       currentSubjects.forEach(subject => {
-        const matchedCategory = getSubjectCategory(subject, changeActiveGrade);
+        const matchedCategory = getSubjectCategory(subject, mappedGradeKey);
         if (matchedCategory === "기초") basicCount++;
         if (matchedCategory === "사회") socialCount++;
         if (matchedCategory === "과학") scienceCount++;
