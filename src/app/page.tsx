@@ -1572,6 +1572,284 @@ export default function Home() {
     return log;
   }, [parsedSampleData, electiveChanges, timetableData, timeSlots, classCols]);
 
+  const handleExportRoster = (isAfter: boolean) => {
+    const wb = XLSX.utils.book_new();
+    const grade = changeActiveGrade;
+    const allStudents = parsedSampleData[grade] || [];
+    const tSlots = timeSlots[grade] || [];
+    const cols = classCols[grade] || [];
+    const gTimetable = timetableData[grade] || {};
+
+    if (tSlots.length === 0) {
+      alert("다운로드할 데이터가 없습니다.");
+      return;
+    }
+
+    tSlots.forEach(timeSlot => {
+      const colStudents: Record<string, any[]> = {};
+      cols.forEach(col => { colStudents[col] = []; });
+      
+      const subjectGroups: Record<string, { col: string, num: number, original: string }[]> = {};
+      cols.forEach(col => {
+        const cellSubject = gTimetable[timeSlot]?.[col]?.subject?.trim();
+        if (!cellSubject) return;
+        
+        const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
+        const base = match ? match[1].trim() : cellSubject;
+        const numMatch = cellSubject.match(/\d+/);
+        const num = numMatch ? parseInt(numMatch[0], 10) : 1;
+        
+        if (!subjectGroups[base]) subjectGroups[base] = [];
+        subjectGroups[base].push({ col, num, original: cellSubject });
+      });
+
+      Object.values(subjectGroups).forEach(group => {
+        group.sort((a, b) => a.num - b.num);
+      });
+
+      const studentsByBase: Record<string, any[]> = {};
+      allStudents.forEach(student => {
+        const chosenSubject = student.timeSlotMap[timeSlot];
+        if (!chosenSubject) return;
+        
+        let effectiveSubject = chosenSubject;
+        if (isAfter) {
+          const studentLogs = adjustmentLog[student.id];
+          if (studentLogs) {
+            for (const entry of studentLogs) {
+              if (entry.status !== 'success') continue;
+              const beforeMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
+              const afterMatch = entry.afterStr.match(/^(.+)\(([^)]+)\)$/);
+              if (beforeMatch && afterMatch) {
+                const logBeforeSubject = beforeMatch[1];
+                const logBeforeSlot = beforeMatch[2];
+                const logAfterSubject = afterMatch[1];
+                const logAfterSlot = afterMatch[2];
+                
+                if (logBeforeSlot === timeSlot && logBeforeSubject === chosenSubject) {
+                  effectiveSubject = '__REMOVED__';
+                }
+                if (logAfterSlot === timeSlot) {
+                  effectiveSubject = logAfterSubject;
+                }
+              }
+            }
+          }
+        }
+        if (effectiveSubject === '__REMOVED__') return;
+        
+        const cleanChosen = effectiveSubject.replace(/[\sⅠⅡⅢⅣ1234]/g, '').toLowerCase();
+        
+        let matchedBase = null;
+        let matchedPriority = 999;
+        
+        for (const base of Object.keys(subjectGroups)) {
+          const cleanBase = base.replace(/[\sⅠⅡⅢⅣ1234]/g, '').toLowerCase();
+          if (cleanBase === cleanChosen) {
+            matchedBase = base;
+            matchedPriority = 1;
+            break;
+          }
+          if (cleanChosen.includes(cleanBase)) {
+            matchedBase = base;
+            matchedPriority = 2;
+          } else if (cleanBase.includes(cleanChosen) && matchedPriority > 2) {
+            matchedBase = base;
+            matchedPriority = 3;
+          }
+        }
+        
+        if (matchedBase) {
+          if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
+          studentsByBase[matchedBase].push(student);
+        }
+      });
+
+      Object.keys(subjectGroups).forEach(base => {
+        const students = studentsByBase[base] || [];
+        students.sort((a, b) => {
+          const numA = parseInt(a.id) || 0;
+          const numB = parseInt(b.id) || 0;
+          return numA - numB;
+        });
+        
+        const group = subjectGroups[base];
+        const numClasses = group.length;
+        if (numClasses === 0) return;
+        
+        const baseSize = Math.floor(students.length / numClasses);
+        let remainder = students.length % numClasses;
+        
+        let studentIndex = 0;
+        group.forEach(classInfo => {
+          let classSize = baseSize;
+          if (remainder > 0) {
+            classSize += 1;
+            remainder -= 1;
+          }
+          const assigned = students.slice(studentIndex, studentIndex + classSize);
+          colStudents[classInfo.col] = assigned;
+          studentIndex += classSize;
+        });
+      });
+
+      const maxRows = Math.max(0, ...Object.values(colStudents).map(arr => arr.length));
+      const wsData: any[][] = [];
+
+      const row1: any[] = [];
+      const row2: any[] = [];
+      const row3: any[] = [];
+      const merges: any[] = [];
+
+      let currentColIdx = 0;
+      cols.forEach((col, idx) => {
+        const teacher = gTimetable[timeSlot]?.[col]?.teacher || "-";
+        const subject = gTimetable[timeSlot]?.[col]?.subject || "-";
+        
+        row1.push(subject, "");
+        row2.push(teacher, "");
+        row3.push("학번", "이름");
+
+        merges.push({ s: { r: 0, c: currentColIdx }, e: { r: 0, c: currentColIdx + 1 } });
+        merges.push({ s: { r: 1, c: currentColIdx }, e: { r: 1, c: currentColIdx + 1 } });
+        currentColIdx += 2;
+      });
+
+      wsData.push(row1, row2, row3);
+
+      for (let i = 0; i < maxRows; i++) {
+        const dataRow: any[] = [];
+        cols.forEach(col => {
+          const student = colStudents[col][i];
+          if (student) {
+            dataRow.push(student.id, student.name);
+          } else {
+            dataRow.push("", "");
+          }
+        });
+        wsData.push(dataRow);
+      }
+
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      ws['!merges'] = merges;
+      
+      for (const cell in ws) {
+        if (cell[0] === '!') continue;
+        if (!ws[cell].s) ws[cell].s = {};
+        ws[cell].s = {
+          alignment: { horizontal: "center", vertical: "center" }
+        };
+      }
+
+      const wscols = [];
+      for (let i = 0; i < cols.length * 2; i++) {
+        wscols.push({ wpx: 80 });
+      }
+      ws['!cols'] = wscols;
+
+      XLSX.utils.book_append_sheet(wb, ws, `${timeSlot}타임`);
+    });
+
+    const prefix = grade === 'grade2' ? '2학년' : '3학년';
+    const suffix = isAfter ? '5단계_변경후명단' : '3단계_변경전명단';
+    XLSX.writeFile(wb, `${prefix}_${suffix}.xlsx`);
+  };
+
+  const handleExportChanges = () => {
+    const grade = changeActiveGrade;
+    const gradeNum = grade === 'grade2' ? '2' : '3';
+    const data = electiveChanges[grade];
+    
+    const studentsWithChanges = Array.from(new Set(data.map(d => d.studentId))).filter(id => id);
+
+    let changeIndex = 1;
+    const rows: any[][] = [];
+    const merges: any[] = [];
+
+    studentsWithChanges.forEach(studentId => {
+      const logs = adjustmentLog[studentId] || [];
+      const studentName = data.find(d => d.studentId === studentId)?.studentName || "";
+      const validLogs = logs.filter(log => log.status === 'success');
+      
+      if (validLogs.length > 0) {
+        validLogs.forEach((log, index) => {
+          rows.push([
+            index === 0 ? changeIndex : "",
+            index === 0 ? studentId : "",
+            index === 0 ? studentName : "",
+            log.beforeStr,
+            "→",
+            log.afterStr
+          ]);
+        });
+        
+        if (validLogs.length > 1) {
+          const startRow = rows.length - validLogs.length + 2;
+          const endRow = rows.length + 1;
+          merges.push({ s: { r: startRow, c: 0 }, e: { r: endRow, c: 0 } });
+          merges.push({ s: { r: startRow, c: 1 }, e: { r: endRow, c: 1 } });
+          merges.push({ s: { r: startRow, c: 2 }, e: { r: endRow, c: 2 } });
+        }
+        changeIndex++;
+      }
+    });
+
+    if (rows.length === 0) {
+      alert("다운로드할 변경 내역이 없습니다.");
+      return;
+    }
+
+    const totalStudents = changeIndex - 1;
+    const title = `${gradeNum}학년 2학기 선택 과목 변경 내역(${totalStudents}명)`;
+    
+    const wsData = [
+      [title, "", "", "", "", ""],
+      ["순번", "학번", "이름", "변경전", "→", "변경후"],
+      ...rows
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } });
+    ws['!merges'] = merges;
+    
+    for (const cell in ws) {
+      if (cell[0] === '!') continue;
+      if (!ws[cell].s) ws[cell].s = {};
+      
+      const rowIndex = parseInt(cell.replace(/\D/g, '')) - 1;
+      
+      ws[cell].s = {
+        alignment: { horizontal: "center", vertical: "center" },
+        border: {
+          top: { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } }
+        }
+      };
+      
+      if (rowIndex === 0) {
+        ws[cell].s.font = { sz: 16, bold: true };
+      } else if (rowIndex === 1) {
+        ws[cell].s.font = { bold: true };
+      }
+    }
+    
+    ws['!cols'] = [
+      { wpx: 40 },
+      { wpx: 70 },
+      { wpx: 80 },
+      { wpx: 180 },
+      { wpx: 30 },
+      { wpx: 180 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "변경내역");
+    XLSX.writeFile(wb, `${gradeNum}학년_선택과목_변경내역.xlsx`);
+  };
+
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30 font-sans">
       {/* Background Gradients */}
@@ -2811,8 +3089,15 @@ export default function Home() {
                         </div>
 
                         <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-inner flex flex-col">
-                          <div className="p-4 bg-slate-800/80 border-b border-slate-700/50">
+                          <div className="p-4 bg-slate-800/80 border-b border-slate-700/50 flex justify-between items-center">
                             <h3 className="font-semibold text-emerald-400">자동 변경 결과 내역</h3>
+                            <button
+                              onClick={handleExportChanges}
+                              className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-lg shadow-md transition-all"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              엑셀 다운로드
+                            </button>
                           </div>
                           <div className="overflow-auto max-h-[600px] flex-1">
                             <table className="w-full text-sm text-left text-slate-300 border-collapse">
@@ -2898,8 +3183,16 @@ export default function Home() {
                           5단계: 타임별 선택과목 명단(변경 후)
                         </h2>
                         
-                        <div className="flex bg-slate-800/50 p-1 rounded-xl">
+                        <div className="flex items-center gap-4">
                           <button
+                            onClick={() => handleExportRoster(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg shadow-md transition-all"
+                          >
+                            <Download className="w-4 h-4" />
+                            엑셀 다운로드
+                          </button>
+                          <div className="flex bg-slate-800/50 p-1 rounded-xl">
+                            <button
                             onClick={() => setChangeActiveGrade("grade2")}
                             className={`px-6 py-2 rounded-lg font-medium transition-all ${
                               changeActiveGrade === "grade2"
@@ -2921,6 +3214,7 @@ export default function Home() {
                           </button>
                         </div>
                       </div>
+                    </div>
 
                       <div className="flex gap-2 flex-wrap mb-4">
                         {timeSlots[changeActiveGrade].map(slot => (
@@ -3137,8 +3431,16 @@ export default function Home() {
                           타임별 선택과목 명단
                         </h2>
                         
-                        <div className="flex bg-slate-800/50 p-1 rounded-xl">
+                        <div className="flex items-center gap-4">
                           <button
+                            onClick={() => handleExportRoster(false)}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg shadow-md transition-all"
+                          >
+                            <Download className="w-4 h-4" />
+                            엑셀 다운로드
+                          </button>
+                          <div className="flex bg-slate-800/50 p-1 rounded-xl">
+                            <button
                             onClick={() => setChangeActiveGrade("grade2")}
                             className={`px-6 py-2 rounded-lg font-medium transition-all ${
                               changeActiveGrade === "grade2"
@@ -3160,6 +3462,7 @@ export default function Home() {
                           </button>
                         </div>
                       </div>
+                    </div>
 
                       <div className="flex gap-2 flex-wrap mb-4">
                         {timeSlots[changeActiveGrade].map(slot => (
