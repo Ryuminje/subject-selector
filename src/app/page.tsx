@@ -110,6 +110,29 @@ export default function Home() {
   const [grade2HistoryData, setGrade2HistoryData] = useState<Record<string, Record<string, string[]>>>({ grade2: {}, grade3: {} });
   const [grade3Sem1HistoryData, setGrade3Sem1HistoryData] = useState<Record<string, Record<string, string[]>>>({ grade2: {}, grade3: {} });
   const [extraUploads, setExtraUploads] = useState<Record<string, { grade2Optional: boolean; grade3Sem1: boolean }>>({ grade2: { grade2Optional: false, grade3Sem1: false }, grade3: { grade2Optional: false, grade3Sem1: false } });
+  const [changeUploadNames, setChangeUploadNames] = useState<Record<string, { timetable: string | null; grade2Optional: string | null; grade3Sem1: string | null }>>({
+    grade2: { timetable: null, grade2Optional: null, grade3Sem1: null },
+    grade3: { timetable: null, grade2Optional: null, grade3Sem1: null }
+  });
+
+  const handleDeleteSampleUpload = () => {
+    if (confirm("업로드된 파일을 삭제하시겠습니까?")) {
+      setParsedSampleData(prev => ({ ...prev, [changeActiveGrade]: [] }));
+      setChangeUploadNames(prev => ({ ...prev, [changeActiveGrade]: { ...prev[changeActiveGrade], timetable: null } }));
+    }
+  };
+
+  const handleDeleteExtraUpload = (key: 'grade2Optional' | 'grade3Sem1') => {
+    if (confirm("업로드된 파일을 삭제하시겠습니까?")) {
+      if (key === 'grade2Optional') {
+        setGrade2HistoryData(prev => ({ ...prev, [changeActiveGrade]: {} }));
+      } else {
+        setGrade3Sem1HistoryData(prev => ({ ...prev, [changeActiveGrade]: {} }));
+      }
+      setExtraUploads(prev => ({ ...prev, [changeActiveGrade]: { ...prev[changeActiveGrade], [key]: false } }));
+      setChangeUploadNames(prev => ({ ...prev, [changeActiveGrade]: { ...prev[changeActiveGrade], [key]: null } }));
+    }
+  };
 
   const handleExtraUpload = (key: 'grade2Optional' | 'grade3Sem1') => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -173,6 +196,7 @@ export default function Home() {
       }
 
       setExtraUploads(prev => ({ ...prev, [changeActiveGrade]: { ...prev[changeActiveGrade], [key]: true } }));
+      setChangeUploadNames(prev => ({ ...prev, [changeActiveGrade]: { ...prev[changeActiveGrade], [key]: file.name } }));
     };
     reader.readAsBinaryString(file);
     e.target.value = "";
@@ -312,6 +336,7 @@ export default function Home() {
         ...prev,
         [changeActiveGrade]: students
       }));
+      setChangeUploadNames(prev => ({ ...prev, [changeActiveGrade]: { ...prev[changeActiveGrade], timetable: file.name } }));
 
       alert(`${changeActiveGrade === "grade2" ? "2학년" : "3학년"} 학생 데이터 ${students.length}명 파싱 완료!`);
     };
@@ -333,7 +358,7 @@ export default function Home() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSaveBackup = () => {
+  const handleSaveBackup = async () => {
     const backupData = {
       parsedCurriculumList,
       subjectMap,
@@ -359,17 +384,42 @@ export default function Home() {
       classCols,
       grade2HistoryData,
       grade3Sem1HistoryData,
-      extraUploads
+      extraUploads,
+      changeUploadNames
     };
-    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "수강신청_설정_백업.json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    
+    const jsonString = JSON.stringify(backupData, null, 2);
+    const suggestedName = "2026학년도 수요조사 및 선택과목 변경.json";
+
+    try {
+      if ('showSaveFilePicker' in window) {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName,
+          types: [{
+            description: 'JSON 파일',
+            accept: { 'application/json': ['.json'] },
+          }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(jsonString);
+        await writable.close();
+      } else {
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = suggestedName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('Failed to save file:', err);
+        alert('파일 저장 중 오류가 발생했습니다.');
+      }
+    }
   };
 
   const handleLoadBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -439,6 +489,9 @@ export default function Home() {
           } else {
             setExtraUploads({ grade2: parsed.extraUploads, grade3: parsed.extraUploads });
           }
+        }
+        if (parsed.changeUploadNames) {
+          setChangeUploadNames(parsed.changeUploadNames);
         }
 
         alert("작업 내역을 성공적으로 불러왔습니다.");
@@ -571,15 +624,28 @@ export default function Home() {
             individualSubjects.forEach(sub => {
               if (sub && sub.length > 1) {
                 const actualCredits = sem1_1 || sem1_2 || sem2_1 || sem2_2 || sem3_1 || sem3_2 || 0;
-                newParsed.push({
-                  type,
-                  subject: sub,
-                  category,
-                  credits: actualCredits,
-                  sem1: activeGrade === "grade1" ? sem1_1 : activeGrade === "grade2" ? sem2_1 : 0,
-                  sem2: activeGrade === "grade1" ? sem1_2 : activeGrade === "grade2" ? sem2_2 : 0,
-                  semesters: sems.length > 0 ? sems.join(", ") : "미지정 (엑셀 빈칸)"
-                });
+                const sem1Val = activeGrade === "grade1" ? sem1_1 : activeGrade === "grade2" ? sem2_1 : 0;
+                const sem2Val = activeGrade === "grade1" ? sem1_2 : activeGrade === "grade2" ? sem2_2 : 0;
+                
+                const existing = newParsed.find(p => p.subject === sub);
+                if (existing) {
+                  existing.credits = Math.max(existing.credits, actualCredits);
+                  existing.sem1 = Math.max(existing.sem1, sem1Val);
+                  existing.sem2 = Math.max(existing.sem2, sem2Val);
+                  
+                  const semsSet = new Set(existing.semesters.split(', ').concat(sems).filter(s => s && s !== "미지정 (엑셀 빈칸)"));
+                  existing.semesters = semsSet.size > 0 ? Array.from(semsSet).join(", ") : "미지정 (엑셀 빈칸)";
+                } else {
+                  newParsed.push({
+                    type,
+                    subject: sub,
+                    category,
+                    credits: actualCredits,
+                    sem1: sem1Val,
+                    sem2: sem2Val,
+                    semesters: sems.length > 0 ? sems.join(", ") : "미지정 (엑셀 빈칸)"
+                  });
+                }
 
                 // Populate backward compatibility states for the chosen grade
                 let sem1ForGrade = 0, sem2ForGrade = 0;
@@ -722,15 +788,28 @@ export default function Home() {
             individualSubjects.forEach(sub => {
               if (sub && sub.length > 1) {
                 const actualCredits = sem1_1 || sem1_2 || sem2_1 || sem2_2 || sem3_1 || sem3_2 || 0;
-                newParsed.push({
-                  type,
-                  subject: sub,
-                  category,
-                  credits: actualCredits,
-                  sem1: changeActiveGrade === "grade2" ? sem2_1 : changeActiveGrade === "grade3" ? sem3_1 : 0,
-                  sem2: changeActiveGrade === "grade2" ? sem2_2 : changeActiveGrade === "grade3" ? sem3_2 : 0,
-                  semesters: sems.length > 0 ? sems.join(", ") : "미지정 (엑셀 빈칸)"
-                });
+                const sem1Val = changeActiveGrade === "grade2" ? sem2_1 : changeActiveGrade === "grade3" ? sem3_1 : 0;
+                const sem2Val = changeActiveGrade === "grade2" ? sem2_2 : changeActiveGrade === "grade3" ? sem3_2 : 0;
+                
+                const existing = newParsed.find(p => p.subject === sub);
+                if (existing) {
+                  existing.credits = Math.max(existing.credits, actualCredits);
+                  existing.sem1 = Math.max(existing.sem1, sem1Val);
+                  existing.sem2 = Math.max(existing.sem2, sem2Val);
+                  
+                  const semsSet = new Set(existing.semesters.split(', ').concat(sems).filter(s => s && s !== "미지정 (엑셀 빈칸)"));
+                  existing.semesters = semsSet.size > 0 ? Array.from(semsSet).join(", ") : "미지정 (엑셀 빈칸)";
+                } else {
+                  newParsed.push({
+                    type,
+                    subject: sub,
+                    category,
+                    credits: actualCredits,
+                    sem1: sem1Val,
+                    sem2: sem2Val,
+                    semesters: sems.length > 0 ? sems.join(", ") : "미지정 (엑셀 빈칸)"
+                  });
+                }
 
                 let broadCat: SubjectCategory = "기타";
                 if (["국어", "수학", "영어"].includes(category)) broadCat = "기초";
@@ -2148,29 +2227,32 @@ export default function Home() {
       const maxRows = Math.max(0, ...Object.values(colStudents).map(arr => arr.length));
       const wsData: any[][] = [];
 
-      const row1: any[] = [];
-      const row2: any[] = [];
-      const row3: any[] = [];
+      const row1: any[] = ["과목명"];
+      const row2: any[] = ["강의실"];
+      const row3: any[] = ["교사"];
+      const row4: any[] = ["순번"];
       const merges: any[] = [];
 
-      let currentColIdx = 0;
+      let currentColIdx = 1;
       cols.forEach((col, idx) => {
         const teacher = gTimetable[timeSlot]?.[col]?.teacher || "-";
         const subject = gTimetable[timeSlot]?.[col]?.subject || "-";
 
         row1.push(subject, "");
-        row2.push(teacher, "");
-        row3.push("학번", "이름");
+        row2.push(col, "");
+        row3.push(teacher, "");
+        row4.push("학번", "이름");
 
         merges.push({ s: { r: 0, c: currentColIdx }, e: { r: 0, c: currentColIdx + 1 } });
         merges.push({ s: { r: 1, c: currentColIdx }, e: { r: 1, c: currentColIdx + 1 } });
+        merges.push({ s: { r: 2, c: currentColIdx }, e: { r: 2, c: currentColIdx + 1 } });
         currentColIdx += 2;
       });
 
-      wsData.push(row1, row2, row3);
+      wsData.push(row1, row2, row3, row4);
 
       for (let i = 0; i < maxRows; i++) {
-        const dataRow: any[] = [];
+        const dataRow: any[] = [i + 1];
         cols.forEach(col => {
           const student = colStudents[col][i];
           if (student) {
@@ -2182,6 +2264,16 @@ export default function Home() {
         wsData.push(dataRow);
       }
 
+      const totalRow: any[] = ["총 인원"];
+      let tColIdx = 1;
+      cols.forEach(col => {
+        const count = colStudents[col].length;
+        totalRow.push(`${count}명`, "");
+        merges.push({ s: { r: wsData.length, c: tColIdx }, e: { r: wsData.length, c: tColIdx + 1 } });
+        tColIdx += 2;
+      });
+      wsData.push(totalRow);
+
       const ws = XLSX.utils.aoa_to_sheet(wsData);
       ws['!merges'] = merges;
 
@@ -2189,11 +2281,17 @@ export default function Home() {
         if (cell[0] === '!') continue;
         if (!ws[cell].s) ws[cell].s = {};
         ws[cell].s = {
-          alignment: { horizontal: "center", vertical: "center" }
+          alignment: { horizontal: "center", vertical: "center" },
+          border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } }
+          }
         };
       }
 
-      const wscols = [];
+      const wscols = [{ wpx: 60 }];
       for (let i = 0; i < cols.length * 2; i++) {
         wscols.push({ wpx: 80 });
       }
@@ -3530,14 +3628,29 @@ export default function Home() {
                           <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">
                             <CheckCircle2 className="w-10 h-10 text-emerald-400" />
                           </div>
-                          <h3 className="text-xl font-semibold text-emerald-400 mb-2">업로드 및 파싱 완료</h3>
-                          <p className="text-slate-300 mb-2 font-medium">
-                            {changeActiveGrade === "grade2" ? "2학년" : "3학년"} 학생 선택 데이터: {parsedSampleData[changeActiveGrade].length}명
+                          <h3 className="text-xl font-medium text-slate-200 mb-2">학생 선택 데이터 파일 (sample3) 업로드</h3>
+                          <p className="text-slate-400 mb-4 text-center max-w-md">
+                            과목명이 열 헤더로 지정되어 있고, 셀 값으로 A, B, C, D 등의 선택 그룹이 명시된 수요조사 결과 파일을 업로드해 주세요.
                           </p>
-                          <p className="text-slate-400 text-sm mb-6 max-w-md">
-                            다음 단계인 '2단계: 타임별 시간표 입력' 탭으로 이동하여 시간표를 작성하거나 파일을 다시 업로드할 수 있습니다.
-                          </p>
+                          <div className="flex flex-col items-center gap-2 mb-6">
+                            <div className="flex items-center gap-2">
+                              <FileIcon className="w-4 h-4 text-emerald-400" />
+                              <span className="text-emerald-400 font-medium">
+                                {changeUploadNames[changeActiveGrade]?.timetable || '업로드된 파일'}
+                              </span>
+                            </div>
+                            <span className="text-slate-400 text-sm">
+                              {changeActiveGrade === "grade2" ? "2학년" : "3학년"} 학생 선택 데이터: {parsedSampleData[changeActiveGrade].length}명 파싱 완료
+                            </span>
+                          </div>
                           <div className="flex gap-4">
+                            <button
+                              onClick={handleDeleteSampleUpload}
+                              className="flex items-center gap-2 px-5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 font-medium rounded-xl transition-all"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              삭제
+                            </button>
                             <label className="cursor-pointer flex items-center gap-2 px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium rounded-xl transition-all">
                               <Upload className="w-4 h-4" />
                               재업로드
@@ -3588,12 +3701,27 @@ export default function Home() {
                               <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">
                                 <CheckCircle2 className="w-8 h-8 text-emerald-400" />
                               </div>
-                              <h3 className="text-lg font-semibold text-emerald-400 mb-4">업로드 완료</h3>
-                              <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium rounded-xl transition-all">
-                                <Upload className="w-4 h-4" />
-                                재업로드
-                                <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleExtraUpload('grade2Optional')} />
-                              </label>
+                              <h3 className="text-lg font-medium text-slate-200 mb-4">2학년 수강과목 데이터 업로드(선택)</h3>
+                              <div className="flex items-center gap-2 mb-6 text-sm">
+                                <FileIcon className="w-4 h-4 text-emerald-400" />
+                                <span className="text-emerald-400 font-medium">
+                                  {changeUploadNames[changeActiveGrade]?.grade2Optional || '업로드된 파일'}
+                                </span>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleDeleteExtraUpload('grade2Optional')}
+                                  className="flex items-center gap-2 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 font-medium rounded-xl transition-all text-sm"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  삭제
+                                </button>
+                                <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium rounded-xl transition-all">
+                                  <Upload className="w-4 h-4" />
+                                  재업로드
+                                  <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleExtraUpload('grade2Optional')} />
+                                </label>
+                              </div>
                             </>
                           ) : (
                             <>
@@ -3617,12 +3745,27 @@ export default function Home() {
                               <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">
                                 <CheckCircle2 className="w-8 h-8 text-emerald-400" />
                               </div>
-                              <h3 className="text-lg font-semibold text-emerald-400 mb-4">업로드 완료</h3>
-                              <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium rounded-xl transition-all">
-                                <Upload className="w-4 h-4" />
-                                재업로드
-                                <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleExtraUpload('grade3Sem1')} />
-                              </label>
+                              <h3 className="text-lg font-medium text-slate-200 mb-4">3학년 1학기 데이터 업로드</h3>
+                              <div className="flex items-center gap-2 mb-6 text-sm">
+                                <FileIcon className="w-4 h-4 text-emerald-400" />
+                                <span className="text-emerald-400 font-medium">
+                                  {changeUploadNames[changeActiveGrade]?.grade3Sem1 || '업로드된 파일'}
+                                </span>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleDeleteExtraUpload('grade3Sem1')}
+                                  className="flex items-center gap-2 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 font-medium rounded-xl transition-all text-sm"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  삭제
+                                </button>
+                                <label className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium rounded-xl transition-all">
+                                  <Upload className="w-4 h-4" />
+                                  재업로드
+                                  <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleExtraUpload('grade3Sem1')} />
+                                </label>
+                              </div>
                             </>
                           ) : (
                             <>
