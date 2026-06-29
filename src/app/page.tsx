@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, Fragment, useMemo } from "react";
+import React, { useState, useEffect, useRef, Fragment, useMemo, useCallback } from "react";
 import { Upload, FileText, Settings, Download, CheckCircle2, ChevronRight, Trash2, File as FileIcon, Save, FolderOpen, GitBranch, Plus, Users } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 
@@ -78,33 +78,38 @@ export default function Home() {
   const [activeSidebarTab, setActiveSidebarTab] = useState<"survey" | "change">("survey");
   const [activeGrade, setActiveGrade] = useState<GradeKey>("grade1");
 
-  const [changeActiveTab, setChangeActiveTab] = useState<"upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis">("upload");
+  const [changeActiveTab, setChangeActiveTab] = useState<"basic" | "upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis">("basic");
   const [changeActiveGrade, setChangeActiveGrade] = useState<"grade2" | "grade3">("grade2");
   const [changeRosterTimeSlot, setChangeRosterTimeSlot] = useState("A");
 
-  const initialTimeSlots = ["A", "B", "C", "D", "E", "F", "G"];
-  const initialColsG2 = Array.from({length: 9}, (_, i) => `2-${i + 1}`);
-  const initialColsG3 = Array.from({length: 9}, (_, i) => `3-${i + 1}`);
+  const [changeTimeSlots, setChangeTimeSlots] = useState<{ grade2: string[], grade3: string[] }>({ grade2: [], grade3: [] });
+  const [changeClassCols, setChangeClassCols] = useState<{ grade2: string[], grade3: string[] }>({ grade2: [], grade3: [] });
+  const [changeTimetableData, setChangeTimetableData] = useState<any>({ grade2: {}, grade3: {} });
+  const [changeParsedSampleData, setChangeParsedSampleData] = useState<any>({ grade2: [], grade3: [] });
 
-  const [timeSlots, setTimeSlots] = useState<{grade2: string[], grade3: string[]}>({
+  const initialTimeSlots = ["A", "B", "C", "D", "E", "F", "G"];
+  const initialColsG2 = Array.from({ length: 9 }, (_, i) => `2-${i + 1}`);
+  const initialColsG3 = Array.from({ length: 9 }, (_, i) => `3-${i + 1}`);
+
+  const [timeSlots, setTimeSlots] = useState<{ grade2: string[], grade3: string[] }>({
     grade2: [...initialTimeSlots], grade3: [...initialTimeSlots]
   });
-  const [classCols, setClassCols] = useState<{grade2: string[], grade3: string[]}>({
+  const [classCols, setClassCols] = useState<{ grade2: string[], grade3: string[] }>({
     grade2: [...initialColsG2], grade3: [...initialColsG3]
   });
   const [timetableData, setTimetableData] = useState<{
     grade2: Record<string, Record<string, { subject: string, teacher: string }>>,
     grade3: Record<string, Record<string, { subject: string, teacher: string }>>
   }>({ grade2: {}, grade3: {} });
-  
+
   const [parsedSampleData, setParsedSampleData] = useState<{
     grade2: StudentTimeData[],
     grade3: StudentTimeData[]
   }>({ grade2: [], grade3: [] });
 
-  const [grade2HistoryData, setGrade2HistoryData] = useState<Record<string, string[]>>({});
-  const [grade3Sem1HistoryData, setGrade3Sem1HistoryData] = useState<Record<string, string[]>>({});
-  const [extraUploads, setExtraUploads] = useState({ grade2Optional: false, grade3Sem1: false });
+  const [grade2HistoryData, setGrade2HistoryData] = useState<Record<string, Record<string, string[]>>>({ grade2: {}, grade3: {} });
+  const [grade3Sem1HistoryData, setGrade3Sem1HistoryData] = useState<Record<string, Record<string, string[]>>>({ grade2: {}, grade3: {} });
+  const [extraUploads, setExtraUploads] = useState<Record<string, { grade2Optional: boolean; grade3Sem1: boolean }>>({ grade2: { grade2Optional: false, grade3Sem1: false }, grade3: { grade2Optional: false, grade3Sem1: false } });
 
   const handleExtraUpload = (key: 'grade2Optional' | 'grade3Sem1') => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -116,16 +121,16 @@ export default function Home() {
       const wb = XLSX.read(bstr, { type: "binary" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
-      
+
       const parsedData: Record<string, string[]> = {};
-      
+
       if (key === 'grade2Optional') {
         if (json.length >= 2) {
           const headers = json[1];
           for (let i = 2; i < json.length; i++) {
             const row = json[i];
             if (!row || row.length === 0 || !row[1] || String(row[1]) === '합계') continue;
-            const studentId = String(row[1]);
+            const studentId = String(row[1]).trim();
             const subjects: string[] = [];
             for (let c = 7; c < headers.length; c++) {
               if (row[c] && headers[c]) {
@@ -135,25 +140,25 @@ export default function Home() {
             }
             parsedData[studentId] = subjects;
           }
-          setGrade2HistoryData(parsedData);
+          setGrade2HistoryData(prev => ({ ...prev, [changeActiveGrade]: parsedData }));
         }
       } else if (key === 'grade3Sem1') {
         if (json.length >= 2) {
           const superHeaders = json[0];
           const headers = json[1];
           let lastSuperHeader = "";
-          
+
           for (let i = 2; i < json.length; i++) {
             const row = json[i];
             if (!row || row.length === 0 || !row[1] || String(row[1]) === '합계') continue;
-            const studentId = String(row[1]);
+            const studentId = String(row[1]).trim();
             const subjects: string[] = [];
-            
+
             let currentSuper = "";
             for (let c = 7; c < headers.length; c++) {
               const sHeader = String(superHeaders[c] || "").trim();
               if (sHeader) currentSuper = sHeader;
-              
+
               if (currentSuper.includes('1학기') || currentSuper.includes('1,2학기')) {
                 if (row[c] && headers[c]) {
                   const subj = String(headers[c]).trim();
@@ -163,17 +168,18 @@ export default function Home() {
             }
             parsedData[studentId] = subjects;
           }
-          setGrade3Sem1HistoryData(parsedData);
+          setGrade3Sem1HistoryData(prev => ({ ...prev, [changeActiveGrade]: parsedData }));
         }
       }
-      
-      setExtraUploads(prev => ({ ...prev, [key]: true }));
+
+      setExtraUploads(prev => ({ ...prev, [changeActiveGrade]: { ...prev[changeActiveGrade], [key]: true } }));
     };
     reader.readAsBinaryString(file);
     e.target.value = "";
   };
 
   const [electiveChanges, setElectiveChanges] = useState<Record<string, any[]>>({ grade2: [], grade3: [] });
+  const [enableOptimization, setEnableOptimization] = useState(false);
   const handleTimetablePaste = (e: React.ClipboardEvent, startRowIndex: number, startColIndex: number, field: "subject" | "teacher") => {
     e.preventDefault();
     const pastedText = e.clipboardData.getData("Text");
@@ -259,6 +265,11 @@ export default function Home() {
   const [isCurriculumParsed, setIsCurriculumParsed] = useState<{ [key in GradeKey]: boolean }>({ grade1: false, grade2: false });
   const [hierarchyRules, setHierarchyRules] = useState<{ [key in GradeKey]: HierarchyRule[] }>({ grade1: [], grade2: [] });
 
+  const [changeParsedCurriculumList, setChangeParsedCurriculumList] = useState<Record<string, ParsedCurriculumSubject[]>>({});
+  const [changeSubjectMap, setChangeSubjectMap] = useState<Record<string, SubjectMap>>({});
+  const [changeIsCurriculumParsed, setChangeIsCurriculumParsed] = useState<Record<string, boolean>>({});
+  const [changeHierarchyRules, setChangeHierarchyRules] = useState<Record<string, HierarchyRule[]>>({});
+
   const handleChangeSampleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -269,7 +280,7 @@ export default function Home() {
       const wb = XLSX.read(bstr, { type: "binary" });
       const sheetName = wb.SheetNames[0];
       const sheet = wb.Sheets[sheetName];
-      
+
       const json = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
       if (json.length < 2) return;
 
@@ -280,9 +291,9 @@ export default function Home() {
         const row = json[r];
         if (!row || row.length === 0 || !row[1]) continue;
 
-        const id = String(row[1]);
+        const id = String(row[1]).trim();
         const name = String(row[2] || "");
-        
+
         const timeSlotMap: Record<string, string> = {};
         for (let c = 8; c < row.length; c++) {
           const timeVal = row[c];
@@ -307,7 +318,7 @@ export default function Home() {
     reader.readAsBinaryString(file);
     e.target.value = "";
   };
-  
+
   const [uploadedFiles, setUploadedFiles] = useState<{ [key in GradeKey]: { name: string, size: number, data: string } | null }>({ grade1: null, grade2: null });
   const [processedData, setProcessedData] = useState<{ [key in GradeKey]: ProcessedStudent[] }>({ grade1: [], grade2: [] });
   const [rawSheetData, setRawSheetData] = useState<{ [key in GradeKey]: any[] }>({ grade1: [], grade2: [] });
@@ -323,12 +334,16 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSaveBackup = () => {
-    const backupData = { 
-      parsedCurriculumList, 
-      subjectMap, 
-      isCurriculumParsed, 
-      hierarchyRules, 
-      uploadedFiles, 
+    const backupData = {
+      parsedCurriculumList,
+      subjectMap,
+      isCurriculumParsed,
+      hierarchyRules,
+      changeParsedCurriculumList,
+      changeSubjectMap,
+      changeIsCurriculumParsed,
+      changeHierarchyRules,
+      uploadedFiles,
       processedData,
       rawSheetData,
       previousHistoryFiles,
@@ -341,7 +356,10 @@ export default function Home() {
       timetableData,
       electiveChanges,
       timeSlots,
-      classCols
+      classCols,
+      grade2HistoryData,
+      grade3Sem1HistoryData,
+      extraUploads
     };
     const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -367,6 +385,10 @@ export default function Home() {
         if (parsed.subjectMap) setSubjectMap(parsed.subjectMap);
         if (parsed.isCurriculumParsed) setIsCurriculumParsed(parsed.isCurriculumParsed);
         if (parsed.hierarchyRules) setHierarchyRules(parsed.hierarchyRules);
+        if (parsed.changeParsedCurriculumList) setChangeParsedCurriculumList(parsed.changeParsedCurriculumList);
+        if (parsed.changeSubjectMap) setChangeSubjectMap(parsed.changeSubjectMap);
+        if (parsed.changeIsCurriculumParsed) setChangeIsCurriculumParsed(parsed.changeIsCurriculumParsed);
+        if (parsed.changeHierarchyRules) setChangeHierarchyRules(parsed.changeHierarchyRules);
         if (parsed.uploadedFiles) setUploadedFiles(parsed.uploadedFiles);
         if (parsed.processedData) setProcessedData(parsed.processedData);
         if (parsed.rawSheetData) setRawSheetData(parsed.rawSheetData);
@@ -381,7 +403,44 @@ export default function Home() {
         if (parsed.electiveChanges) setElectiveChanges(parsed.electiveChanges);
         if (parsed.timeSlots) setTimeSlots(parsed.timeSlots);
         if (parsed.classCols) setClassCols(parsed.classCols);
-  
+        if (parsed.grade2HistoryData) {
+          if (parsed.grade2HistoryData.grade2 || parsed.grade2HistoryData.grade3) {
+            const trimmed: Record<string, Record<string, string[]>> = { grade2: {}, grade3: {} };
+            for (const g of ["grade2", "grade3"]) {
+              if (parsed.grade2HistoryData[g]) {
+                for (const k in parsed.grade2HistoryData[g]) trimmed[g][k.trim()] = parsed.grade2HistoryData[g][k];
+              }
+            }
+            setGrade2HistoryData(trimmed);
+          } else {
+            const trimmed: Record<string, string[]> = {};
+            for (const k in parsed.grade2HistoryData) trimmed[k.trim()] = parsed.grade2HistoryData[k];
+            setGrade2HistoryData({ grade2: trimmed, grade3: trimmed });
+          }
+        }
+        if (parsed.grade3Sem1HistoryData) {
+          if (parsed.grade3Sem1HistoryData.grade2 || parsed.grade3Sem1HistoryData.grade3) {
+            const trimmed: Record<string, Record<string, string[]>> = { grade2: {}, grade3: {} };
+            for (const g of ["grade2", "grade3"]) {
+              if (parsed.grade3Sem1HistoryData[g]) {
+                for (const k in parsed.grade3Sem1HistoryData[g]) trimmed[g][k.trim()] = parsed.grade3Sem1HistoryData[g][k];
+              }
+            }
+            setGrade3Sem1HistoryData(trimmed);
+          } else {
+            const trimmed: Record<string, string[]> = {};
+            for (const k in parsed.grade3Sem1HistoryData) trimmed[k.trim()] = parsed.grade3Sem1HistoryData[k];
+            setGrade3Sem1HistoryData({ grade2: trimmed, grade3: trimmed });
+          }
+        }
+        if (parsed.extraUploads) {
+          if (parsed.extraUploads.grade2 || parsed.extraUploads.grade3) {
+            setExtraUploads(parsed.extraUploads);
+          } else {
+            setExtraUploads({ grade2: parsed.extraUploads, grade3: parsed.extraUploads });
+          }
+        }
+
         alert("작업 내역을 성공적으로 불러왔습니다.");
       } catch (e) {
         alert("올바르지 않은 백업 파일입니다.");
@@ -395,17 +454,15 @@ export default function Home() {
     <div className="flex gap-2 mb-6 border-b border-slate-800 pb-4">
       <button
         onClick={() => setActiveGrade("grade1")}
-        className={`px-6 py-2.5 rounded-xl font-medium transition-all ${
-          activeGrade === "grade1" ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-inner" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-        }`}
+        className={`px-6 py-2.5 rounded-xl font-medium transition-all ${activeGrade === "grade1" ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-inner" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+          }`}
       >
         1학년
       </button>
       <button
         onClick={() => setActiveGrade("grade2")}
-        className={`px-6 py-2.5 rounded-xl font-medium transition-all ${
-          activeGrade === "grade2" ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-inner" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-        }`}
+        className={`px-6 py-2.5 rounded-xl font-medium transition-all ${activeGrade === "grade2" ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-inner" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+          }`}
       >
         2학년
       </button>
@@ -444,7 +501,7 @@ export default function Home() {
       // Find header row indices dynamically for all columns
       let typeIdx = -1, catIdx = -1, subjIdx = -1, credIdx = -1;
       let grade1Idx = -1, grade2Idx = -1, grade3Idx = -1;
-      
+
       for (let r = 0; r < Math.min(6, json.length); r++) {
         if (json[r]) {
           for (let c = 0; c < json[r].length; c++) {
@@ -452,7 +509,7 @@ export default function Home() {
             if (val === "1학년" && grade1Idx === -1) grade1Idx = c;
             if (val === "2학년" && grade2Idx === -1) grade2Idx = c;
             if (val === "3학년" && grade3Idx === -1) grade3Idx = c;
-            
+
             if (val.includes("구분") && typeIdx === -1) typeIdx = c;
             if ((val.includes("교과(군)") || val === "교과군") && catIdx === -1) catIdx = c;
             if ((val === "과목" || val.includes("과목명")) && subjIdx === -1) subjIdx = c;
@@ -480,7 +537,7 @@ export default function Home() {
       for (let r = 0; r < json.length; r++) {
         const row = json[r];
         if (!row) continue;
-        
+
         const typeStr = String(row[typeIdx] || "").replace(/\s+/g, "");
         let category = String(row[catIdx] || "").replace(/\s+/g, "");
         category = category.replace(/\(역사\/도덕포함\)/g, "").trim();
@@ -488,11 +545,11 @@ export default function Home() {
 
         if (subjectNameRaw && subjectNameRaw.length > 1 && subjectNameRaw !== "과목" && !subjectNameRaw.includes("소계") && !subjectNameRaw.includes("합계")) {
           if (["공통", "일반", "진로", "융합"].includes(subjectNameRaw)) continue;
-          
+
           let type: "지정" | "선택" | null = null;
           if (typeStr.includes("지정")) type = "지정";
           else if (typeStr.includes("선택")) type = "선택";
-          
+
           if (type) {
             let sem1_1 = Number(row[grade1Idx]) || 0;
             let sem1_2 = Number(row[grade1Idx + 1]) || 0;
@@ -510,7 +567,7 @@ export default function Home() {
             if (sem3_2) sems.push("3학년 2학기");
 
             const individualSubjects = subjectNameRaw.split("↔").map(s => s.trim());
-            
+
             individualSubjects.forEach(sub => {
               if (sub && sub.length > 1) {
                 const actualCredits = sem1_1 || sem1_2 || sem2_1 || sem2_2 || sem3_1 || sem3_2 || 0;
@@ -571,6 +628,139 @@ export default function Home() {
     }));
   };
 
+  const handleChangeCurriculumUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const data = evt.target?.result;
+      if (!data) return;
+
+      const workbook = XLSX.read(data, { type: "binary" });
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+
+      if (sheet['!merges']) {
+        sheet['!merges'].forEach((m: any) => {
+          const val = json[m.s.r]?.[m.s.c];
+          if (val !== undefined) {
+            for (let r = m.s.r; r <= m.e.r; r++) {
+              if (!json[r]) json[r] = [];
+              for (let c = m.s.c; c <= m.e.c; c++) json[r][c] = val;
+            }
+          }
+        });
+      }
+
+      let typeIdx = -1, catIdx = -1, subjIdx = -1, credIdx = -1;
+      let grade1Idx = -1, grade2Idx = -1, grade3Idx = -1;
+
+      for (let r = 0; r < Math.min(6, json.length); r++) {
+        if (json[r]) {
+          for (let c = 0; c < json[r].length; c++) {
+            const val = String(json[r][c] || "").replace(/\s+/g, "");
+            if (val === "1학년" && grade1Idx === -1) grade1Idx = c;
+            if (val === "2학년" && grade2Idx === -1) grade2Idx = c;
+            if (val === "3학년" && grade3Idx === -1) grade3Idx = c;
+
+            if (val.includes("구분") && typeIdx === -1) typeIdx = c;
+            if ((val.includes("교과(군)") || val === "교과군") && catIdx === -1) catIdx = c;
+            if ((val === "과목" || val.includes("과목명")) && subjIdx === -1) subjIdx = c;
+            if (val.includes("운영학점") && credIdx === -1) credIdx = c;
+          }
+        }
+      }
+
+      if (typeIdx === -1) typeIdx = 0;
+      if (catIdx === -1) catIdx = 1;
+      if (subjIdx === -1) subjIdx = 3;
+      if (credIdx === -1) credIdx = 5;
+
+      if (grade1Idx === -1) grade1Idx = 6;
+      if (grade2Idx === -1) grade2Idx = 8;
+      if (grade3Idx === -1) grade3Idx = 10;
+
+      const newParsed: ParsedCurriculumSubject[] = [];
+      const newMap: SubjectMap = {};
+
+      for (let r = 0; r < json.length; r++) {
+        const row = json[r];
+        if (!row) continue;
+
+        const typeStr = String(row[typeIdx] || "").replace(/\s+/g, "");
+        let category = String(row[catIdx] || "").replace(/\s+/g, "");
+        category = category.replace(/\(역사\/도덕포함\)/g, "").trim();
+        const subjectNameRaw = String(row[subjIdx] || "").trim();
+
+        if (subjectNameRaw && subjectNameRaw.length > 1 && subjectNameRaw !== "과목" && !subjectNameRaw.includes("소계") && !subjectNameRaw.includes("합계")) {
+          if (["공통", "일반", "진로", "융합"].includes(subjectNameRaw)) continue;
+
+          let type: "지정" | "선택" | null = null;
+          if (typeStr.includes("지정")) type = "지정";
+          else if (typeStr.includes("선택")) type = "선택";
+
+          if (type) {
+            let sem1_1 = Number(row[grade1Idx]) || 0;
+            let sem1_2 = Number(row[grade1Idx + 1]) || 0;
+            let sem2_1 = Number(row[grade2Idx]) || 0;
+            let sem2_2 = Number(row[grade2Idx + 1]) || 0;
+            let sem3_1 = Number(row[grade3Idx]) || 0;
+            let sem3_2 = Number(row[grade3Idx + 1]) || 0;
+
+            const sems: string[] = [];
+            if (sem1_1) sems.push("1학년 1학기");
+            if (sem1_2) sems.push("1학년 2학기");
+            if (sem2_1) sems.push("2학년 1학기");
+            if (sem2_2) sems.push("2학년 2학기");
+            if (sem3_1) sems.push("3학년 1학기");
+            if (sem3_2) sems.push("3학년 2학기");
+
+            const individualSubjects = subjectNameRaw.split("↔").map(s => s.trim());
+
+            individualSubjects.forEach(sub => {
+              if (sub && sub.length > 1) {
+                const actualCredits = sem1_1 || sem1_2 || sem2_1 || sem2_2 || sem3_1 || sem3_2 || 0;
+                newParsed.push({
+                  type,
+                  subject: sub,
+                  category,
+                  credits: actualCredits,
+                  sem1: changeActiveGrade === "grade2" ? sem2_1 : changeActiveGrade === "grade3" ? sem3_1 : 0,
+                  sem2: changeActiveGrade === "grade2" ? sem2_2 : changeActiveGrade === "grade3" ? sem3_2 : 0,
+                  semesters: sems.length > 0 ? sems.join(", ") : "미지정 (엑셀 빈칸)"
+                });
+
+                let broadCat: SubjectCategory = "기타";
+                if (["국어", "수학", "영어"].includes(category)) broadCat = "기초";
+                else if (["사회", "역사", "도덕", "사회(역사/도덕포함)"].includes(category)) broadCat = "사회";
+                else if (["과학"].includes(category)) broadCat = "과학";
+
+                if (type !== "지정") {
+                  newMap[sub] = broadCat;
+                }
+              }
+            });
+          }
+        }
+      }
+
+      setChangeParsedCurriculumList(prev => ({ ...prev, [changeActiveGrade]: newParsed }));
+      setChangeSubjectMap(prev => ({ ...prev, [changeActiveGrade]: newMap }));
+      setChangeIsCurriculumParsed(prev => ({ ...prev, [changeActiveGrade]: true }));
+      alert("교육과정 엑셀 파일이 성공적으로 업로드되었습니다!");
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleChangeCategoryChange = (subject: string, category: SubjectCategory) => {
+    setChangeSubjectMap(prev => ({
+      ...prev,
+      [changeActiveGrade]: { ...prev[changeActiveGrade], [subject]: category }
+    }));
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -580,13 +770,13 @@ export default function Home() {
       const arrayBuffer = evt.target?.result as ArrayBuffer;
       const dataUrlReader = new FileReader();
       dataUrlReader.onload = (dataEvt) => {
-        setUploadedFiles(prev => ({ 
-          ...prev, 
-          [activeGrade]: { 
-            name: file.name, 
-            size: file.size, 
-            data: dataEvt.target?.result as string 
-          } 
+        setUploadedFiles(prev => ({
+          ...prev,
+          [activeGrade]: {
+            name: file.name,
+            size: file.size,
+            data: dataEvt.target?.result as string
+          }
         }));
       };
       dataUrlReader.readAsDataURL(file);
@@ -595,7 +785,7 @@ export default function Home() {
       const wsname = wb.SheetNames.length > 1 ? wb.SheetNames[1] : wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
       const sheetData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-      
+
       let headerRowIndex = -1;
       for (let i = 0; i < sheetData.length; i++) {
         const row = sheetData[i];
@@ -621,10 +811,10 @@ export default function Home() {
       const idColIndex = tempHeaders.findIndex(h => h.includes("학번"));
       const nameColIndex = tempHeaders.findIndex(h => h.includes("이름") || h.includes("성명"));
 
-      const hasMultiRowHeader = row2 && 
-                                !row2[idColIndex] && 
-                                !row2[nameColIndex] && 
-                                row2.some(cell => typeof cell === "string" && String(cell).trim().length > 0);
+      const hasMultiRowHeader = row2 &&
+        !row2[idColIndex] &&
+        !row2[nameColIndex] &&
+        row2.some(cell => typeof cell === "string" && String(cell).trim().length > 0);
 
       const blocklist = ["순번", "학년", "학번", "이름", "성명", "성별", "과정", "메모", "과목수", "합계", "총계"];
       const headers: string[] = [];
@@ -665,12 +855,12 @@ export default function Home() {
       }
 
       const startDataRowIndex = hasMultiRowHeader ? headerRowIndex + 2 : headerRowIndex + 1;
-      
+
       const dataObjects: any[] = [];
       for (let i = startDataRowIndex; i < sheetData.length; i++) {
         const row = sheetData[i];
         if (!row || row.length === 0) continue;
-        
+
         const obj: any = {};
         let hasAnyData = false;
         headers.forEach((header, colIndex) => {
@@ -700,13 +890,13 @@ export default function Home() {
       const arrayBuffer = evt.target?.result as ArrayBuffer;
       const dataUrlReader = new FileReader();
       dataUrlReader.onload = (dataEvt) => {
-        setPreviousHistoryFiles(prev => ({ 
-          ...prev, 
-          [activeGrade]: { 
-            name: file.name, 
-            size: file.size, 
-            data: dataEvt.target?.result as string 
-          } 
+        setPreviousHistoryFiles(prev => ({
+          ...prev,
+          [activeGrade]: {
+            name: file.name,
+            size: file.size,
+            data: dataEvt.target?.result as string
+          }
         }));
       };
       dataUrlReader.readAsDataURL(file);
@@ -715,7 +905,7 @@ export default function Home() {
       const wsname = wb.SheetNames.length > 1 ? wb.SheetNames[1] : wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
       const sheetData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
-      
+
       let headerRowIndex = -1;
       for (let i = 0; i < sheetData.length; i++) {
         const row = sheetData[i];
@@ -741,10 +931,10 @@ export default function Home() {
       const idColIndex = tempHeaders.findIndex(h => h.includes("학번"));
       const nameColIndex = tempHeaders.findIndex(h => h.includes("이름") || h.includes("성명"));
 
-      const hasMultiRowHeader = row2 && 
-                                !row2[idColIndex] && 
-                                !row2[nameColIndex] && 
-                                row2.some(cell => typeof cell === "string" && String(cell).trim().length > 0);
+      const hasMultiRowHeader = row2 &&
+        !row2[idColIndex] &&
+        !row2[nameColIndex] &&
+        row2.some(cell => typeof cell === "string" && String(cell).trim().length > 0);
 
       const blocklist = ["순번", "학년", "학번", "이름", "성명", "성별", "과정", "메모", "과목수", "합계", "총계"];
       const headers: string[] = [];
@@ -803,7 +993,7 @@ export default function Home() {
 
         if (!studentId || !name) continue;
         if (studentId.includes("합계") || name.includes("합계") || studentId.includes("총계") || name.includes("총계")) continue;
-        if (!/^\d+/.test(studentId)) continue; 
+        if (!/^\d+/.test(studentId)) continue;
 
         const completedSubjects: string[] = [];
         subjectCols.forEach(col => {
@@ -837,7 +1027,7 @@ export default function Home() {
   const normalizeSubjectName = (name: string): string => {
     if (!name) return "";
     let normalized = name.trim().replace(/\s+/g, "");
-    
+
     // 1. 유니코드 로마자 (Ⅰ, Ⅱ, Ⅲ, Ⅳ, Ⅴ) -> 영어 알파벳 (I, II, III, IV, V)으로 통일
     normalized = normalized
       .replace(/Ⅰ/g, "I")
@@ -859,7 +1049,7 @@ export default function Home() {
 
   const getSubjectCategory = (subjName: string, targetGrade: GradeKey): SubjectCategory => {
     const normalizedSubject = normalizeSubjectName(subjName);
-    
+
     const findCategoryFromParsed = (grade: GradeKey): SubjectCategory | null => {
       const list = parsedCurriculumList[grade] || [];
       for (const subj of list) {
@@ -875,11 +1065,11 @@ export default function Home() {
 
     let cat = findCategoryFromParsed(targetGrade);
     if (cat) return cat;
-    
+
     const otherGradeKey: GradeKey = targetGrade === "grade2" ? "grade1" : "grade2";
     cat = findCategoryFromParsed(otherGradeKey);
     if (cat) return cat;
-    
+
     // Fallback to subjectMap
     // 1. Check target grade's subjectMap first
     const targetSubjectMap = subjectMap[targetGrade] || {};
@@ -888,7 +1078,7 @@ export default function Home() {
       const normalizedMapSubj = normalizeSubjectName(mapSubj);
       if (normalizedSubject.includes(normalizedMapSubj)) return mapCat;
     }
-    
+
     // 2. Check other grade's subjectMap as fallback
     const otherSubjectMap = subjectMap[otherGradeKey] || {};
     const sortedOtherMapEntries = Object.entries(otherSubjectMap).sort((a, b) => b[0].replace(/\s+/g, "").length - a[0].replace(/\s+/g, "").length);
@@ -896,18 +1086,45 @@ export default function Home() {
       const normalizedMapSubj = normalizeSubjectName(mapSubj);
       if (normalizedSubject.includes(normalizedMapSubj)) return mapCat;
     }
-    
+
     return "기타";
   };
+
+  const getChangeSubjectCategory = useCallback((subjName: string, targetGrade: GradeKey): SubjectCategory => {
+    const normalizedSubject = normalizeSubjectName(subjName);
+
+    for (const grade of Object.keys(changeParsedCurriculumList)) {
+      const list = changeParsedCurriculumList[grade as GradeKey] || [];
+      for (const subj of list) {
+        if (normalizeSubjectName(subj.subject) === normalizedSubject) {
+          if (["국어", "수학", "영어"].includes(subj.category)) return "기초";
+          if (subj.category.includes("사회") || subj.category.includes("역사") || subj.category.includes("도덕")) return "사회";
+          if (subj.category.includes("과학")) return "과학";
+          return "기타";
+        }
+      }
+    }
+
+    for (const grade of Object.keys(changeSubjectMap)) {
+      const targetSubjectMap = changeSubjectMap[grade as GradeKey] || {};
+      const sortedTargetMapEntries = Object.entries(targetSubjectMap).sort((a, b) => b[0].replace(/\s+/g, "").length - a[0].replace(/\s+/g, "").length);
+      for (const [mapSubj, mapCat] of sortedTargetMapEntries) {
+        const normalizedMapSubj = normalizeSubjectName(mapSubj);
+        if (normalizedSubject.includes(normalizedMapSubj)) return mapCat;
+      }
+    }
+
+    return "기타";
+  }, [changeParsedCurriculumList, changeSubjectMap]);
 
   const parseGroupAndSemester = (header: string) => {
     let group = "";
     let semester = "";
-    
+
     // Extract Group (e.g. 선택군 A, 선택군 B, or fallback A군, B군)
     const selectGroupMatch = header.match(/선택군\s*([A-Za-z0-9가-힣])/i);
     const letterGroupMatch = header.match(/([A-Za-z0-9])군/i);
-    
+
     if (selectGroupMatch) {
       group = selectGroupMatch[1].toUpperCase();
     } else if (letterGroupMatch) {
@@ -933,27 +1150,27 @@ export default function Home() {
   const processData = (data: any[]) => {
     const processed: ProcessedStudent[] = [];
     const historyMap = previousSubjectMap[activeGrade] || {};
-    
+
     const statsMap: Record<string, { group: string; semester: string; count: number }> = {};
 
     data.forEach((row, index) => {
       const keys = Object.keys(row);
       const idKey = keys.find(k => k.includes("학번"));
       const nameKey = keys.find(k => k.includes("이름") || k.includes("성명"));
-      
-      if (!idKey || !nameKey) return; 
+
+      if (!idKey || !nameKey) return;
 
       const studentId = String(row[idKey]).trim();
       const name = String(row[nameKey]).trim();
-      
+
       if (!/^\d{4,}/.test(studentId)) {
         return;
       }
-      
+
       if (studentId.includes("합계") || name.includes("합계") || studentId.includes("총계") || name.includes("총계")) {
         return;
       }
-      
+
       let grade = "", classNum = "", num = "";
       if (studentId.length >= 5) {
         grade = studentId.substring(0, 1);
@@ -969,7 +1186,7 @@ export default function Home() {
       let completedBefore: string[] = [];
       const cleanStudentId = studentId.replace(/\s+/g, "");
       const matchedKey = Object.keys(historyMap).find(k => k.replace(/\s+/g, "") === cleanStudentId);
-      
+
       if (matchedKey) {
         completedBefore = historyMap[matchedKey].subjects;
       } else {
@@ -989,7 +1206,7 @@ export default function Home() {
           lower.includes("시간") || lower.includes("비고")
         );
       });
-      
+
       const semester1: string[] = [];
       const semester2: string[] = [];
       let basicCount = 0;
@@ -1012,10 +1229,10 @@ export default function Home() {
         const chosenSubjectRaw = val.trim();
         const subjects = chosenSubjectRaw.split(",").map(s => s.trim());
         const { group, semester } = parseGroupAndSemester(k);
-        
+
         subjects.forEach((subject, idx) => {
           if (!subject) return;
-          
+
           const matchedCategory = getSubjectCategory(subject, activeGrade);
 
           if (subjects.length >= 2) {
@@ -1031,7 +1248,7 @@ export default function Home() {
           if (matchedCategory === "기초") basicCount++;
           if (matchedCategory === "사회") socialCount++;
           if (matchedCategory === "과학") scienceCount++;
-          
+
           const statKey = `${group}|${semester}|${subject}`;
           if (!statsMap[statKey]) statsMap[statKey] = { group, semester, count: 0 };
           statsMap[statKey].count++;
@@ -1047,20 +1264,20 @@ export default function Home() {
 
       const hierarchyViolations: { subject: string; prereq: string; message: string }[] = [];
       const currentRules = hierarchyRules[activeGrade] || [];
-      
+
       const getSemester = (subj: string) => {
         const normSubj = normalizeSubjectName(subj);
         if (semester1.some(s => normalizeSubjectName(s) === normSubj)) return 1;
         if (semester2.some(s => normalizeSubjectName(s) === normSubj)) return 2;
-        return 0; 
+        return 0;
       };
 
       currentRules.forEach(rule => {
         const advancedSem = getSemester(rule.advanced);
-        if (advancedSem > 0) { 
+        if (advancedSem > 0) {
           const prereqSem = getSemester(rule.prereq);
           const isPrereqCompletedBefore = completedBefore.some(s => normalizeSubjectName(s) === normalizeSubjectName(rule.prereq));
-          
+
           if (isPrereqCompletedBefore) {
             // Prerequisite completed in previous years, no violation
             return;
@@ -1107,7 +1324,7 @@ export default function Home() {
         applicants: data.count
       };
     });
-    
+
     // Sort logic: by Group first, then Semester, then applicants descending
     newStats.sort((a, b) => {
       if (a.group !== b.group) return a.group.localeCompare(b.group);
@@ -1146,7 +1363,7 @@ export default function Home() {
       classData.sort((a, b) => parseInt(a.studentId) - parseInt(b.studentId));
 
       const aoa: any[][] = [];
-      
+
       const headerRow = ["순번", "학번", "이름"];
       for (let i = 0; i < maxSem1; i++) headerRow.push(i === 0 ? "1학기" : "");
       for (let i = 0; i < maxSem2; i++) headerRow.push(i === 0 ? "2학기" : "");
@@ -1166,9 +1383,9 @@ export default function Home() {
         if (student.basicCount >= 10) remarks.push("기초과목 최대학점 초과");
         if (student.duplicateSubjects?.length) remarks.push(`중복선택: ${student.duplicateSubjects.join(", ")}`);
         if (student.hierarchyViolations?.length) remarks.push(student.hierarchyViolations.map(v => v.message).join(", "));
-        
+
         row.push(student.basicCount || 0, student.socialCount || 0, student.scienceCount || 0, remarks.join(" / "));
-        
+
         aoa.push(row);
       });
 
@@ -1182,11 +1399,11 @@ export default function Home() {
         for (let C = range.s.c; C <= range.e.c; ++C) {
           const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
           if (!ws[cellAddress]) ws[cellAddress] = { t: "s", v: "" }; // Create empty cell if not exists for border styling
-          
+
           ws[cellAddress].s = {
-            alignment: { 
-              horizontal: (C === remarksColIndex && R > 0) ? "left" : "center", 
-              vertical: "center" 
+            alignment: {
+              horizontal: (C === remarksColIndex && R > 0) ? "left" : "center",
+              vertical: "center"
             },
             border: {
               top: { style: "thin", color: { rgb: "000000" } },
@@ -1221,7 +1438,7 @@ export default function Home() {
                 if (subject) {
                   const isHierarchyViolation = student.hierarchyViolations?.some(v => v.subject === subject || v.prereq === subject);
                   const isDuplicate = student.duplicateSubjects?.includes(subject);
-                  
+
                   if (isHierarchyViolation) {
                     ws[cellAddress].s.fill = { fgColor: { rgb: "E0F7FA" } }; // Soft Cyan
                     ws[cellAddress].s.font = { name: "맑은 고딕", size: 10, bold: true, color: { rgb: "006064" } }; // Dark Cyan text
@@ -1282,17 +1499,17 @@ export default function Home() {
   const getClassRecommendation = (applicants: number, standardSize: number) => {
     if (applicants < 5) return "폐강";
     if (applicants < 0.7 * standardSize) return "논의";
-    
+
     const k = Math.round(applicants / standardSize);
     const nominalClasses = k < 1 ? 1 : k;
-    
+
     if (nominalClasses >= 2) {
       const avgSize = applicants / nominalClasses;
       if (avgSize > 1.12 * standardSize) {
         return `${nominalClasses}~${nominalClasses + 1}`;
       }
     }
-    
+
     return `${nominalClasses}`;
   };
 
@@ -1391,7 +1608,7 @@ export default function Home() {
           };
         } else {
           const remarkVal = cell.v ? String(cell.v) : "";
-          
+
           let remarkFontColor = "000000";
           let remarkFontBold = false;
           if (remarkVal === "폐강") {
@@ -1406,15 +1623,15 @@ export default function Home() {
           }
 
           cell.s = {
-            font: { 
-              name: "맑은 고딕", 
+            font: {
+              name: "맑은 고딕",
               size: 10,
               color: C === 4 ? { rgb: remarkFontColor } : { rgb: "000000" },
               bold: C === 4 ? remarkFontBold : false
             },
-            alignment: { 
-              horizontal: C === 2 ? "left" : "center", 
-              vertical: "center" 
+            alignment: {
+              horizontal: C === 2 ? "left" : "center",
+              vertical: "center"
             },
             border: {
               top: { style: "thin", color: { rgb: "D9D9D9" } },
@@ -1455,7 +1672,7 @@ export default function Home() {
 
   const getDetailedCategory = (subject: string, cat: string) => {
     const specificCategories = ["국어", "영어", "수학", "사회", "과학", "체육", "미술", "음악", "일본어", "제2외국어", "정보", "한문", "진로", "교양"];
-    
+
     // If cat is already a specific fine-grained category (not a broad one like 기초/기타), trust it
     if (cat && specificCategories.includes(cat)) return cat;
 
@@ -1472,16 +1689,16 @@ export default function Home() {
     if (subject.includes("한문")) return "한문";
     if (subject.includes("진로")) return "진로";
     if (subject.includes("교양")) return "교양";
-    
+
     return cat === "기초" ? "기초기타" : (cat || "기타");
   };
 
 
 
-    const adjustmentLog = useMemo(() => {
+  const adjustmentLog = useMemo(() => {
     const log: Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string }[]> = {};
     if (!parsedSampleData || (!parsedSampleData.grade2.length && !parsedSampleData.grade3.length) || !electiveChanges) return log;
-    
+
     (['grade2', 'grade3'] as ('grade2' | 'grade3')[]).forEach(grade => {
       const changes = electiveChanges[grade] || [];
       const studentsInGrade = parsedSampleData[grade] || [];
@@ -1501,16 +1718,15 @@ export default function Home() {
         });
       });
 
-      // Normalize subject names for fuzzy matching (handle Roman numeral vs English letter I, II, etc.)
+      // Normalize subject names for fuzzy matching
       const normalizeSubject = (subject: string): string => {
         return subject.replace(/\s+/g, '')
-                      .replace(/Ⅰ/g, 'I')
-                      .replace(/Ⅱ/g, 'II')
-                      .replace(/Ⅲ/g, 'III')
-                      .replace(/Ⅳ/g, 'IV');
+          .replace(/Ⅰ/g, 'I')
+          .replace(/Ⅱ/g, 'II')
+          .replace(/Ⅲ/g, 'III')
+          .replace(/Ⅳ/g, 'IV');
       };
 
-      // Helper: check if a subject exists in a given timeslot (fuzzy match)
       const subjectExistsInSlot = (subject: string, slot: string): boolean => {
         const subjects = subjectsInTimeSlot[slot];
         if (!subjects) return false;
@@ -1522,126 +1738,284 @@ export default function Home() {
         return false;
       };
 
-      // Helper: find which timeslots have a given subject
       const findSlotsWithSubject = (subject: string): string[] => {
         const slots: string[] = [];
         for (const slot of gradeTimeSlots) {
-          if (subjectExistsInSlot(subject, slot)) {
-            slots.push(slot);
-          }
+          if (subjectExistsInSlot(subject, slot)) slots.push(slot);
         }
         return slots;
       };
-      
-      // We need to maintain a working copy of each student's schedule to handle sequential changes properly
-      const studentSchedules: Record<string, Record<string, string>> = {};
 
-      changes.forEach(c => {
-        if (!c.studentId || !c.beforeSubject || !c.afterSubject) return;
-        
-        const targetStudent = studentsInGrade.find(s => s.id === c.studentId);
-        if (!targetStudent) {
-          if (!log[c.studentId]) log[c.studentId] = [];
-          log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: '학생을 찾을 수 없음' });
-          return;
-        }
-        
-        // Initialize working copy if it doesn't exist
-        if (!studentSchedules[c.studentId]) {
-          studentSchedules[c.studentId] = { ...targetStudent.timeSlotMap };
-        }
-        const currentSchedule = studentSchedules[c.studentId];
-        
-        // Find which timeslot the student currently has the beforeSubject
-        let beforeSlot: string | null = null;
-        const cleanBefore = normalizeSubject(c.beforeSubject);
-        for (const [slot, subject] of Object.entries(currentSchedule)) {
-          const cleanSubject = normalizeSubject(subject);
-          if (cleanSubject === cleanBefore || cleanSubject.includes(cleanBefore) || cleanBefore.includes(cleanSubject)) {
-            beforeSlot = slot;
-            break;
-          }
-        }
-        if (!beforeSlot) {
-          if (!log[c.studentId]) log[c.studentId] = [];
-          log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `현재 수강중인 과목이 아님 (이전 변경으로 사라졌을 수 있음)` });
-          return;
-        }
+      if (!enableOptimization) {
+        // --- 기존 순차 매칭 알고리즘 (Original sequential greedy matching) ---
+        const studentSchedules: Record<string, Record<string, string>> = {};
 
-        // Case 1: afterSubject exists in the SAME timeslot → direct swap
-        if (subjectExistsInSlot(c.afterSubject, beforeSlot)) {
-          if (!log[c.studentId]) log[c.studentId] = [];
-          log[c.studentId].push({
-            beforeStr: `${c.beforeSubject}(${beforeSlot})`,
-            afterStr: `${c.afterSubject}(${beforeSlot})`,
-            status: 'success'
-          });
-          // Update the working schedule
-          currentSchedule[beforeSlot] = c.afterSubject;
-          return;
-        }
+        changes.forEach(c => {
+          if (!c.studentId || !c.beforeSubject || !c.afterSubject) return;
 
-        // Case 2: afterSubject is in a DIFFERENT timeslot → 2-step change
-        const afterSlots = findSlotsWithSubject(c.afterSubject);
-        if (afterSlots.length === 0) {
-          if (!log[c.studentId]) log[c.studentId] = [];
-          log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목` });
-          return;
-        }
-
-        let swapSuccess = false;
-        let lastFailedReason = "";
-
-        for (const afterSlot of afterSlots) {
-          // Check what the student currently has in the afterSlot
-          const studentSubjectInAfterSlot = currentSchedule[afterSlot];
-          if (!studentSubjectInAfterSlot) {
-            lastFailedReason = `${afterSlot}타임 수강 과목 없음`;
-            continue;
-          }
-
-          // Check if the student's subject from afterSlot can be moved to beforeSlot
-          if (subjectExistsInSlot(studentSubjectInAfterSlot, beforeSlot)) {
+          const targetStudent = studentsInGrade.find(s => s.id === c.studentId);
+          if (!targetStudent) {
             if (!log[c.studentId]) log[c.studentId] = [];
-            // Step 1: move the conflicting subject to the original timeslot
-            log[c.studentId].push({
-              beforeStr: `${studentSubjectInAfterSlot}(${afterSlot})`,
-              afterStr: `${studentSubjectInAfterSlot}(${beforeSlot})`,
-              status: 'success'
-            });
-            // Step 2: move the beforeSubject's slot to the afterSubject
+            log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: '학생을 찾을 수 없음' });
+            return;
+          }
+
+          if (!studentSchedules[c.studentId]) {
+            studentSchedules[c.studentId] = { ...targetStudent.timeSlotMap };
+          }
+          const currentSchedule = studentSchedules[c.studentId];
+
+          let beforeSlot: string | null = null;
+          const cleanBefore = normalizeSubject(c.beforeSubject);
+          for (const [slot, subject] of Object.entries(currentSchedule)) {
+            const cleanSubject = normalizeSubject(subject as string);
+            if (cleanSubject === cleanBefore || cleanSubject.includes(cleanBefore) || cleanBefore.includes(cleanSubject)) {
+              beforeSlot = slot;
+              break;
+            }
+          }
+          if (!beforeSlot) {
+            if (!log[c.studentId]) log[c.studentId] = [];
+            log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `현재 수강중인 과목이 아님 (이전 변경으로 사라졌을 수 있음)` });
+            return;
+          }
+
+          if (subjectExistsInSlot(c.afterSubject, beforeSlot)) {
+            if (!log[c.studentId]) log[c.studentId] = [];
             log[c.studentId].push({
               beforeStr: `${c.beforeSubject}(${beforeSlot})`,
-              afterStr: `${c.afterSubject}(${afterSlot})`,
+              afterStr: `${c.afterSubject}(${beforeSlot})`,
               status: 'success'
             });
-            
-            // Update the working schedule
-            currentSchedule[beforeSlot] = studentSubjectInAfterSlot;
-            currentSchedule[afterSlot] = c.afterSubject;
-            
-            swapSuccess = true;
-            break; // Stop searching once we find a valid path
-          } else {
-            lastFailedReason = `2단계 변경 불가: '${studentSubjectInAfterSlot}' 과목이 ${beforeSlot}타임에 개설되지 않음`;
+            currentSchedule[beforeSlot] = c.afterSubject;
+            return;
           }
+
+          const afterSlots = findSlotsWithSubject(c.afterSubject);
+          if (afterSlots.length === 0) {
+            if (!log[c.studentId]) log[c.studentId] = [];
+            log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목` });
+            return;
+          }
+
+          let swapSuccess = false;
+          let lastFailedReason = "";
+
+          for (const afterSlot of afterSlots) {
+            const studentSubjectInAfterSlot = currentSchedule[afterSlot] as string;
+            if (!studentSubjectInAfterSlot) {
+              lastFailedReason = `${afterSlot}타임 수강 과목 없음`;
+              continue;
+            }
+
+            if (subjectExistsInSlot(studentSubjectInAfterSlot, beforeSlot)) {
+              if (!log[c.studentId]) log[c.studentId] = [];
+              log[c.studentId].push({
+                beforeStr: `${studentSubjectInAfterSlot}(${afterSlot})`,
+                afterStr: `${studentSubjectInAfterSlot}(${beforeSlot})`,
+                status: 'success'
+              });
+              log[c.studentId].push({
+                beforeStr: `${c.beforeSubject}(${beforeSlot})`,
+                afterStr: `${c.afterSubject}(${afterSlot})`,
+                status: 'success'
+              });
+
+              currentSchedule[beforeSlot] = studentSubjectInAfterSlot;
+              currentSchedule[afterSlot] = c.afterSubject;
+
+              swapSuccess = true;
+              break;
+            } else {
+              lastFailedReason = `2단계 변경 불가: '${studentSubjectInAfterSlot}' 과목이 ${beforeSlot}타임에 개설되지 않음`;
+            }
+          }
+
+          if (!swapSuccess) {
+            if (!log[c.studentId]) log[c.studentId] = [];
+            log[c.studentId].push({
+              beforeStr: c.beforeSubject,
+              afterStr: c.afterSubject,
+              status: 'failed',
+              reason: afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 2단계 교환 실패` : lastFailedReason
+            });
+          }
+        });
+      } else {
+        // --- 동적 밸런싱 최적화 알고리즘 (Dynamic Balancing Optimization) ---
+        const classSizes: Record<string, number> = {};
+        
+        // 초기 모든 학생의 반별 인원수 계산
+        studentsInGrade.forEach(student => {
+          Object.entries(student.timeSlotMap).forEach(([slot, subject]) => {
+             const key = `${slot}::${normalizeSubject(subject as string)}`;
+             classSizes[key] = (classSizes[key] || 0) + 1;
+          });
+        });
+
+        // 수강정정 신청자 목록 (고유값)
+        const studentsWithChanges = Array.from(new Set(changes.map(c => c.studentId)));
+        
+        // 신청자별 현재 최적 스케줄 및 로그 관리
+        const optimizedSchedules: Record<string, Record<string, string>> = {};
+        const optimizedLogs: Record<string, any[]> = {};
+
+        // 1. 초기값: 모든 신청자의 시간표를 원본으로 설정
+        studentsWithChanges.forEach(id => {
+           const student = studentsInGrade.find(s => s.id === id);
+           if (student) optimizedSchedules[id] = { ...student.timeSlotMap };
+        });
+
+        let isOptimized = false;
+        let iterations = 0;
+
+        // Hill Climbing: 인원수 편차를 최소화하는 방향으로 반복 탐색
+        while (!isOptimized && iterations < 5) {
+          isOptimized = true;
+
+          studentsWithChanges.forEach(studentId => {
+            const student = studentsInGrade.find(s => s.id === studentId);
+            if (!student) return;
+
+            // 1. 현재 이 학생이 기여하고 있는 인원수를 뺀다 (시뮬레이션을 위해)
+            const currentSched = optimizedSchedules[studentId];
+            Object.entries(currentSched).forEach(([slot, subject]) => {
+               const key = `${slot}::${normalizeSubject(subject as string)}`;
+               if (classSizes[key] > 0) classSizes[key]--;
+            });
+
+            // 2. 이 학생의 원래 시간표에서부터 변경 신청을 순차적으로 적용하여 최적의 경로 찾기
+            const newSched = { ...student.timeSlotMap };
+            const studentLog: any[] = [];
+            const studentChanges = changes.filter(c => c.studentId === studentId);
+
+            studentChanges.forEach(c => {
+               let beforeSlot: string | null = null;
+               const cleanBefore = normalizeSubject(c.beforeSubject);
+               for (const [slot, subject] of Object.entries(newSched)) {
+                 const cleanSubject = normalizeSubject(subject as string);
+                 if (cleanSubject === cleanBefore || cleanSubject.includes(cleanBefore) || cleanBefore.includes(cleanSubject)) {
+                   beforeSlot = slot;
+                   break;
+                 }
+               }
+               
+               if (!beforeSlot) {
+                  studentLog.push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `현재 수강중인 과목이 아님` });
+                  return;
+               }
+
+               const afterSlots = findSlotsWithSubject(c.afterSubject);
+               if (afterSlots.length === 0) {
+                  studentLog.push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목` });
+                  return;
+               }
+
+               // 현재 인원 분포를 바탕으로 최적의 교체 경로(타임) 탐색
+               let bestSlot: string | null = null;
+               let bestCost = Infinity; // 비용: 교체 시 도달하게 되는 반의 인원수 (작을수록 좋음)
+               let lastFailedReason = "";
+
+               for (const afterSlot of afterSlots) {
+                 // 1-step (같은 타임)
+                 if (afterSlot === beforeSlot) {
+                   const costKey = `${beforeSlot}::${normalizeSubject(c.afterSubject)}`;
+                   const cost = classSizes[costKey] || 0;
+                   if (cost < bestCost) {
+                     bestCost = cost;
+                     bestSlot = afterSlot;
+                   }
+                   continue;
+                 }
+
+                 // 2-step (다른 타임)
+                 const studentSubjectInAfterSlot = newSched[afterSlot] as string;
+                 if (!studentSubjectInAfterSlot) {
+                   lastFailedReason = `${afterSlot}타임 수강 과목 없음`;
+                   continue;
+                 }
+
+                 if (subjectExistsInSlot(studentSubjectInAfterSlot, beforeSlot)) {
+                    // Cost = MAX( afterSlot에 들어가는 과목 인원, beforeSlot으로 이동하는 과목 인원 )
+                    const cost1Key = `${afterSlot}::${normalizeSubject(c.afterSubject)}`;
+                    const cost2Key = `${beforeSlot}::${normalizeSubject(studentSubjectInAfterSlot)}`;
+                    
+                    const size1 = classSizes[cost1Key] || 0;
+                    const size2 = classSizes[cost2Key] || 0;
+                    
+                    const cost = Math.max(size1, size2);
+
+                    // 최소 인원 편차를 가진 타임을 선택
+                    if (cost < bestCost) {
+                       bestCost = cost;
+                       bestSlot = afterSlot;
+                    }
+                 } else {
+                    lastFailedReason = `2단계 변경 불가: '${studentSubjectInAfterSlot}' 과목이 ${beforeSlot}타임에 개설되지 않음`;
+                 }
+               }
+
+               if (bestSlot) {
+                 if (bestSlot === beforeSlot) {
+                   studentLog.push({
+                     beforeStr: `${c.beforeSubject}(${beforeSlot})`,
+                     afterStr: `${c.afterSubject}(${beforeSlot})`,
+                     status: 'success'
+                   });
+                   newSched[beforeSlot] = c.afterSubject;
+                 } else {
+                   const studentSubjectInAfterSlot = newSched[bestSlot] as string;
+                   studentLog.push({
+                     beforeStr: `${studentSubjectInAfterSlot}(${bestSlot})`,
+                     afterStr: `${studentSubjectInAfterSlot}(${beforeSlot})`,
+                     status: 'success'
+                   });
+                   studentLog.push({
+                     beforeStr: `${c.beforeSubject}(${beforeSlot})`,
+                     afterStr: `${c.afterSubject}(${bestSlot})`,
+                     status: 'success'
+                   });
+                   newSched[beforeSlot] = studentSubjectInAfterSlot;
+                   newSched[bestSlot] = c.afterSubject;
+                 }
+               } else {
+                 studentLog.push({
+                   beforeStr: c.beforeSubject,
+                   afterStr: c.afterSubject,
+                   status: 'failed',
+                   reason: afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 교환 실패` : lastFailedReason
+                 });
+               }
+            });
+
+            // 3. 새로 계산된 이 학생의 시간표를 전체 인원수에 다시 더함
+            Object.entries(newSched).forEach(([slot, subject]) => {
+               const key = `${slot}::${normalizeSubject(subject as string)}`;
+               classSizes[key] = (classSizes[key] || 0) + 1;
+            });
+
+            // 4. 기존 최적 스케줄과 다른 변동사항이 있으면 아직 완벽히 수렴(최적화)된 게 아님
+            if (JSON.stringify(currentSched) !== JSON.stringify(newSched)) {
+               isOptimized = false;
+            }
+
+            optimizedSchedules[studentId] = newSched;
+            optimizedLogs[studentId] = studentLog;
+          });
+
+          iterations++;
         }
 
-        if (!swapSuccess) {
-          if (!log[c.studentId]) log[c.studentId] = [];
-          log[c.studentId].push({ 
-            beforeStr: c.beforeSubject, 
-            afterStr: c.afterSubject, 
-            status: 'failed', 
-            // If multiple slots were checked, we show the reason for the last one we checked, or a generic one.
-            reason: afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 2단계 교환 실패` : lastFailedReason
-          });
-        }
-      });
+        // 반복이 끝나면 가장 최적화된 로그를 전체 log 객체에 병합
+        studentsWithChanges.forEach(studentId => {
+          if (!log[studentId]) log[studentId] = [];
+          log[studentId].push(...optimizedLogs[studentId]);
+        });
+      }
     });
-    
+
     return log;
-  }, [parsedSampleData, electiveChanges, timetableData, timeSlots, classCols]);
+  }, [parsedSampleData, electiveChanges, timetableData, timeSlots, classCols, enableOptimization]);
 
   const handleExportRoster = (isAfter: boolean) => {
     const wb = XLSX.utils.book_new();
@@ -1659,17 +2033,17 @@ export default function Home() {
     tSlots.forEach(timeSlot => {
       const colStudents: Record<string, any[]> = {};
       cols.forEach(col => { colStudents[col] = []; });
-      
+
       const subjectGroups: Record<string, { col: string, num: number, original: string }[]> = {};
       cols.forEach(col => {
         const cellSubject = gTimetable[timeSlot]?.[col]?.subject?.trim();
         if (!cellSubject) return;
-        
+
         const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
         const base = match ? match[1].trim() : cellSubject;
         const numMatch = cellSubject.match(/\d+/);
         const num = numMatch ? parseInt(numMatch[0], 10) : 1;
-        
+
         if (!subjectGroups[base]) subjectGroups[base] = [];
         subjectGroups[base].push({ col, num, original: cellSubject });
       });
@@ -1682,7 +2056,7 @@ export default function Home() {
       allStudents.forEach(student => {
         const chosenSubject = student.timeSlotMap[timeSlot];
         if (!chosenSubject) return;
-        
+
         let effectiveSubject = chosenSubject;
         if (isAfter) {
           const studentLogs = adjustmentLog[student.id];
@@ -1698,7 +2072,7 @@ export default function Home() {
                 const logBeforeSlot = beforeMatch[2];
                 const logAfterSubject = afterMatch[1];
                 const logAfterSlot = afterMatch[2];
-                
+
                 if (logBeforeSlot === timeSlot && logBeforeSubject === chosenSubject) {
                   movedOut = true;
                 }
@@ -1715,12 +2089,12 @@ export default function Home() {
           }
         }
         if (effectiveSubject === '__REMOVED__') return;
-        
+
         const cleanChosen = effectiveSubject.replace(/[\sⅠⅡⅢⅣ1234]/g, '').toLowerCase();
-        
+
         let matchedBase = null;
         let matchedPriority = 999;
-        
+
         for (const base of Object.keys(subjectGroups)) {
           const cleanBase = base.replace(/[\sⅠⅡⅢⅣ1234]/g, '').toLowerCase();
           if (cleanBase === cleanChosen) {
@@ -1736,7 +2110,7 @@ export default function Home() {
             matchedPriority = 3;
           }
         }
-        
+
         if (matchedBase) {
           if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
           studentsByBase[matchedBase].push(student);
@@ -1750,14 +2124,14 @@ export default function Home() {
           const numB = parseInt(b.id) || 0;
           return numA - numB;
         });
-        
+
         const group = subjectGroups[base];
         const numClasses = group.length;
         if (numClasses === 0) return;
-        
+
         const baseSize = Math.floor(students.length / numClasses);
         let remainder = students.length % numClasses;
-        
+
         let studentIndex = 0;
         group.forEach(classInfo => {
           let classSize = baseSize;
@@ -1783,7 +2157,7 @@ export default function Home() {
       cols.forEach((col, idx) => {
         const teacher = gTimetable[timeSlot]?.[col]?.teacher || "-";
         const subject = gTimetable[timeSlot]?.[col]?.subject || "-";
-        
+
         row1.push(subject, "");
         row2.push(teacher, "");
         row3.push("학번", "이름");
@@ -1810,7 +2184,7 @@ export default function Home() {
 
       const ws = XLSX.utils.aoa_to_sheet(wsData);
       ws['!merges'] = merges;
-      
+
       for (const cell in ws) {
         if (cell[0] === '!') continue;
         if (!ws[cell].s) ws[cell].s = {};
@@ -1837,7 +2211,7 @@ export default function Home() {
     const grade = changeActiveGrade;
     const gradeNum = grade === 'grade2' ? '2' : '3';
     const data = electiveChanges[grade];
-    
+
     const studentsWithChanges = Array.from(new Set(data.map(d => d.studentId))).filter(id => id);
 
     let changeIndex = 1;
@@ -1848,7 +2222,7 @@ export default function Home() {
       const logs = adjustmentLog[studentId] || [];
       const studentName = data.find(d => d.studentId === studentId)?.studentName || "";
       const validLogs = logs.filter(log => log.status === 'success');
-      
+
       if (validLogs.length > 0) {
         validLogs.forEach((log, index) => {
           rows.push([
@@ -1860,7 +2234,7 @@ export default function Home() {
             log.afterStr
           ]);
         });
-        
+
         if (validLogs.length > 1) {
           const startRow = rows.length - validLogs.length + 2;
           const endRow = rows.length + 1;
@@ -1879,7 +2253,7 @@ export default function Home() {
 
     const totalStudents = changeIndex - 1;
     const title = `${gradeNum}학년 2학기 선택 과목 변경 내역(${totalStudents}명)`;
-    
+
     const wsData = [
       [title, "", "", "", "", ""],
       ["순번", "학번", "이름", "변경전", "→", "변경후"],
@@ -1887,16 +2261,16 @@ export default function Home() {
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
-    
+
     merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } });
     ws['!merges'] = merges;
-    
+
     for (const cell in ws) {
       if (cell[0] === '!') continue;
       if (!ws[cell].s) ws[cell].s = {};
-      
+
       const rowIndex = parseInt(cell.replace(/\D/g, '')) - 1;
-      
+
       ws[cell].s = {
         alignment: { horizontal: "center", vertical: "center" },
         border: {
@@ -1906,14 +2280,14 @@ export default function Home() {
           right: { style: "thin", color: { rgb: "000000" } }
         }
       };
-      
+
       if (rowIndex === 0) {
         ws[cell].s.font = { sz: 16, bold: true };
       } else if (rowIndex === 1) {
         ws[cell].s.font = { bold: true };
       }
     }
-    
+
     ws['!cols'] = [
       { wpx: 40 },
       { wpx: 70 },
@@ -1930,31 +2304,32 @@ export default function Home() {
 
   const step6Data = useMemo(() => {
     if (changeActiveTab !== "analysis") return [];
-    
+
     const students = parsedSampleData[changeActiveGrade];
     if (!students || students.length === 0) return [];
-    
-    const historyData = changeActiveGrade === "grade2" ? grade2HistoryData : grade3Sem1HistoryData;
-    const mappedGradeKey: GradeKey = changeActiveGrade === "grade2" ? "grade1" : "grade2";
-    const currentRules = hierarchyRules[mappedGradeKey] || [];
-    
+
+    const currentRules = changeHierarchyRules[changeActiveGrade] || [];
+
     const processed = students.map((student) => {
       let completedBefore: string[] = [];
       if (changeActiveGrade === "grade2") {
-        completedBefore = grade2HistoryData[student.id] || [];
+        const dataMap = grade2HistoryData.grade2 || {};
+        completedBefore = dataMap[String(student.id).trim()] || dataMap[student.id] || [];
       } else {
-        const g2History = grade2HistoryData[student.id] || [];
-        const g3Sem1History = grade3Sem1HistoryData[student.id] || [];
+        const g2Map = grade2HistoryData.grade3 || {};
+        const g3Map = grade3Sem1HistoryData.grade3 || {};
+        const g2History = g2Map[String(student.id).trim()] || g2Map[student.id] || [];
+        const g3Sem1History = g3Map[String(student.id).trim()] || g3Map[student.id] || [];
         completedBefore = [...g2History, ...g3Sem1History];
       }
-      
+
       const currentSubjects: string[] = [];
       const timeSlotsForGrade = timeSlots[changeActiveGrade];
-      
+
       timeSlotsForGrade.forEach(slot => {
         let chosenSubject = student.timeSlotMap[slot];
         if (!chosenSubject) return;
-        
+
         let effectiveSubject = chosenSubject;
         const studentLogs = adjustmentLog[student.id];
         if (studentLogs) {
@@ -1976,53 +2351,53 @@ export default function Home() {
           if (movedInto) effectiveSubject = movedInto;
           else if (movedOut) effectiveSubject = '__REMOVED__';
         }
-        
+
         if (effectiveSubject !== '__REMOVED__') {
           currentSubjects.push(effectiveSubject);
         }
       });
-      
+
       let basicCount = 0;
       let socialCount = 0;
       let scienceCount = 0;
-      
+
       const prevGradeKey = changeActiveGrade === "grade2" ? "grade1" : "grade2";
       completedBefore.forEach(prevSubj => {
-        const matchedCategory = getSubjectCategory(prevSubj, prevGradeKey);
+        const matchedCategory = getChangeSubjectCategory(prevSubj, prevGradeKey);
         if (matchedCategory === "기초") basicCount++;
         if (matchedCategory === "사회") socialCount++;
         if (matchedCategory === "과학") scienceCount++;
       });
-      
+
       currentSubjects.forEach(subject => {
-        const matchedCategory = getSubjectCategory(subject, mappedGradeKey);
+        const matchedCategory = getChangeSubjectCategory(subject, changeActiveGrade as any);
         if (matchedCategory === "기초") basicCount++;
         if (matchedCategory === "사회") socialCount++;
         if (matchedCategory === "과학") scienceCount++;
       });
-      
+
       const subjectCounts: Record<string, number> = {};
       currentSubjects.forEach(s => {
         subjectCounts[s] = (subjectCounts[s] || 0) + 1;
       });
       const duplicateSubjects = Object.keys(subjectCounts).filter(s => subjectCounts[s] > 1);
-      
+
       const hierarchyViolations: { subject: string; prereq: string; message: string }[] = [];
-      
+
       currentRules.forEach(rule => {
         const normAdvanced = normalizeSubjectName(rule.advanced);
         const normPrereq = normalizeSubjectName(rule.prereq);
-        
-        const hasAdvanced = currentSubjects.some(s => normalizeSubjectName(s) === normAdvanced) || 
-                            completedBefore.some(s => normalizeSubjectName(s) === normAdvanced);
-        
+
+        const hasAdvanced = currentSubjects.some(s => normalizeSubjectName(s) === normAdvanced) ||
+          completedBefore.some(s => normalizeSubjectName(s) === normAdvanced);
+
         const hasPrereqInPast = completedBefore.some(s => normalizeSubjectName(s) === normPrereq);
-        
+
         if (hasAdvanced && !hasPrereqInPast) {
           hierarchyViolations.push({ subject: rule.advanced, prereq: rule.prereq, message: `권장 이수 순서: ${rule.prereq} -> ${rule.advanced}` });
         }
       });
-      
+
       return {
         id: student.id,
         name: student.name,
@@ -2035,17 +2410,17 @@ export default function Home() {
         hierarchyViolations
       };
     });
-    
+
     processed.sort((a, b) => parseInt(a.id) - parseInt(b.id));
     return processed;
-  }, [changeActiveTab, parsedSampleData, changeActiveGrade, grade2HistoryData, grade3Sem1HistoryData, adjustmentLog, hierarchyRules, timeSlots]);
+  }, [changeActiveTab, parsedSampleData, changeActiveGrade, grade2HistoryData, grade3Sem1HistoryData, adjustmentLog, changeHierarchyRules, timeSlots, getChangeSubjectCategory]);
 
   const handleExportStep6 = () => {
     if (step6Data.length === 0) return;
-    
+
     const aoa: any[][] = [];
     const gradeNum = changeActiveGrade === "grade2" ? 2 : 3;
-    
+
     aoa.push([`${gradeNum}학년 다년도 분석 결과`]);
     aoa.push([
       "순번", "학번", "이름", "과거 이수 과목", "2학기 최종 과목", "기초과목", "사회", "과학", "비고(중복/위계)"
@@ -2056,7 +2431,7 @@ export default function Home() {
       if (student.basicCount >= 10) remarks.push("기초과목 최대학점 초과");
       if (student.duplicateSubjects?.length) remarks.push(`중복: ${student.duplicateSubjects.join(", ")}`);
       if (student.hierarchyViolations?.length) remarks.push(student.hierarchyViolations.map((v: any) => v.message).join(", "));
-      
+
       aoa.push([
         idx + 1,
         student.id,
@@ -2071,7 +2446,7 @@ export default function Home() {
     });
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    
+
     ws["!cols"] = [
       { wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 40 }, { wch: 30 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 40 }
     ];
@@ -2096,26 +2471,24 @@ export default function Home() {
             데이터 처리기
           </h2>
         </div>
-        
+
         <div className="flex flex-col gap-2 p-4">
-          <button 
+          <button
             onClick={() => setActiveSidebarTab("survey")}
-            className={`flex items-center gap-3 px-4 py-3.5 rounded-xl font-semibold transition-all duration-300 ${
-              activeSidebarTab === "survey" 
-                ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]" 
+            className={`flex items-center gap-3 px-4 py-3.5 rounded-xl font-semibold transition-all duration-300 ${activeSidebarTab === "survey"
+                ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
                 : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 border border-transparent"
-            }`}
+              }`}
           >
             <FileText className="w-5 h-5" />
             <span>수요조사</span>
           </button>
-          <button 
+          <button
             onClick={() => setActiveSidebarTab("change")}
-            className={`flex items-center gap-3 px-4 py-3.5 rounded-xl font-semibold transition-all duration-300 ${
-              activeSidebarTab === "change" 
-                ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]" 
+            className={`flex items-center gap-3 px-4 py-3.5 rounded-xl font-semibold transition-all duration-300 ${activeSidebarTab === "change"
+                ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
                 : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 border border-transparent"
-            }`}
+              }`}
           >
             <GitBranch className="w-5 h-5" />
             <span>선택과목 변경</span>
@@ -2131,28 +2504,28 @@ export default function Home() {
               {activeSidebarTab === "survey" ? "수강 신청 데이터 처리기" : "선택과목 변경 시스템"}
             </h1>
             <p className="text-slate-400 text-sm max-w-2xl">
-              {activeSidebarTab === "survey" 
-                ? "학생 수강 신청 엑셀 파일을 업로드하면, 학급별 시트 분리 및 기초/사회/과학 과목 통계가 계산된 엑셀 파일로 변환해 드립니다." 
+              {activeSidebarTab === "survey"
+                ? "학생 수강 신청 엑셀 파일을 업로드하면, 학급별 시트 분리 및 기초/사회/과학 과목 통계가 계산된 엑셀 파일로 변환해 드립니다."
                 : "수요조사 이후 선택과목을 변경하는 학생들의 데이터를 관리합니다."}
             </p>
           </div>
-          
+
           <div className="flex gap-2 shrink-0">
-            <input 
-              type="file" 
-              accept=".json" 
-              className="hidden" 
-              ref={fileInputRef} 
-              onChange={handleLoadBackup} 
+            <input
+              type="file"
+              accept=".json"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleLoadBackup}
             />
-            <button 
+            <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-2 px-4 py-2 bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 text-sm font-medium rounded-xl transition-all border border-slate-700/60 shadow-sm"
             >
               <FolderOpen className="w-4 h-4" />
               불러오기
             </button>
-            <button 
+            <button
               onClick={handleSaveBackup}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all border border-indigo-500/50 shadow-md shadow-indigo-500/20"
             >
@@ -2165,686 +2538,692 @@ export default function Home() {
         {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto p-10 pb-24">
           <div className="max-w-[95%] 2xl:max-w-[1600px] mx-auto">
-            
+
             {activeSidebarTab === "survey" && (
               <Fragment>
                 <div className="flex gap-3 mb-8 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit mx-auto">
-          <button
-            onClick={() => setActiveTab("curriculum")}
-            className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-              activeTab === "curriculum"
-                ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-            }`}
-          >
-            <span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span>
-            <div className="flex items-center gap-2">
-              <Settings className="w-4 h-4" />
-              <span>교육과정 편성표 입력</span>
-            </div>
-          </button>
-          <button
-            onClick={() => setActiveTab("hierarchy")}
-            className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-              activeTab === "hierarchy"
-                ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-            }`}
-          >
-            <span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span>
-            <div className="flex items-center gap-2">
-              <GitBranch className="w-4 h-4" />
-              <span>과목 위계 설정</span>
-            </div>
-          </button>
-          <button
-            onClick={() => setActiveTab("upload")}
-            className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-              activeTab === "upload"
-                ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-            }`}
-          >
-            <span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span>
-            <div className="flex items-center gap-2">
-              <Upload className="w-4 h-4" />
-              <span>파일 업로드</span>
-            </div>
-          </button>
-          <button
-            onClick={() => setActiveTab("preview")}
-            className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-              activeTab === "preview"
-                ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-            }`}
-          >
-            <span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span>
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              <span>수요조사 결과</span>
-            </div>
-          </button>
-          <button
-            onClick={() => setActiveTab("classOpening")}
-            className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-              activeTab === "classOpening"
-                ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-            }`}
-          >
-            <span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>과목 개설 여부</span>
-            </div>
-          </button>
-
-        </div>
-
-        <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 rounded-3xl p-8 shadow-2xl">
-          {activeTab === "curriculum" && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex justify-between items-center mb-2">
-                <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
-                  <Settings className="w-6 h-6 text-indigo-400" />
-                  1단계: 교육과정 편성표 입력
-                </h2>
-              </div>
-              
-              {renderGradeTabs()}
-
-              <p className="text-slate-400">
-                선택하신 학년의 교육과정 편성표 엑셀 파일을 업로드해 주세요. 3개년 데이터가 모두 포함된 원본 엑셀 파일을 그대로 올리시면 됩니다.
-              </p>
-              
-              <div className="relative group">
-                <input
-                  type="file"
-                  accept=".xlsx, .xls"
-                  onChange={handleCurriculumUpload}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                />
-                <div className="flex flex-col items-center justify-center w-full h-40 bg-slate-900/50 border-2 border-dashed border-slate-700 rounded-xl group-hover:border-indigo-500/50 group-hover:bg-indigo-500/5 transition-all">
-                  <Upload className="w-10 h-10 text-slate-500 group-hover:text-indigo-400 mb-3 transition-colors" />
-                  <p className="text-slate-300 font-medium">클릭하거나 엑셀 파일을 드래그하여 업로드하세요</p>
-                  <p className="text-slate-500 text-sm mt-1">.xlsx, .xls 파일 지원</p>
-                </div>
-              </div>
-
-              {isCurriculumParsed[activeGrade] && parsedCurriculumList[activeGrade]?.length > 0 && (
-                <div className="mt-8 p-6 bg-slate-950/50 border border-slate-800 rounded-2xl animate-in fade-in">
-                  <h3 className="text-xl font-medium text-slate-200 mb-4 flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                    추출된 교육과정 데이터 ({activeGrade === "grade1" ? "1학년 탭" : "2학년 탭"})
-                  </h3>
-                  <p className="text-sm text-slate-400 mb-6">
-                    업로드된 엑셀 파일에서 1~3학년 전체 교육과정을 자동으로 분석했습니다. 내부적으로 기초/사회/과학 과목 매핑도 완료되었습니다.
-                  </p>
-                  
-                  <div className="overflow-x-auto rounded-lg border border-slate-800">
-                    <table className="w-full text-sm text-left">
-                      <thead className="text-xs text-slate-400 uppercase bg-slate-900/80">
-                        <tr>
-                          <th className="px-4 py-3 font-medium">구분</th>
-                          <th className="px-4 py-3 font-medium">과목명</th>
-                          <th className="px-4 py-3 font-medium">교과(군)</th>
-                          <th className="px-4 py-3 font-medium text-center">운영학점</th>
-                          <th className="px-4 py-3 font-medium">개설학기</th>
-                          <th className="px-4 py-3 font-medium text-center">비고</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800/50">
-                        {parsedCurriculumList[activeGrade].map((subj, idx) => (
-                          <tr key={idx} className="bg-slate-950/30 hover:bg-slate-900/50 transition-colors">
-                            <td className="px-4 py-3">
-                              <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider ${
-                                subj.type === "지정" ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
-                              }`}>
-                                {subj.type}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 font-medium text-slate-200">{subj.subject}</td>
-                            <td className="px-4 py-3 text-slate-400">{subj.category}</td>
-                            <td className="px-4 py-3 text-center text-amber-400/90 font-mono">{subj.credits}</td>
-                            <td className="px-4 py-3 text-slate-500 text-xs">{subj.semesters}</td>
-                            <td className="px-4 py-3 text-center">
-                              {["국어", "수학", "영어"].includes(subj.category) && (
-                                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-medium">
-                                  기초
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  
-                  <div className="mt-8 flex justify-end">
-                     <button 
-                        onClick={() => setActiveTab("hierarchy")}
-                        className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-xl transition-colors border border-slate-700 flex items-center gap-2"
-                      >
-                        다음 단계(위계 설정)로 이동
-                        <GitBranch className="w-4 h-4" />
-                      </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === "hierarchy" && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex justify-between items-center mb-2">
-                <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
-                  <GitBranch className="w-6 h-6 text-amber-400" />
-                  2단계: 과목 위계(선수 과목) 설정
-                </h2>
-              </div>
-              
-              {renderGradeTabs()}
-
-              <p className="text-slate-400">
-                특정 과목을 수강하기 위해 먼저 들어야 하는 선수 과목 규칙을 설정할 수 있습니다. 1단계에서 분석된 과목들만 선택 가능합니다.
-              </p>
-              
-              {!isCurriculumParsed[activeGrade] || Object.keys(subjectMap[activeGrade]).length === 0 ? (
-                <div className="p-8 bg-slate-950/50 border border-slate-800 rounded-2xl text-center">
-                  <p className="text-slate-500">먼저 교육과정 설정 탭에서 과목을 분석해 주세요.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
                   <button
-                    onClick={() => {
-                      const subjects = Object.keys(subjectMap[activeGrade]);
-                      if (subjects.length > 0) {
-                        setHierarchyRules(prev => ({
-                          ...prev,
-                          [activeGrade]: [...(prev[activeGrade] || []), { id: Date.now().toString(), prereq: subjects[0], advanced: subjects[0] }]
-                        }));
-                      }
-                    }}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors border border-slate-700 flex items-center gap-2 text-sm"
+                    onClick={() => setActiveTab("curriculum")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${activeTab === "curriculum"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                      }`}
                   >
-                    <Plus className="w-4 h-4" />
-                    새로운 위계 규칙 추가
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span>
+                    <div className="flex items-center gap-2">
+                      <Settings className="w-4 h-4" />
+                      <span>교육과정 편성표 입력</span>
+                    </div>
                   </button>
-                  
-                  {(!hierarchyRules[activeGrade] || hierarchyRules[activeGrade].length === 0) && (
-                     <div className="p-6 bg-slate-900/50 border border-dashed border-slate-700 rounded-xl text-center text-slate-500 text-sm">
-                       설정된 위계 규칙이 없습니다. 필요한 경우 규칙을 추가해 주세요.
-                     </div>
-                  )}
-
-                  <div className="grid gap-3">
-                    {(hierarchyRules[activeGrade] || []).map((rule, idx) => (
-                      <div key={rule.id} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-700/50 rounded-xl">
-                        <span className="text-slate-400 font-medium">#{idx + 1}</span>
-                        <div className="flex-1 flex items-center gap-4">
-                          <div className="flex-1">
-                            <label className="block text-xs text-slate-500 mb-1">선행 과목 (먼저 듣는 과목)</label>
-                            <select 
-                              value={rule.prereq}
-                              onChange={(e) => {
-                                const newRules = [...hierarchyRules[activeGrade]];
-                                newRules[idx].prereq = e.target.value;
-                                setHierarchyRules(prev => ({ ...prev, [activeGrade]: newRules }));
-                              }}
-                              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                            >
-                              {Object.keys(subjectMap[activeGrade]).map(subj => (
-                                <option key={subj} value={subj}>{subj}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <ChevronRight className="w-5 h-5 text-slate-600 mt-5" />
-                          <div className="flex-1">
-                            <label className="block text-xs text-slate-500 mb-1">후행 과목 (나중에 듣는 과목)</label>
-                            <select 
-                              value={rule.advanced}
-                              onChange={(e) => {
-                                const newRules = [...hierarchyRules[activeGrade]];
-                                newRules[idx].advanced = e.target.value;
-                                setHierarchyRules(prev => ({ ...prev, [activeGrade]: newRules }));
-                              }}
-                              className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                            >
-                              {Object.keys(subjectMap[activeGrade]).map(subj => (
-                                <option key={subj} value={subj}>{subj}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => {
-                            const newRules = hierarchyRules[activeGrade].filter(r => r.id !== rule.id);
-                            setHierarchyRules(prev => ({ ...prev, [activeGrade]: newRules }));
-                          }}
-                          className="mt-5 p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                          title="규칙 삭제"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="mt-8 flex justify-end">
-                     <button 
-                        onClick={() => setActiveTab("upload")}
-                        className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-xl transition-colors border border-slate-700 flex items-center gap-2"
-                      >
-                        다음 단계(파일 업로드)로 이동
-                        <Upload className="w-4 h-4" />
-                      </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === "upload" && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div>
-                <h2 className="text-2xl font-semibold text-white flex items-center gap-2 mb-2">
-                  <Upload className="w-6 h-6 text-rose-400" />
-                  3단계: 데이터 파일 업로드
-                </h2>
-                <p className="text-slate-400 text-sm">
-                  당해년도 수요조사 설문 파일과 이전 학년의 이수 이력 데이터(선택)를 업로드해 주세요.
-                </p>
-              </div>
-              
-              {renderGradeTabs()}
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* 1. 당해년도 수강신청 파일 업로드 */}
-                <div className="space-y-3">
-                  <h3 className="text-lg font-medium text-slate-200 flex items-center gap-2">
-                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-bold">1</span>
-                    당해년도 수요조사 설문 파일 (필수)
-                  </h3>
-                  
-                  {!uploadedFiles[activeGrade] ? (
-                    <div className="border-2 border-dashed border-slate-700 hover:border-indigo-500/50 bg-slate-950/30 rounded-2xl p-12 text-center transition-all duration-300 group cursor-pointer relative">
-                      <input 
-                        key={`curr-${activeGrade}`}
-                        type="file" 
-                        accept=".xlsx, .xls"
-                        onChange={handleFileUpload}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      />
-                      <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform duration-300 border border-slate-800">
-                        <Upload className="w-6 h-6 text-indigo-400" />
-                      </div>
-                      <h4 className="text-md font-medium text-slate-200 mb-1">
-                        리로스쿨 설문 제출내역 파일을 업로드하세요.
-                      </h4>
-                      <p className="text-xs text-slate-500 mb-4">또는 클릭하여 컴퓨터에서 선택 (.xlsx, .xls)</p>
-                      <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors border border-slate-700">
-                        파일 선택
-                      </button>
+                  <button
+                    onClick={() => setActiveTab("hierarchy")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${activeTab === "hierarchy"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                      }`}
+                  >
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span>
+                    <div className="flex items-center gap-2">
+                      <GitBranch className="w-4 h-4" />
+                      <span>과목 위계 설정</span>
                     </div>
-                  ) : (
-                    <div className="border border-slate-805 bg-slate-900/30 rounded-2xl p-6 flex flex-col justify-between h-[196px]">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center border border-indigo-500/30 flex-shrink-0">
-                          <FileIcon className="w-6 h-6" />
-                        </div>
-                        <div className="overflow-hidden">
-                          <h4 className="text-md font-medium text-slate-200 truncate" title={uploadedFiles[activeGrade]?.name}>
-                            {uploadedFiles[activeGrade]?.name}
-                          </h4>
-                          <p className="text-xs text-slate-500 mt-1">
-                            {(uploadedFiles[activeGrade]!.size / 1024).toFixed(1)} KB
-                          </p>
-                          <span className="inline-block mt-2 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-xs font-semibold rounded border border-emerald-500/20">
-                            업로드 완료
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => setActiveTab("preview")}
-                          className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5"
-                        >
-                          결과 미리보기
-                        </button>
-                        <button 
-                          onClick={handleRemoveFile}
-                          className="px-3 py-2 bg-slate-850 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 rounded-lg transition-colors border border-slate-800"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("upload")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${activeTab === "upload"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                      }`}
+                  >
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span>
+                    <div className="flex items-center gap-2">
+                      <Upload className="w-4 h-4" />
+                      <span>파일 업로드</span>
                     </div>
-                  )}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("preview")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${activeTab === "preview"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                      }`}
+                  >
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span>
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      <span>수요조사 결과</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("classOpening")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${activeTab === "classOpening"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                      }`}
+                  >
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>과목 개설 여부</span>
+                    </div>
+                  </button>
+
                 </div>
 
-                {/* 2. 이전 학년 이수 이력 파일 업로드 */}
-                <div className="space-y-3">
-                  <h3 className="text-lg font-medium text-slate-200 flex items-center gap-2">
-                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">2</span>
-                    이전 학년 이수 이력 파일 (선택)
-                  </h3>
-                  
-                  {!previousHistoryFiles[activeGrade] ? (
-                    <div className="border-2 border-dashed border-slate-700 hover:border-amber-500/50 bg-slate-950/30 rounded-2xl p-12 text-center transition-all duration-300 group cursor-pointer relative">
-                      <input 
-                        key={`prev-${activeGrade}`}
-                        type="file" 
-                        accept=".xlsx, .xls"
-                        onChange={handlePrevHistoryFileUpload}
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      />
-                      <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform duration-300 border border-slate-800">
-                        <Upload className="w-6 h-6 text-amber-400" />
+                <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 rounded-3xl p-8 shadow-2xl">
+                  {activeTab === "curriculum" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex justify-between items-center mb-2">
+                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                          <Settings className="w-6 h-6 text-indigo-400" />
+                          1단계: 교육과정 편성표 입력
+                        </h2>
                       </div>
-                      <h4 className="text-md font-medium text-slate-200 mb-1">
-                        수강신청 통계 파일 업로드
-                      </h4>
-                      <p className="text-xs text-slate-400 mb-4 px-4 leading-relaxed">
-                        "리로스쿨-교육과정-수강신청-통계-엑셀저장"에서 다운받은 수강신청 통계 파일을 업로드하세요.
+
+                      {renderGradeTabs()}
+
+                      <p className="text-slate-400">
+                        선택하신 학년의 교육과정 편성표 엑셀 파일을 업로드해 주세요. 3개년 데이터가 모두 포함된 원본 엑셀 파일을 그대로 올리시면 됩니다.
                       </p>
-                      <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors border border-slate-700">
-                        파일 선택
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="border border-slate-808 bg-slate-900/30 rounded-2xl p-6 flex flex-col justify-between h-[196px]">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-xl flex items-center justify-center border border-amber-500/30 flex-shrink-0">
-                          <FileIcon className="w-6 h-6" />
-                        </div>
-                        <div className="overflow-hidden">
-                          <h4 className="text-md font-medium text-slate-200 truncate" title={previousHistoryFiles[activeGrade]?.name}>
-                            {previousHistoryFiles[activeGrade]?.name}
-                          </h4>
-                          <p className="text-xs text-slate-500 mt-1">
-                            {(previousHistoryFiles[activeGrade]!.size / 1024).toFixed(1)} KB
-                          </p>
-                          <span className="inline-block mt-2 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-xs font-semibold rounded border border-emerald-500/20">
-                            총 {Object.keys(previousSubjectMap[activeGrade] || {}).length}명 연동 완료
-                          </span>
+
+                      <div className="relative group">
+                        <input
+                          type="file"
+                          accept=".xlsx, .xls"
+                          onChange={handleCurriculumUpload}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        />
+                        <div className="flex flex-col items-center justify-center w-full h-40 bg-slate-900/50 border-2 border-dashed border-slate-700 rounded-xl group-hover:border-indigo-500/50 group-hover:bg-indigo-500/5 transition-all">
+                          <Upload className="w-10 h-10 text-slate-500 group-hover:text-indigo-400 mb-3 transition-colors" />
+                          <p className="text-slate-300 font-medium">클릭하거나 엑셀 파일을 드래그하여 업로드하세요</p>
+                          <p className="text-slate-500 text-sm mt-1">.xlsx, .xls 파일 지원</p>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <div className="flex-1 py-2 text-center text-slate-400 text-xs bg-slate-800/50 rounded-lg flex items-center justify-center border border-slate-800">
-                          다년도 위계 검사 자동 적용됨
+
+                      {isCurriculumParsed[activeGrade] && parsedCurriculumList[activeGrade]?.length > 0 && (
+                        <div className="mt-8 p-6 bg-slate-950/50 border border-slate-800 rounded-2xl animate-in fade-in">
+                          <h3 className="text-xl font-medium text-slate-200 mb-4 flex items-center gap-2">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                            추출된 교육과정 데이터 ({activeGrade === "grade1" ? "1학년 탭" : "2학년 탭"})
+                          </h3>
+                          <p className="text-sm text-slate-400 mb-6">
+                            업로드된 엑셀 파일에서 1~3학년 전체 교육과정을 자동으로 분석했습니다. 내부적으로 기초/사회/과학 과목 매핑도 완료되었습니다.
+                          </p>
+
+                          <div className="overflow-x-auto rounded-lg border border-slate-800">
+                            <table className="w-full text-sm text-left">
+                              <thead className="text-xs text-slate-400 uppercase bg-slate-900/80">
+                                <tr>
+                                  <th className="px-4 py-3 font-medium">구분</th>
+                                  <th className="px-4 py-3 font-medium">과목명</th>
+                                  <th className="px-4 py-3 font-medium">교과(군)</th>
+                                  <th className="px-4 py-3 font-medium text-center">운영학점</th>
+                                  <th className="px-4 py-3 font-medium">개설학기</th>
+                                  <th className="px-4 py-3 font-medium text-center">비고</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800/50">
+                                {parsedCurriculumList[activeGrade].map((subj, idx) => (
+                                  <tr key={idx} className="bg-slate-950/30 hover:bg-slate-900/50 transition-colors">
+                                    <td className="px-4 py-3">
+                                      <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider ${subj.type === "지정" ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                                        }`}>
+                                        {subj.type}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-3 font-medium text-slate-200">{subj.subject}</td>
+                                    <td className="px-4 py-3 text-slate-400">{subj.category}</td>
+                                    <td className="px-4 py-3 text-center text-amber-400/90 font-mono">{subj.credits}</td>
+                                    <td className="px-4 py-3 text-slate-500 text-xs">{subj.semesters}</td>
+                                    <td className="px-4 py-3 text-center">
+                                      {["국어", "수학", "영어"].includes(subj.category) && (
+                                        <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-medium">
+                                          기초
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          <div className="mt-8 flex justify-end">
+                            <button
+                              onClick={() => setActiveTab("hierarchy")}
+                              className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-xl transition-colors border border-slate-700 flex items-center gap-2"
+                            >
+                              다음 단계(위계 설정)로 이동
+                              <GitBranch className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                        <button 
-                          onClick={handleRemovePrevHistoryFile}
-                          className="px-3 py-2 bg-slate-850 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 rounded-lg transition-colors border border-slate-800"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {activeTab === "hierarchy" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex justify-between items-center mb-2">
+                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                          <GitBranch className="w-6 h-6 text-amber-400" />
+                          2단계: 과목 위계(선수 과목) 설정
+                        </h2>
+                      </div>
+
+                      {renderGradeTabs()}
+
+                      <p className="text-slate-400">
+                        특정 과목을 수강하기 위해 먼저 들어야 하는 선수 과목 규칙을 설정할 수 있습니다. 1단계에서 분석된 과목들만 선택 가능합니다.
+                      </p>
+
+                      {!isCurriculumParsed[activeGrade] || Object.keys(subjectMap[activeGrade]).length === 0 ? (
+                        <div className="p-8 bg-slate-950/50 border border-slate-800 rounded-2xl text-center">
+                          <p className="text-slate-500">먼저 교육과정 설정 탭에서 과목을 분석해 주세요.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <button
+                            onClick={() => {
+                              const subjects = Object.keys(subjectMap[activeGrade]);
+                              if (subjects.length > 0) {
+                                setHierarchyRules(prev => ({
+                                  ...prev,
+                                  [activeGrade]: [...(prev[activeGrade] || []), { id: Date.now().toString(), prereq: subjects[0], advanced: subjects[0] }]
+                                }));
+                              }
+                            }}
+                            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors border border-slate-700 flex items-center gap-2 text-sm"
+                          >
+                            <Plus className="w-4 h-4" />
+                            새로운 위계 규칙 추가
+                          </button>
+
+                          {(!hierarchyRules[activeGrade] || hierarchyRules[activeGrade].length === 0) && (
+                            <div className="p-6 bg-slate-900/50 border border-dashed border-slate-700 rounded-xl text-center text-slate-500 text-sm">
+                              설정된 위계 규칙이 없습니다. 필요한 경우 규칙을 추가해 주세요.
+                            </div>
+                          )}
+
+                          <div className="grid gap-3">
+                            {(hierarchyRules[activeGrade] || []).map((rule, idx) => (
+                              <div key={rule.id} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-700/50 rounded-xl">
+                                <span className="text-slate-400 font-medium">#{idx + 1}</span>
+                                <div className="flex-1 flex items-center gap-4">
+                                  <div className="flex-1">
+                                    <label className="block text-xs text-slate-500 mb-1">선행 과목 (먼저 듣는 과목)</label>
+                                    <select
+                                      value={rule.prereq}
+                                      onChange={(e) => {
+                                        const newRules = [...hierarchyRules[activeGrade]];
+                                        newRules[idx].prereq = e.target.value;
+                                        setHierarchyRules(prev => ({ ...prev, [activeGrade]: newRules }));
+                                      }}
+                                      className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                    >
+                                      {Object.keys(subjectMap[activeGrade]).map(subj => (
+                                        <option key={subj} value={subj}>{subj}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <ChevronRight className="w-5 h-5 text-slate-600 mt-5" />
+                                  <div className="flex-1">
+                                    <label className="block text-xs text-slate-500 mb-1">후행 과목 (나중에 듣는 과목)</label>
+                                    <select
+                                      value={rule.advanced}
+                                      onChange={(e) => {
+                                        const newRules = [...hierarchyRules[activeGrade]];
+                                        newRules[idx].advanced = e.target.value;
+                                        setHierarchyRules(prev => ({ ...prev, [activeGrade]: newRules }));
+                                      }}
+                                      className="w-full bg-slate-950 border border-slate-700 rounded-md px-3 py-2 text-slate-300 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                    >
+                                      {Object.keys(subjectMap[activeGrade]).map(subj => (
+                                        <option key={subj} value={subj}>{subj}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    const newRules = hierarchyRules[activeGrade].filter(r => r.id !== rule.id);
+                                    setHierarchyRules(prev => ({ ...prev, [activeGrade]: newRules }));
+                                  }}
+                                  className="mt-5 p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                  title="규칙 삭제"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="mt-8 flex justify-end">
+                            <button
+                              onClick={() => setActiveTab("upload")}
+                              className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-xl transition-colors border border-slate-700 flex items-center gap-2"
+                            >
+                              다음 단계(파일 업로드)로 이동
+                              <Upload className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {activeTab === "upload" && (
+                    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div>
+                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2 mb-2">
+                          <Upload className="w-6 h-6 text-rose-400" />
+                          3단계: 데이터 파일 업로드
+                        </h2>
+                        <p className="text-slate-400 text-sm">
+                          당해년도 수요조사 설문 파일과 이전 학년의 이수 이력 데이터(선택)를 업로드해 주세요.
+                        </p>
+                      </div>
+
+                      {renderGradeTabs()}
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* 1. 당해년도 수강신청 파일 업로드 */}
+                        <div className="space-y-3">
+                          <h3 className="text-lg font-medium text-slate-200 flex items-center gap-2">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-bold">1</span>
+                            당해년도 수요조사 설문 파일 (필수)
+                          </h3>
+
+                          {!uploadedFiles[activeGrade] ? (
+                            <div className="border-2 border-dashed border-slate-700 hover:border-indigo-500/50 bg-slate-950/30 rounded-2xl p-12 text-center transition-all duration-300 group cursor-pointer relative">
+                              <input
+                                key={`curr-${activeGrade}`}
+                                type="file"
+                                accept=".xlsx, .xls"
+                                onChange={handleFileUpload}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                              />
+                              <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform duration-300 border border-slate-800">
+                                <Upload className="w-6 h-6 text-indigo-400" />
+                              </div>
+                              <h4 className="text-md font-medium text-slate-200 mb-1">
+                                리로스쿨 설문 제출내역 파일을 업로드하세요.
+                              </h4>
+                              <p className="text-xs text-slate-500 mb-4">또는 클릭하여 컴퓨터에서 선택 (.xlsx, .xls)</p>
+                              <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors border border-slate-700">
+                                파일 선택
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="border border-slate-805 bg-slate-900/30 rounded-2xl p-6 flex flex-col justify-between h-[196px]">
+                              <div className="flex items-start gap-4">
+                                <div className="w-12 h-12 bg-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center border border-indigo-500/30 flex-shrink-0">
+                                  <FileIcon className="w-6 h-6" />
+                                </div>
+                                <div className="overflow-hidden">
+                                  <h4 className="text-md font-medium text-slate-200 truncate" title={uploadedFiles[activeGrade]?.name}>
+                                    {uploadedFiles[activeGrade]?.name}
+                                  </h4>
+                                  <p className="text-xs text-slate-500 mt-1">
+                                    {(uploadedFiles[activeGrade]!.size / 1024).toFixed(1)} KB
+                                  </p>
+                                  <span className="inline-block mt-2 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-xs font-semibold rounded border border-emerald-500/20">
+                                    업로드 완료
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setActiveTab("preview")}
+                                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                                >
+                                  결과 미리보기
+                                </button>
+                                <button
+                                  onClick={handleRemoveFile}
+                                  className="px-3 py-2 bg-slate-850 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 rounded-lg transition-colors border border-slate-800"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 2. 이전 학년 이수 이력 파일 업로드 */}
+                        <div className="space-y-3">
+                          <h3 className="text-lg font-medium text-slate-200 flex items-center gap-2">
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold">2</span>
+                            이전 학년 이수 이력 파일 (선택)
+                          </h3>
+
+                          {!previousHistoryFiles[activeGrade] ? (
+                            <div className="border-2 border-dashed border-slate-700 hover:border-amber-500/50 bg-slate-950/30 rounded-2xl p-12 text-center transition-all duration-300 group cursor-pointer relative">
+                              <input
+                                key={`prev-${activeGrade}`}
+                                type="file"
+                                accept=".xlsx, .xls"
+                                onChange={handlePrevHistoryFileUpload}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                              />
+                              <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-105 transition-transform duration-300 border border-slate-800">
+                                <Upload className="w-6 h-6 text-amber-400" />
+                              </div>
+                              <h4 className="text-md font-medium text-slate-200 mb-1">
+                                수강신청 통계 파일 업로드
+                              </h4>
+                              <p className="text-xs text-slate-400 mb-4 px-4 leading-relaxed">
+                                "리로스쿨-교육과정-수강신청-통계-엑셀저장"에서 다운받은 수강신청 통계 파일을 업로드하세요.
+                              </p>
+                              <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors border border-slate-700">
+                                파일 선택
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="border border-slate-808 bg-slate-900/30 rounded-2xl p-6 flex flex-col justify-between h-[196px]">
+                              <div className="flex items-start gap-4">
+                                <div className="w-12 h-12 bg-amber-500/20 text-amber-400 rounded-xl flex items-center justify-center border border-amber-500/30 flex-shrink-0">
+                                  <FileIcon className="w-6 h-6" />
+                                </div>
+                                <div className="overflow-hidden">
+                                  <h4 className="text-md font-medium text-slate-200 truncate" title={previousHistoryFiles[activeGrade]?.name}>
+                                    {previousHistoryFiles[activeGrade]?.name}
+                                  </h4>
+                                  <p className="text-xs text-slate-500 mt-1">
+                                    {(previousHistoryFiles[activeGrade]!.size / 1024).toFixed(1)} KB
+                                  </p>
+                                  <span className="inline-block mt-2 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-xs font-semibold rounded border border-emerald-500/20">
+                                    총 {Object.keys(previousSubjectMap[activeGrade] || {}).length}명 연동 완료
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <div className="flex-1 py-2 text-center text-slate-400 text-xs bg-slate-800/50 rounded-lg flex items-center justify-center border border-slate-800">
+                                  다년도 위계 검사 자동 적용됨
+                                </div>
+                                <button
+                                  onClick={handleRemovePrevHistoryFile}
+                                  className="px-3 py-2 bg-slate-850 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 rounded-lg transition-colors border border-slate-800"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
-                </div>
-              </div>
-            </div>
-          )}
 
-          {activeTab === "preview" && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex justify-between items-center mb-2">
-                <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
-                  <FileText className="w-6 h-6 text-emerald-400" />
-                  4단계: 수요조사 결과 및 다운로드
-                </h2>
-                <button 
-                  onClick={handleExport}
-                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-500/25 flex items-center gap-2"
-                  disabled={activeData.length === 0}
-                >
-                  <Download className="w-4 h-4" />
-                  {activeGrade === "grade1" ? "1학년" : "2학년"} 엑셀 다운로드
-                </button>
-              </div>
+                  {activeTab === "preview" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex justify-between items-center mb-2">
+                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                          <FileText className="w-6 h-6 text-emerald-400" />
+                          4단계: 수요조사 결과 및 다운로드
+                        </h2>
+                        <button
+                          onClick={handleExport}
+                          className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-500/25 flex items-center gap-2"
+                          disabled={activeData.length === 0}
+                        >
+                          <Download className="w-4 h-4" />
+                          {activeGrade === "grade1" ? "1학년" : "2학년"} 엑셀 다운로드
+                        </button>
+                      </div>
 
-              {renderGradeTabs()}
-              
-              {activeData.length === 0 ? (
-                <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-8 text-center">
-                  <p className="text-slate-500">선택하신 학년의 데이터가 아직 없습니다. 교육과정 설정과 파일 업로드를 진행해 주세요.</p>
-                </div>
-              ) : (
-                <div className="bg-slate-950/50 border border-slate-800 rounded-2xl overflow-hidden">
-                  <div className="overflow-auto max-h-[650px] relative">
-                    <table className="w-full text-sm text-left text-slate-300 border-collapse">
-                      <thead className="text-xs text-slate-400 uppercase bg-slate-900 border-b border-slate-800">
-                        <tr>
-                          <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-0 z-40 bg-slate-900 min-w-[50px] max-w-[50px] border-r border-slate-800 text-center">순번</th>
-                          <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[50px] z-40 bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800 text-center">학번</th>
-                          <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[130px] z-40 bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800/50 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)]">이름</th>
-                          <th className="px-2 py-2.5 text-center whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-r border-slate-800" colSpan={maxSem1}>1학기</th>
-                          <th className="px-2 py-2.5 text-center whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-r border-slate-800" colSpan={maxSem2}>2학기</th>
-                          <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 text-center">기초과목</th>
-                          <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 text-center">사회</th>
-                          <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 text-center">과학</th>
-                          <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900">비고(중복)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {activeData.map((row, idx) => (
-                          <tr key={idx} className="group border-b border-slate-800/50 hover:bg-slate-900/50">
-                            <td className="px-2 py-2.5 whitespace-nowrap sticky left-0 z-20 bg-slate-950 group-hover:bg-slate-900 min-w-[50px] max-w-[50px] border-r border-slate-800 text-center">{idx + 1}</td>
-                            <td className="px-2 py-2.5 font-medium text-white whitespace-nowrap sticky left-[50px] z-20 bg-slate-950 group-hover:bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800 text-center">{row.studentId}</td>
-                            <td className="px-2 py-2.5 whitespace-nowrap sticky left-[130px] z-20 bg-slate-950 group-hover:bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800/50 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)]">{row.name}</td>
-                            {Array.from({length: maxSem1}).map((_, i) => {
-                               const subject = row.semester1[i] || "";
-                               const isDuplicate = subject && row.duplicateSubjects?.includes(subject);
-                               const isHierarchyViolation = subject && row.hierarchyViolations?.some(v => v.subject === subject || v.prereq === subject);
-                               let cellClass = "px-2 py-2.5 whitespace-nowrap ";
-                               if (isHierarchyViolation) cellClass += "text-cyan-400 font-bold bg-cyan-400/10 rounded-md";
-                               else if (isDuplicate) cellClass += "text-yellow-400 font-bold bg-yellow-400/10 rounded-md";
+                      {renderGradeTabs()}
 
-                               return (
-                                 <td key={`s1-${i}`} className={cellClass}>
-                                   {subject}
-                                 </td>
-                               );
-                            })}
-                            {Array.from({length: maxSem2}).map((_, i) => {
-                               const subject = row.semester2[i] || "";
-                               const isDuplicate = subject && row.duplicateSubjects?.includes(subject);
-                               const isHierarchyViolation = subject && row.hierarchyViolations?.some(v => v.subject === subject || v.prereq === subject);
-                               let cellClass = "px-2 py-2.5 whitespace-nowrap ";
-                               if (isHierarchyViolation) cellClass += "text-cyan-400 font-bold bg-cyan-400/10 rounded-md";
-                               else if (isDuplicate) cellClass += "text-yellow-400 font-bold bg-yellow-400/10 rounded-md";
+                      {activeData.length === 0 ? (
+                        <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-8 text-center">
+                          <p className="text-slate-500">선택하신 학년의 데이터가 아직 없습니다. 교육과정 설정과 파일 업로드를 진행해 주세요.</p>
+                        </div>
+                      ) : (
+                        <div className="bg-slate-950/50 border border-slate-800 rounded-2xl overflow-hidden">
+                          <div className="overflow-auto max-h-[650px] relative">
+                            <table className="w-full text-sm text-left text-slate-300 border-collapse">
+                              <thead className="text-xs text-slate-400 uppercase bg-slate-900 border-b border-slate-800">
+                                <tr>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-0 z-40 bg-slate-900 min-w-[50px] max-w-[50px] border-r border-slate-800 text-center">순번</th>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[50px] z-40 bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800 text-center">학번</th>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[130px] z-40 bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800/50 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)]">이름</th>
+                                  <th className="px-2 py-2.5 text-center whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-r border-slate-800" colSpan={maxSem1}>1학기</th>
+                                  <th className="px-2 py-2.5 text-center whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-r border-slate-800" colSpan={maxSem2}>2학기</th>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 text-center">기초과목</th>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 text-center">사회</th>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 text-center">과학</th>
+                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900">비고(중복)</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {activeData.map((row, idx) => (
+                                  <tr key={idx} className="group border-b border-slate-800/50 hover:bg-slate-900/50">
+                                    <td className="px-2 py-2.5 whitespace-nowrap sticky left-0 z-20 bg-slate-950 group-hover:bg-slate-900 min-w-[50px] max-w-[50px] border-r border-slate-800 text-center">{idx + 1}</td>
+                                    <td className="px-2 py-2.5 font-medium text-white whitespace-nowrap sticky left-[50px] z-20 bg-slate-950 group-hover:bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800 text-center">{row.studentId}</td>
+                                    <td className="px-2 py-2.5 whitespace-nowrap sticky left-[130px] z-20 bg-slate-950 group-hover:bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800/50 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)]">{row.name}</td>
+                                    {Array.from({ length: maxSem1 }).map((_, i) => {
+                                      const subject = row.semester1[i] || "";
+                                      const isDuplicate = subject && row.duplicateSubjects?.includes(subject);
+                                      const isHierarchyViolation = subject && row.hierarchyViolations?.some(v => v.subject === subject || v.prereq === subject);
+                                      let cellClass = "px-2 py-2.5 whitespace-nowrap ";
+                                      if (isHierarchyViolation) cellClass += "text-cyan-400 font-bold bg-cyan-400/10 rounded-md";
+                                      else if (isDuplicate) cellClass += "text-yellow-400 font-bold bg-yellow-400/10 rounded-md";
 
-                               return (
-                                 <td key={`s2-${i}`} className={cellClass}>
-                                   {subject}
-                                 </td>
-                               );
-                            })}
-                            <td className="px-2 py-2.5 text-center text-indigo-400 font-medium whitespace-nowrap">{row.basicCount}</td>
-                            <td className="px-2 py-2.5 text-center text-rose-400 font-medium whitespace-nowrap">{row.socialCount}</td>
-                            <td className="px-2 py-2.5 text-center text-emerald-400 font-medium whitespace-nowrap">{row.scienceCount}</td>
-                            <td className="px-2 py-2.5 font-medium flex flex-col gap-1 whitespace-nowrap">
-                              {row.basicCount >= 10 && <span className="text-rose-400 whitespace-nowrap">기초과목 최대학점 초과</span>}
-                              {row.duplicateSubjects?.length > 0 && <span className="text-yellow-400 whitespace-nowrap">중복선택: {row.duplicateSubjects.join(", ")}</span>}
-                              {row.hierarchyViolations?.map((v, i) => (
-                                <span key={i} className="text-cyan-400 text-xs whitespace-nowrap">
-                                  {v.message}
-                                </span>
-                              ))}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+                                      return (
+                                        <td key={`s1-${i}`} className={cellClass}>
+                                          {subject}
+                                        </td>
+                                      );
+                                    })}
+                                    {Array.from({ length: maxSem2 }).map((_, i) => {
+                                      const subject = row.semester2[i] || "";
+                                      const isDuplicate = subject && row.duplicateSubjects?.includes(subject);
+                                      const isHierarchyViolation = subject && row.hierarchyViolations?.some(v => v.subject === subject || v.prereq === subject);
+                                      let cellClass = "px-2 py-2.5 whitespace-nowrap ";
+                                      if (isHierarchyViolation) cellClass += "text-cyan-400 font-bold bg-cyan-400/10 rounded-md";
+                                      else if (isDuplicate) cellClass += "text-yellow-400 font-bold bg-yellow-400/10 rounded-md";
 
-          {activeTab === "classOpening" && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
-                <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
-                  <CheckCircle2 className="w-6 h-6 text-indigo-400" />
-                  5단계: 과목 개설 여부 및 학급 분반 추천
-                </h2>
-                <button 
-                  onClick={handleExportStep5}
-                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-500/25 flex items-center gap-2"
-                  disabled={subjectStats[activeGrade].length === 0}
-                >
-                  <Download className="w-4 h-4" />
-                  {activeGrade === "grade1" ? "1학년" : "2학년"} 개설 여부 엑셀 다운로드
-                </button>
-              </div>
-
-              {renderGradeTabs()}
-
-              {/* 학급 기준 인원 설정 */}
-              <div className="p-5 bg-slate-950/40 border border-slate-800/80 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                  <h3 className="font-semibold text-slate-200">학급 분반 및 개설 기준 설정</h3>
-                  <p className="text-xs text-slate-400 mt-1">
-                    설정된 학급 기준 인원에 따라 개설(70% 이상), 논의(70% 미만), 분반 추천(120% 초과) 및 폐강(5명 미만) 여부를 자동으로 판단합니다.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <label htmlFor="standardSizeInput" className="text-sm text-slate-300 font-medium whitespace-nowrap">학급 기준 인원:</label>
-                  <input
-                    id="standardSizeInput"
-                    type="number"
-                    min={10}
-                    max={50}
-                    value={standardClassSize[activeGrade]}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value) || 25;
-                      setStandardClassSize(prev => ({ ...prev, [activeGrade]: val }));
-                    }}
-                    className="w-20 bg-slate-950 border border-slate-700 text-center rounded-lg px-2 py-1.5 text-white font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <span className="text-sm text-slate-400">명</span>
-                </div>
-              </div>
-
-              {subjectStats[activeGrade].length === 0 ? (
-                <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-8 text-center">
-                  <p className="text-slate-500">선택하신 학년의 데이터가 아직 없습니다. 교육과정 설정과 파일 업로드를 진행해 주세요.</p>
-                </div>
-              ) : (() => {
-                const stats = subjectStats[activeGrade] || [];
-                const standardSize = standardClassSize[activeGrade] || 25;
-
-                // Precompute group and semester rowSpans
-                const groupSpans: number[] = [];
-                const semSpans: number[] = [];
-
-                for (let idx = 0; idx < stats.length; idx++) {
-                  if (idx === 0 || stats[idx].group !== stats[idx - 1].group) {
-                    let count = 1;
-                    while (idx + count < stats.length && stats[idx + count].group === stats[idx].group) {
-                      count++;
-                    }
-                    groupSpans.push(count);
-                  } else {
-                    groupSpans.push(0);
-                  }
-
-                  if (idx === 0 || stats[idx].group !== stats[idx - 1].group || stats[idx].semester !== stats[idx - 1].semester) {
-                    let count = 1;
-                    while (idx + count < stats.length && stats[idx + count].group === stats[idx].group && stats[idx + count].semester === stats[idx].semester) {
-                      count++;
-                    }
-                    semSpans.push(count);
-                  } else {
-                    semSpans.push(0);
-                  }
-                }
-
-                return (
-                  <div className="bg-slate-950/50 border border-slate-800 rounded-2xl overflow-hidden">
-                    <div className="overflow-auto max-h-[650px]">
-                      <table className="w-full text-sm text-left text-slate-300 border-collapse">
-                        <thead className="text-xs text-slate-400 uppercase bg-slate-900 border-b border-slate-800">
-                          <tr>
-                            <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[100px]">선택군</th>
-                            <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">학기</th>
-                            <th className="px-6 py-3 border-r border-slate-800/60">과목</th>
-                            <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">신청자 수</th>
-                            <th className="px-4 py-3 text-center min-w-[120px]">비고</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {stats.map((row, idx) => {
-                            const remark = getClassRecommendation(row.applicants, standardSize);
-                            
-                            let remarkStyle = "text-slate-300 font-medium";
-                            if (remark === "폐강") {
-                              remarkStyle = "text-rose-400 font-bold bg-rose-500/10 px-2.5 py-1 rounded-md inline-block";
-                            } else if (remark === "논의") {
-                              remarkStyle = "text-amber-400 font-bold bg-amber-500/10 px-2.5 py-1 rounded-md inline-block";
-                            } else if (remark !== "개설" && remark !== "") {
-                              remarkStyle = "text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-md inline-block";
-                            }
-
-                            return (
-                              <tr key={idx} className="border-b border-slate-800/50 hover:bg-slate-900/20 transition-colors">
-                                {groupSpans[idx] > 0 && (
-                                  <td 
-                                    rowSpan={groupSpans[idx]} 
-                                    className="px-4 py-3.5 text-center font-bold text-slate-200 border-r border-slate-800/50 bg-slate-950/60 align-middle"
-                                  >
-                                    {row.group}
-                                  </td>
-                                )}
-                                {semSpans[idx] > 0 && (
-                                  <td 
-                                    rowSpan={semSpans[idx]} 
-                                    className="px-4 py-3.5 text-center font-semibold text-slate-300 border-r border-slate-800/50 bg-slate-950/40 align-middle"
-                                  >
-                                    {row.semester}
-                                  </td>
-                                )}
-                                <td className="px-6 py-3.5 border-r border-slate-800/50 font-medium text-white">
-                                  {row.subject}
-                                </td>
-                                <td className="px-4 py-3.5 text-center border-r border-slate-800/50 font-semibold text-indigo-400">
-                                  {row.applicants}명
-                                </td>
-                                <td className="px-4 py-3.5 text-center align-middle">
-                                  <span className={remarkStyle}>
-                                    {remark}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                      return (
+                                        <td key={`s2-${i}`} className={cellClass}>
+                                          {subject}
+                                        </td>
+                                      );
+                                    })}
+                                    <td className="px-2 py-2.5 text-center text-indigo-400 font-medium whitespace-nowrap">{row.basicCount}</td>
+                                    <td className="px-2 py-2.5 text-center text-rose-400 font-medium whitespace-nowrap">{row.socialCount}</td>
+                                    <td className="px-2 py-2.5 text-center text-emerald-400 font-medium whitespace-nowrap">{row.scienceCount}</td>
+                                    <td className="px-2 py-2.5 font-medium flex flex-col gap-1 whitespace-nowrap">
+                                      {row.basicCount >= 10 && <span className="text-rose-400 whitespace-nowrap">기초과목 최대학점 초과</span>}
+                                      {row.duplicateSubjects?.length > 0 && <span className="text-yellow-400 whitespace-nowrap">중복선택: {row.duplicateSubjects.join(", ")}</span>}
+                                      {row.hierarchyViolations?.map((v, i) => (
+                                        <span key={i} className="text-cyan-400 text-xs whitespace-nowrap">
+                                          {v.message}
+                                        </span>
+                                      ))}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-        </div>
-      </Fragment>
-    )}
+                  )}
+
+                  {activeTab === "classOpening" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                          <CheckCircle2 className="w-6 h-6 text-indigo-400" />
+                          5단계: 과목 개설 여부 및 학급 분반 추천
+                        </h2>
+                        <button
+                          onClick={handleExportStep5}
+                          className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-500/25 flex items-center gap-2"
+                          disabled={subjectStats[activeGrade].length === 0}
+                        >
+                          <Download className="w-4 h-4" />
+                          {activeGrade === "grade1" ? "1학년" : "2학년"} 개설 여부 엑셀 다운로드
+                        </button>
+                      </div>
+
+                      {renderGradeTabs()}
+
+                      {/* 학급 기준 인원 설정 */}
+                      <div className="p-5 bg-slate-950/40 border border-slate-800/80 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <h3 className="font-semibold text-slate-200">학급 분반 및 개설 기준 설정</h3>
+                          <p className="text-xs text-slate-400 mt-1">
+                            설정된 학급 기준 인원에 따라 개설(70% 이상), 논의(70% 미만), 분반 추천(120% 초과) 및 폐강(5명 미만) 여부를 자동으로 판단합니다.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <label htmlFor="standardSizeInput" className="text-sm text-slate-300 font-medium whitespace-nowrap">학급 기준 인원:</label>
+                          <input
+                            id="standardSizeInput"
+                            type="number"
+                            min={10}
+                            max={50}
+                            value={standardClassSize[activeGrade]}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value) || 25;
+                              setStandardClassSize(prev => ({ ...prev, [activeGrade]: val }));
+                            }}
+                            className="w-20 bg-slate-950 border border-slate-700 text-center rounded-lg px-2 py-1.5 text-white font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <span className="text-sm text-slate-400">명</span>
+                        </div>
+                      </div>
+
+                      {subjectStats[activeGrade].length === 0 ? (
+                        <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-8 text-center">
+                          <p className="text-slate-500">선택하신 학년의 데이터가 아직 없습니다. 교육과정 설정과 파일 업로드를 진행해 주세요.</p>
+                        </div>
+                      ) : (() => {
+                        const stats = subjectStats[activeGrade] || [];
+                        const standardSize = standardClassSize[activeGrade] || 25;
+
+                        // Precompute group and semester rowSpans
+                        const groupSpans: number[] = [];
+                        const semSpans: number[] = [];
+
+                        for (let idx = 0; idx < stats.length; idx++) {
+                          if (idx === 0 || stats[idx].group !== stats[idx - 1].group) {
+                            let count = 1;
+                            while (idx + count < stats.length && stats[idx + count].group === stats[idx].group) {
+                              count++;
+                            }
+                            groupSpans.push(count);
+                          } else {
+                            groupSpans.push(0);
+                          }
+
+                          if (idx === 0 || stats[idx].group !== stats[idx - 1].group || stats[idx].semester !== stats[idx - 1].semester) {
+                            let count = 1;
+                            while (idx + count < stats.length && stats[idx + count].group === stats[idx].group && stats[idx + count].semester === stats[idx].semester) {
+                              count++;
+                            }
+                            semSpans.push(count);
+                          } else {
+                            semSpans.push(0);
+                          }
+                        }
+
+                        return (
+                          <div className="bg-slate-950/50 border border-slate-800 rounded-2xl overflow-hidden">
+                            <div className="overflow-auto max-h-[650px]">
+                              <table className="w-full text-sm text-left text-slate-300 border-collapse">
+                                <thead className="text-xs text-slate-400 uppercase bg-slate-900 border-b border-slate-800">
+                                  <tr>
+                                    <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[100px]">선택군</th>
+                                    <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">학기</th>
+                                    <th className="px-6 py-3 border-r border-slate-800/60">과목</th>
+                                    <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">신청자 수</th>
+                                    <th className="px-4 py-3 text-center min-w-[120px]">비고</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {stats.map((row, idx) => {
+                                    const remark = getClassRecommendation(row.applicants, standardSize);
+
+                                    let remarkStyle = "text-slate-300 font-medium";
+                                    if (remark === "폐강") {
+                                      remarkStyle = "text-rose-400 font-bold bg-rose-500/10 px-2.5 py-1 rounded-md inline-block";
+                                    } else if (remark === "논의") {
+                                      remarkStyle = "text-amber-400 font-bold bg-amber-500/10 px-2.5 py-1 rounded-md inline-block";
+                                    } else if (remark !== "개설" && remark !== "") {
+                                      remarkStyle = "text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-md inline-block";
+                                    }
+
+                                    return (
+                                      <tr key={idx} className="border-b border-slate-800/50 hover:bg-slate-900/20 transition-colors">
+                                        {groupSpans[idx] > 0 && (
+                                          <td
+                                            rowSpan={groupSpans[idx]}
+                                            className="px-4 py-3.5 text-center font-bold text-slate-200 border-r border-slate-800/50 bg-slate-950/60 align-middle"
+                                          >
+                                            {row.group}
+                                          </td>
+                                        )}
+                                        {semSpans[idx] > 0 && (
+                                          <td
+                                            rowSpan={semSpans[idx]}
+                                            className="px-4 py-3.5 text-center font-semibold text-slate-300 border-r border-slate-800/50 bg-slate-950/40 align-middle"
+                                          >
+                                            {row.semester}
+                                          </td>
+                                        )}
+                                        <td className="px-6 py-3.5 border-r border-slate-800/50 font-medium text-white">
+                                          {row.subject}
+                                        </td>
+                                        <td className="px-4 py-3.5 text-center border-r border-slate-800/50 font-semibold text-indigo-400">
+                                          {row.applicants}명
+                                        </td>
+                                        <td className="px-4 py-3.5 text-center align-middle">
+                                          <span className={remarkStyle}>
+                                            {remark}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </Fragment>
+            )}
 
             {activeSidebarTab === "change" && (
               <Fragment>
                 <div className="flex gap-3 mb-8 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit mx-auto">
                   <button
-                    onClick={() => setChangeActiveTab("upload")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-                      changeActiveTab === "upload"
+                    onClick={() => setChangeActiveTab("basic")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "basic"
                         ? "bg-slate-800 text-white shadow-lg border border-slate-700"
                         : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                    }`}
+                      }`}
                   >
                     <span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span>
+                    <div className="flex items-center gap-2">
+                      <Settings className="w-4 h-4" />
+                      <span>기초자료 입력</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setChangeActiveTab("upload")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "upload"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                      }`}
+                  >
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span>
                     <div className="flex items-center gap-2">
                       <Upload className="w-4 h-4" />
                       <span>2학기 타임별 선택과목 데이터 업로드</span>
@@ -2852,13 +3231,12 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => setChangeActiveTab("timetable")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-                      changeActiveTab === "timetable"
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "timetable"
                         ? "bg-slate-800 text-white shadow-lg border border-slate-700"
                         : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                    }`}
+                      }`}
                   >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span>
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span>
                     <div className="flex items-center gap-2">
                       <Settings className="w-4 h-4" />
                       <span>타임별 시간표 입력</span>
@@ -2866,13 +3244,12 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => setChangeActiveTab("roster")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-                      changeActiveTab === "roster"
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "roster"
                         ? "bg-slate-800 text-white shadow-lg border border-slate-700"
                         : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                    }`}
+                      }`}
                   >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span>
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span>
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4" />
                       <span>3단계: 타임별 선택과목 명단</span>
@@ -2880,13 +3257,12 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => setChangeActiveTab("application")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-                      changeActiveTab === "application"
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "application"
                         ? "bg-slate-800 text-white shadow-lg border border-slate-700"
                         : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                    }`}
+                      }`}
                   >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span>
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span>
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4" />
                       <span>4단계: 선택과목 변경 신청</span>
@@ -2894,13 +3270,12 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => setChangeActiveTab("roster_after")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-                      changeActiveTab === "roster_after"
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "roster_after"
                         ? "bg-slate-800 text-white shadow-lg border border-slate-700"
                         : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                    }`}
+                      }`}
                   >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span>
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span>
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4" />
                       <span>5단계: 변경 후 명단</span>
@@ -2908,13 +3283,12 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => setChangeActiveTab("analysis")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${
-                      changeActiveTab === "analysis"
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "analysis"
                         ? "bg-slate-800 text-white shadow-lg border border-slate-700"
                         : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                    }`}
+                      }`}
                   >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span>
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">7단계</span>
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4" />
                       <span>6단계: 다년도 분석</span>
@@ -2923,38 +3297,234 @@ export default function Home() {
                 </div>
 
                 <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 rounded-3xl p-8 shadow-2xl">
-                  {changeActiveTab === "upload" && (
-                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                      <div className="flex justify-between items-center mb-2">
+                                    {changeActiveTab === "basic" && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex justify-between items-center mb-6">
                         <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
-                          <Upload className="w-6 h-6 text-indigo-400" />
-                          2학기 타임별 선택과목 데이터 업로드
+                          <Settings className="w-6 h-6 text-indigo-400" />
+                          1단계: 선택과목 변경 기초자료 입력 (교육과정 및 위계)
                         </h2>
                         
                         <div className="flex bg-slate-800/50 p-1 rounded-xl">
                           <button
                             onClick={() => setChangeActiveGrade("grade2")}
-                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                              changeActiveGrade === "grade2"
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
                                 ? "bg-indigo-500 text-white shadow-md"
                                 : "text-slate-400 hover:text-slate-200"
-                            }`}
+                              }`}
                           >
                             2학년
                           </button>
                           <button
                             onClick={() => setChangeActiveGrade("grade3")}
-                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                              changeActiveGrade === "grade3"
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
                                 ? "bg-indigo-500 text-white shadow-md"
                                 : "text-slate-400 hover:text-slate-200"
-                            }`}
+                              }`}
                           >
                             3학년
                           </button>
                         </div>
                       </div>
                       
+                      <div className="grid grid-cols-5 gap-8">
+                        {/* Left Column: Curriculum Upload */}
+                        <div className="col-span-3 space-y-6">
+                          <div className="bg-slate-950/40 border border-slate-800/50 rounded-2xl p-6 h-full flex flex-col">
+                            <h3 className="text-lg font-semibold text-slate-200 mb-2 flex items-center gap-2">
+                              <Upload className="w-5 h-5 text-indigo-400" />
+                              교육과정 엑셀 업로드
+                            </h3>
+                            <p className="text-sm text-slate-400 mb-6">
+                              선택하신 학년이 기준이 됩니다. 수요조사와 독립적으로 검증에 사용될 교육과정 엑셀 파일을 업로드해 주세요.
+                            </p>
+                            
+                            <div className="relative group mb-6 shrink-0">
+                              <input
+                                type="file"
+                                accept=".xlsx, .xls"
+                                onChange={handleChangeCurriculumUpload}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                              />
+                              <div className="flex flex-col items-center justify-center w-full h-32 bg-slate-900/50 border-2 border-dashed border-slate-700 rounded-xl group-hover:border-indigo-500/50 group-hover:bg-indigo-500/5 transition-all">
+                                <Upload className="w-8 h-8 text-slate-500 group-hover:text-indigo-400 mb-2 transition-colors" />
+                                <p className="text-slate-300 font-medium text-sm">엑셀 파일 업로드</p>
+                              </div>
+                            </div>
+
+                            {changeIsCurriculumParsed[changeActiveGrade] && changeParsedCurriculumList[changeActiveGrade]?.length > 0 && (
+                              <div className="flex-1 overflow-auto pr-2 custom-scrollbar">
+                                <div className="rounded-lg border border-slate-800">
+                                  <table className="w-full text-sm text-left">
+                                    <thead className="text-xs text-slate-400 uppercase bg-slate-900/80 sticky top-0 z-10">
+                                      <tr>
+                                        <th className="px-4 py-3 font-medium">구분</th>
+                                        <th className="px-4 py-3 font-medium">과목명</th>
+                                        <th className="px-4 py-3 font-medium">교과(군)</th>
+                                        <th className="px-4 py-3 font-medium text-center">학점</th>
+                                        <th className="px-4 py-3 font-medium">학기</th>
+                                        <th className="px-4 py-3 font-medium text-center">비고</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/50">
+                                      {changeParsedCurriculumList[changeActiveGrade].map((subj, idx) => (
+                                        <tr key={idx} className="bg-slate-950/30 hover:bg-slate-900/50 transition-colors">
+                                          <td className="px-4 py-3">
+                                            <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider ${subj.type === "지정" ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                                              }`}>
+                                              {subj.type}
+                                            </span>
+                                          </td>
+                                          <td className="px-4 py-3 font-medium text-slate-200">{subj.subject}</td>
+                                          <td className="px-4 py-3 text-slate-400 text-xs">{subj.category}</td>
+                                          <td className="px-4 py-3 text-center text-amber-400/90 font-mono">{subj.credits}</td>
+                                          <td className="px-4 py-3 text-slate-500 text-[10px]">{subj.semesters}</td>
+                                          <td className="px-4 py-3 text-center">
+                                            {["국어", "수학", "영어"].includes(subj.category) && (
+                                              <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-medium">
+                                                기초
+                                              </span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right Column: Hierarchy Setup */}
+                        <div className="col-span-2 space-y-6">
+                          <div className="bg-slate-950/40 border border-slate-800/50 rounded-2xl p-6 h-full flex flex-col">
+                            <div className="flex justify-between items-center mb-2">
+                              <h3 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
+                                <GitBranch className="w-5 h-5 text-indigo-400" />
+                                위계 규칙 설정
+                              </h3>
+                              <button
+                                onClick={() => {
+                                  const subjects = Object.keys(changeSubjectMap[changeActiveGrade] || {});
+                                  if (subjects.length > 0) {
+                                    setChangeHierarchyRules(prev => ({
+                                      ...prev,
+                                      [changeActiveGrade]: [...(prev[changeActiveGrade] || []), { id: Date.now().toString(), prereq: subjects[0], advanced: subjects[0] }]
+                                    }));
+                                  } else {
+                                    alert('먼저 교육과정 엑셀 파일을 업로드해 주세요.');
+                                  }
+                                }}
+                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors border border-slate-700 flex items-center gap-1.5 text-xs"
+                              >
+                                <Plus className="w-3 h-3" />
+                                규칙 추가
+                              </button>
+                            </div>
+                            <p className="text-sm text-slate-400 mb-6">
+                              변경 신청 시 위계 위반을 검증할 규칙을 설정합니다.
+                            </p>
+
+                            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3">
+                              {(!changeHierarchyRules[changeActiveGrade] || changeHierarchyRules[changeActiveGrade].length === 0) ? (
+                                <div className="p-6 border border-dashed border-slate-700/50 rounded-xl text-center text-slate-500 text-sm">
+                                  설정된 위계 규칙이 없습니다.
+                                </div>
+                              ) : (
+                                changeHierarchyRules[changeActiveGrade].map((rule, idx) => (
+                                  <div key={rule.id} className="flex flex-col gap-2 p-3 bg-slate-900/80 border border-slate-700/50 rounded-xl relative group">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-slate-400 font-medium text-xs">규칙 #{idx + 1}</span>
+                                      <button
+                                        onClick={() => {
+                                          const newRules = changeHierarchyRules[changeActiveGrade].filter(r => r.id !== rule.id);
+                                          setChangeHierarchyRules(prev => ({ ...prev, [changeActiveGrade]: newRules }));
+                                        }}
+                                        className="text-slate-500 hover:text-rose-400 transition-colors"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <select
+                                        value={rule.prereq}
+                                        onChange={(e) => {
+                                          const newRules = [...changeHierarchyRules[changeActiveGrade]];
+                                          newRules[idx].prereq = e.target.value;
+                                          setChangeHierarchyRules(prev => ({ ...prev, [changeActiveGrade]: newRules }));
+                                        }}
+                                        className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-slate-300 text-xs"
+                                      >
+                                        {Object.keys(changeSubjectMap[changeActiveGrade] || {}).map(subj => (
+                                          <option key={subj} value={subj}>{subj}</option>
+                                        ))}
+                                      </select>
+                                      <ChevronRight className="w-4 h-4 text-slate-600 shrink-0" />
+                                      <select
+                                        value={rule.advanced}
+                                        onChange={(e) => {
+                                          const newRules = [...changeHierarchyRules[changeActiveGrade]];
+                                          newRules[idx].advanced = e.target.value;
+                                          setChangeHierarchyRules(prev => ({ ...prev, [changeActiveGrade]: newRules }));
+                                        }}
+                                        className="flex-1 bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-slate-300 text-xs"
+                                      >
+                                        {Object.keys(changeSubjectMap[changeActiveGrade] || {}).map(subj => (
+                                          <option key={subj} value={subj}>{subj}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-8 flex justify-end">
+                        <button
+                          onClick={() => setChangeActiveTab("upload")}
+                          className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white font-medium rounded-xl transition-colors border border-slate-700 flex items-center gap-2"
+                        >
+                          다음 단계(데이터 업로드)로 이동
+                          <Upload className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+{changeActiveTab === "upload" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex justify-between items-center mb-2">
+                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                          <Upload className="w-6 h-6 text-indigo-400" />
+                          2학기 타임별 선택과목 데이터 업로드
+                        </h2>
+
+                        <div className="flex bg-slate-800/50 p-1 rounded-xl">
+                          <button
+                            onClick={() => setChangeActiveGrade("grade2")}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
+                                ? "bg-indigo-500 text-white shadow-md"
+                                : "text-slate-400 hover:text-slate-200"
+                              }`}
+                          >
+                            2학년
+                          </button>
+                          <button
+                            onClick={() => setChangeActiveGrade("grade3")}
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
+                                ? "bg-indigo-500 text-white shadow-md"
+                                : "text-slate-400 hover:text-slate-200"
+                              }`}
+                          >
+                            3학년
+                          </button>
+                        </div>
+                      </div>
+
                       {parsedSampleData[changeActiveGrade] && parsedSampleData[changeActiveGrade].length > 0 ? (
                         <div className="bg-slate-800/30 rounded-2xl p-8 border border-emerald-500/30 flex flex-col items-center justify-center min-h-[300px] text-center">
                           <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">
@@ -2996,7 +3566,7 @@ export default function Home() {
                           <p className="text-slate-400 mb-6 text-center max-w-md">
                             과목명이 열 헤더로 지정되어 있고, 셀 값으로 A, B, C, D 등의 선택 그룹이 명시된 수요조사 결과 파일을 업로드해 주세요.
                           </p>
-                          
+
                           <label className="cursor-pointer flex items-center gap-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded-xl transition-all shadow-lg shadow-indigo-500/20">
                             <Upload className="w-5 h-5" />
                             엑셀 파일 선택
@@ -3013,7 +3583,7 @@ export default function Home() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
                         {/* 2학년 수강과목 데이터 업로드(선택) */}
                         <div className="bg-slate-800/30 rounded-2xl p-6 border border-slate-700/50 flex flex-col items-center justify-center min-h-[250px]">
-                          {extraUploads.grade2Optional ? (
+                          {extraUploads[changeActiveGrade]?.grade2Optional ? (
                             <>
                               <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">
                                 <CheckCircle2 className="w-8 h-8 text-emerald-400" />
@@ -3039,10 +3609,10 @@ export default function Home() {
                             </>
                           )}
                         </div>
-                        
+
                         {/* 3학년 1학기 데이터 업로드 */}
                         <div className="bg-slate-800/30 rounded-2xl p-6 border border-slate-700/50 flex flex-col items-center justify-center min-h-[250px]">
-                          {extraUploads.grade3Sem1 ? (
+                          {extraUploads[changeActiveGrade]?.grade3Sem1 ? (
                             <>
                               <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">
                                 <CheckCircle2 className="w-8 h-8 text-emerald-400" />
@@ -3079,44 +3649,42 @@ export default function Home() {
                           <Settings className="w-6 h-6 text-indigo-400" />
                           타임별 시간표 입력
                         </h2>
-                        
+
                         <div className="flex bg-slate-800/50 p-1 rounded-xl">
                           <button
                             onClick={() => setChangeActiveGrade("grade2")}
-                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                              changeActiveGrade === "grade2"
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
                                 ? "bg-indigo-500 text-white shadow-md"
                                 : "text-slate-400 hover:text-slate-200"
-                            }`}
+                              }`}
                           >
                             2학년
                           </button>
                           <button
                             onClick={() => setChangeActiveGrade("grade3")}
-                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                              changeActiveGrade === "grade3"
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
                                 ? "bg-indigo-500 text-white shadow-md"
                                 : "text-slate-400 hover:text-slate-200"
-                            }`}
+                              }`}
                           >
                             3학년
                           </button>
                         </div>
                       </div>
-                      
+
                       <div className="bg-slate-900 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl">
                         <div className="p-4 border-b border-slate-800/80 bg-slate-800/30 flex justify-between items-center">
                           <div className="text-sm text-slate-400">
                             엑셀에서 복사한 데이터를 칸에 클릭 후 붙여넣기(Ctrl+V) 하시면 한 번에 자동으로 채워집니다.
                           </div>
                           <div className="flex gap-2">
-                            <button 
+                            <button
                               onClick={addTimeSlot}
                               className="flex items-center gap-1 px-3 py-1.5 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 rounded-lg font-medium text-sm transition-colors border border-indigo-500/30"
                             >
                               <Plus className="w-4 h-4" /> 타임 추가
                             </button>
-                            <button 
+                            <button
                               onClick={addClassCol}
                               className="flex items-center gap-1 px-3 py-1.5 bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 rounded-lg font-medium text-sm transition-colors border border-rose-500/30"
                             >
@@ -3124,7 +3692,7 @@ export default function Home() {
                             </button>
                           </div>
                         </div>
-                        
+
                         <div className="overflow-x-auto pb-4">
                           <table className="w-full text-sm text-left whitespace-nowrap">
                             <thead className="text-xs text-slate-300 uppercase bg-slate-800/80">
@@ -3133,7 +3701,7 @@ export default function Home() {
                                 {classCols[changeActiveGrade].map((col, cIdx) => (
                                   <th key={cIdx} className="px-4 py-3 border-r border-slate-700/50 min-w-[100px] text-center relative group">
                                     {col}
-                                    <button 
+                                    <button
                                       onClick={() => removeClassCol(cIdx)}
                                       className="absolute top-1/2 -translate-y-1/2 right-2 text-rose-400 opacity-0 group-hover:opacity-100 hover:text-rose-300 transition-opacity"
                                       title="열 삭제"
@@ -3149,7 +3717,7 @@ export default function Home() {
                                 <tr key={rIdx} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
                                   <th className="px-4 py-3 border-r border-slate-700/50 font-medium text-slate-300 text-center bg-slate-800/20 relative group">
                                     {row}타임
-                                    <button 
+                                    <button
                                       onClick={() => removeTimeSlot(rIdx)}
                                       className="absolute top-1/2 -translate-y-1/2 right-2 text-rose-400 opacity-0 group-hover:opacity-100 hover:text-rose-300 transition-opacity"
                                       title="행 삭제"
@@ -3198,21 +3766,19 @@ export default function Home() {
                         <div className="flex bg-slate-800/50 p-1 rounded-xl">
                           <button
                             onClick={() => setChangeActiveGrade("grade2")}
-                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                              changeActiveGrade === "grade2"
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
                                 ? "bg-indigo-500 text-white shadow-md"
                                 : "text-slate-400 hover:text-slate-200"
-                            }`}
+                              }`}
                           >
                             2학년
                           </button>
                           <button
                             onClick={() => setChangeActiveGrade("grade3")}
-                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                              changeActiveGrade === "grade3"
+                            className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
                                 ? "bg-indigo-500 text-white shadow-md"
                                 : "text-slate-400 hover:text-slate-200"
-                            }`}
+                              }`}
                           >
                             3학년
                           </button>
@@ -3259,7 +3825,7 @@ export default function Home() {
                                     return (
                                       <tr>
                                         <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
-                                          등록된 선택과목 변경 신청 내역이 없습니다.<br/>
+                                          등록된 선택과목 변경 신청 내역이 없습니다.<br />
                                           우측 상단의 <Plus className="w-4 h-4 inline mx-1" /> 버튼을 눌러 추가하세요.
                                         </td>
                                       </tr>
@@ -3282,7 +3848,7 @@ export default function Home() {
                                       const currentIndex = globalIndex++;
                                       const isFirstInGroup = itemIdx === 0;
                                       const rowSpan = group.items.length;
-                                      
+
                                       const updateItem = (field: string, value: string) => {
                                         setElectiveChanges(prev => {
                                           const newData = [...prev[changeActiveGrade]];
@@ -3395,7 +3961,18 @@ export default function Home() {
 
                         <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-inner flex flex-col">
                           <div className="p-4 bg-slate-800/80 border-b border-slate-700/50 flex justify-between items-center">
-                            <h3 className="font-semibold text-emerald-400">자동 변경 결과 내역</h3>
+                            <div className="flex items-center gap-4">
+                              <h3 className="font-semibold text-emerald-400">자동 변경 결과 내역</h3>
+                              <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={enableOptimization}
+                                  onChange={(e) => setEnableOptimization(e.target.checked)}
+                                  className="form-checkbox rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-emerald-500"
+                                />
+                                인원 균등화 최적화 알고리즘
+                              </label>
+                            </div>
                             <button
                               onClick={handleExportChanges}
                               className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-lg shadow-md transition-all"
@@ -3427,7 +4004,7 @@ export default function Home() {
                                   }
 
                                   const studentsWithChanges = Array.from(new Set(data.map(d => d.studentId))).filter(id => id);
-                                  
+
                                   if (studentsWithChanges.length === 0) {
                                     return (
                                       <tr>
@@ -3441,7 +4018,7 @@ export default function Home() {
                                   return studentsWithChanges.map(studentId => {
                                     const logs = adjustmentLog[studentId] || [];
                                     const studentName = data.find(d => d.studentId === studentId)?.studentName || "";
-                                    
+
                                     return (
                                       <tr key={studentId} className="border-b border-slate-800/50 hover:bg-slate-800/20">
                                         <td className="px-4 py-3 text-center border-r border-slate-700/50 font-medium">{studentId}</td>
@@ -3450,13 +4027,12 @@ export default function Home() {
                                           {logs.length > 0 ? (
                                             <div className="space-y-1">
                                               {logs.map((log, i) => (
-                                                <div 
-                                                  key={i} 
-                                                  className={`inline-block px-2 py-1 rounded border text-xs mr-2 mb-1 ${
-                                                    log.status === 'success' 
-                                                      ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20' 
+                                                <div
+                                                  key={i}
+                                                  className={`inline-block px-2 py-1 rounded border text-xs mr-2 mb-1 ${log.status === 'success'
+                                                      ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
                                                       : 'text-rose-300 bg-rose-500/10 border-rose-500/20 cursor-help'
-                                                  }`}
+                                                    }`}
                                                   title={log.reason}
                                                 >
                                                   {log.beforeStr} → {log.afterStr}
@@ -3487,7 +4063,7 @@ export default function Home() {
                           <Users className="w-6 h-6 text-indigo-400" />
                           5단계: 타임별 선택과목 명단(변경 후)
                         </h2>
-                        
+
                         <div className="flex items-center gap-4">
                           <button
                             onClick={() => handleExportRoster(true)}
@@ -3498,39 +4074,36 @@ export default function Home() {
                           </button>
                           <div className="flex bg-slate-800/50 p-1 rounded-xl">
                             <button
-                            onClick={() => setChangeActiveGrade("grade2")}
-                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                              changeActiveGrade === "grade2"
-                                ? "bg-indigo-500 text-white shadow-md"
-                                : "text-slate-400 hover:text-slate-200"
-                            }`}
-                          >
-                            2학년
-                          </button>
-                          <button
-                            onClick={() => setChangeActiveGrade("grade3")}
-                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                              changeActiveGrade === "grade3"
-                                ? "bg-indigo-500 text-white shadow-md"
-                                : "text-slate-400 hover:text-slate-200"
-                            }`}
-                          >
-                            3학년
-                          </button>
+                              onClick={() => setChangeActiveGrade("grade2")}
+                              className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
+                                  ? "bg-indigo-500 text-white shadow-md"
+                                  : "text-slate-400 hover:text-slate-200"
+                                }`}
+                            >
+                              2학년
+                            </button>
+                            <button
+                              onClick={() => setChangeActiveGrade("grade3")}
+                              className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
+                                  ? "bg-indigo-500 text-white shadow-md"
+                                  : "text-slate-400 hover:text-slate-200"
+                                }`}
+                            >
+                              3학년
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
                       <div className="flex gap-2 flex-wrap mb-4">
                         {timeSlots[changeActiveGrade].map(slot => (
                           <button
                             key={slot}
                             onClick={() => setChangeRosterTimeSlot(slot)}
-                            className={`px-5 py-2 rounded-lg font-medium transition-all ${
-                              changeRosterTimeSlot === slot
+                            className={`px-5 py-2 rounded-lg font-medium transition-all ${changeRosterTimeSlot === slot
                                 ? "bg-indigo-600 text-white shadow-md"
                                 : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
-                            }`}
+                              }`}
                           >
                             {slot}타임
                           </button>
@@ -3576,111 +4149,111 @@ export default function Home() {
                                 classCols[changeActiveGrade].forEach(col => {
                                   colStudents[col] = [];
                                 });
-                                
+
                                 const allStudents = parsedSampleData[changeActiveGrade] || [];
-                                 // 1. Group columns by base subject
-                                 const subjectGroups: Record<string, { col: string, num: number, original: string }[]> = {};
-                                 classCols[changeActiveGrade].forEach(col => {
-                                   const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
-                                   if (!cellSubject) return;
-                                   
-                                   const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
-                                   const base = match ? match[1].trim() : cellSubject;
-                                   const numMatch = cellSubject.match(/\d+/);
-                                   const num = numMatch ? parseInt(numMatch[0], 10) : 1;
-                                   
-                                   if (!subjectGroups[base]) subjectGroups[base] = [];
-                                   subjectGroups[base].push({ col, num, original: cellSubject });
-                                 });
+                                // 1. Group columns by base subject
+                                const subjectGroups: Record<string, { col: string, num: number, original: string }[]> = {};
+                                classCols[changeActiveGrade].forEach(col => {
+                                  const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
+                                  if (!cellSubject) return;
 
-                                 // Sort each group by num (so class 1 gets the remainder if odd)
-                                 Object.values(subjectGroups).forEach(group => {
-                                   group.sort((a, b) => a.num - b.num);
-                                 });
+                                  const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
+                                  const base = match ? match[1].trim() : cellSubject;
+                                  const numMatch = cellSubject.match(/\d+/);
+                                  const num = numMatch ? parseInt(numMatch[0], 10) : 1;
 
-                                 // 2. Map students to their base subjects WITH VALIDATED CHANGES
-                                 const studentsByBase: Record<string, any[]> = {};
-                                 
-                                 allStudents.forEach(student => {
-                                   const chosenSubject = student.timeSlotMap[changeRosterTimeSlot];
-                                   if (!chosenSubject) return;
-                                   
-                                   // Use adjustmentLog to apply only validated changes
-                                   let effectiveSubject = chosenSubject;
-                                   let isModified = false;
-                                   const studentLogs = adjustmentLog[student.id];
-                                   if (studentLogs) {
-                                     let movedInto = null;
-                                     let movedOut = false;
-                                     // Check if any log entry changes this student's subject in this timeslot
-                                     for (const entry of studentLogs) {
-                                       if (entry.status !== 'success') continue;
-                                       // Parse the slot from beforeStr like "수학과제탐구(B)"
-                                       const beforeMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
-                                       const afterMatch = entry.afterStr.match(/^(.+)\(([^)]+)\)$/);
-                                       if (beforeMatch && afterMatch) {
-                                         const logBeforeSubject = beforeMatch[1];
-                                         const logBeforeSlot = beforeMatch[2];
-                                         const logAfterSubject = afterMatch[1];
-                                         const logAfterSlot = afterMatch[2];
-                                         
-                                         // If this log moves the student OUT of this timeslot's subject
-                                         if (logBeforeSlot === changeRosterTimeSlot && logBeforeSubject === chosenSubject) {
-                                           movedOut = true;
-                                         }
-                                         // If this log moves a subject INTO this timeslot
-                                         if (logAfterSlot === changeRosterTimeSlot) {
-                                           movedInto = logAfterSubject;
-                                         }
-                                       }
-                                     }
-                                     if (movedInto) {
-                                       effectiveSubject = movedInto;
-                                       isModified = true;
-                                     } else if (movedOut) {
-                                       effectiveSubject = '__REMOVED__';
-                                       isModified = true;
-                                     }
-                                   }
-                                   
-                                   if (effectiveSubject === '__REMOVED__') return;
-                                   
-                                   let matchedBase = Object.keys(subjectGroups).find(base => {
-                                     const cleanChosen = effectiveSubject.replace(/\s+/g, '');
-                                     const cleanBase = base.replace(/\s+/g, '');
-                                     if (!cleanBase) return false;
-                                     return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
-                                   });
+                                  if (!subjectGroups[base]) subjectGroups[base] = [];
+                                  subjectGroups[base].push({ col, num, original: cellSubject });
+                                });
 
-                                   if (matchedBase) {
-                                     if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
-                                     studentsByBase[matchedBase].push({ ...student, isModified });
-                                   }
-                                 });
+                                // Sort each group by num (so class 1 gets the remainder if odd)
+                                Object.values(subjectGroups).forEach(group => {
+                                  group.sort((a, b) => a.num - b.num);
+                                });
 
-                                 // 3. Distribute students into columns
-                                 Object.keys(studentsByBase).forEach(base => {
-                                   const students = studentsByBase[base].sort((a, b) => {
-                                     return a.id.localeCompare(b.id, undefined, { numeric: true });
-                                   });
-                                   const cols = subjectGroups[base];
-                                   
-                                   const baseCount = Math.floor(students.length / cols.length);
-                                   const remainder = students.length % cols.length;
+                                // 2. Map students to their base subjects WITH VALIDATED CHANGES
+                                const studentsByBase: Record<string, any[]> = {};
 
-                                   let sIdx = 0;
-                                   cols.forEach((colObj, idx) => {
-                                     const count = baseCount + (idx < remainder ? 1 : 0);
-                                     const assigned = students.slice(sIdx, sIdx + count);
-                                     colStudents[colObj.col].push(...assigned);
-                                     sIdx += count;
-                                   });
-                                 });
+                                allStudents.forEach(student => {
+                                  const chosenSubject = student.timeSlotMap[changeRosterTimeSlot];
+                                  if (!chosenSubject) return;
+
+                                  // Use adjustmentLog to apply only validated changes
+                                  let effectiveSubject = chosenSubject;
+                                  let isModified = false;
+                                  const studentLogs = adjustmentLog[student.id];
+                                  if (studentLogs) {
+                                    let movedInto = null;
+                                    let movedOut = false;
+                                    // Check if any log entry changes this student's subject in this timeslot
+                                    for (const entry of studentLogs) {
+                                      if (entry.status !== 'success') continue;
+                                      // Parse the slot from beforeStr like "수학과제탐구(B)"
+                                      const beforeMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
+                                      const afterMatch = entry.afterStr.match(/^(.+)\(([^)]+)\)$/);
+                                      if (beforeMatch && afterMatch) {
+                                        const logBeforeSubject = beforeMatch[1];
+                                        const logBeforeSlot = beforeMatch[2];
+                                        const logAfterSubject = afterMatch[1];
+                                        const logAfterSlot = afterMatch[2];
+
+                                        // If this log moves the student OUT of this timeslot's subject
+                                        if (logBeforeSlot === changeRosterTimeSlot && logBeforeSubject === chosenSubject) {
+                                          movedOut = true;
+                                        }
+                                        // If this log moves a subject INTO this timeslot
+                                        if (logAfterSlot === changeRosterTimeSlot) {
+                                          movedInto = logAfterSubject;
+                                        }
+                                      }
+                                    }
+                                    if (movedInto) {
+                                      effectiveSubject = movedInto;
+                                      isModified = true;
+                                    } else if (movedOut) {
+                                      effectiveSubject = '__REMOVED__';
+                                      isModified = true;
+                                    }
+                                  }
+
+                                  if (effectiveSubject === '__REMOVED__') return;
+
+                                  let matchedBase = Object.keys(subjectGroups).find(base => {
+                                    const cleanChosen = effectiveSubject.replace(/\s+/g, '');
+                                    const cleanBase = base.replace(/\s+/g, '');
+                                    if (!cleanBase) return false;
+                                    return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
+                                  });
+
+                                  if (matchedBase) {
+                                    if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
+                                    studentsByBase[matchedBase].push({ ...student, isModified });
+                                  }
+                                });
+
+                                // 3. Distribute students into columns
+                                Object.keys(studentsByBase).forEach(base => {
+                                  const students = studentsByBase[base].sort((a, b) => {
+                                    return a.id.localeCompare(b.id, undefined, { numeric: true });
+                                  });
+                                  const cols = subjectGroups[base];
+
+                                  const baseCount = Math.floor(students.length / cols.length);
+                                  const remainder = students.length % cols.length;
+
+                                  let sIdx = 0;
+                                  cols.forEach((colObj, idx) => {
+                                    const count = baseCount + (idx < remainder ? 1 : 0);
+                                    const assigned = students.slice(sIdx, sIdx + count);
+                                    colStudents[colObj.col].push(...assigned);
+                                    sIdx += count;
+                                  });
+                                });
                                 let maxStudents = 0;
                                 classCols[changeActiveGrade].forEach(col => {
                                   if (colStudents[col].length > maxStudents) maxStudents = colStudents[col].length;
                                 });
-                                
+
                                 const rows = [];
                                 for (let r = 0; r < maxStudents; r++) {
                                   rows.push(
@@ -3693,15 +4266,13 @@ export default function Home() {
                                         const tooltipText = studentChangeLogs.map(l => `${l.beforeStr} → ${l.afterStr}`).join('\n');
                                         return (
                                           <Fragment key={`data-${col}-${r}`}>
-                                            <td className={`px-2 py-1.5 border-r border-slate-700/50 text-center border-r-slate-800/30 text-xs ${
-                                              isModified ? 'bg-amber-500/10 text-amber-300 font-bold' : 'text-slate-400'
-                                            }`}>
+                                            <td className={`px-2 py-1.5 border-r border-slate-700/50 text-center border-r-slate-800/30 text-xs ${isModified ? 'bg-amber-500/10 text-amber-300 font-bold' : 'text-slate-400'
+                                              }`}>
                                               {student ? student.id : ""}
                                             </td>
                                             <td
-                                              className={`px-2 py-1.5 border-r border-slate-700/50 text-center text-xs ${
-                                                isModified ? 'bg-amber-500/10 text-amber-400 font-bold cursor-help' : 'text-slate-300 font-medium'
-                                              }`}
+                                              className={`px-2 py-1.5 border-r border-slate-700/50 text-center text-xs ${isModified ? 'bg-amber-500/10 text-amber-400 font-bold cursor-help' : 'text-slate-300 font-medium'
+                                                }`}
                                               title={isModified && tooltipText ? tooltipText : undefined}
                                             >
                                               {student ? student.name : ""}
@@ -3712,7 +4283,7 @@ export default function Home() {
                                     </tr>
                                   );
                                 }
-                                
+
                                 return (
                                   <>
                                     {rows}
@@ -3742,7 +4313,7 @@ export default function Home() {
                           <Users className="w-6 h-6 text-indigo-400" />
                           타임별 선택과목 명단
                         </h2>
-                        
+
                         <div className="flex items-center gap-4">
                           <button
                             onClick={() => handleExportRoster(false)}
@@ -3753,39 +4324,36 @@ export default function Home() {
                           </button>
                           <div className="flex bg-slate-800/50 p-1 rounded-xl">
                             <button
-                            onClick={() => setChangeActiveGrade("grade2")}
-                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                              changeActiveGrade === "grade2"
-                                ? "bg-indigo-500 text-white shadow-md"
-                                : "text-slate-400 hover:text-slate-200"
-                            }`}
-                          >
-                            2학년
-                          </button>
-                          <button
-                            onClick={() => setChangeActiveGrade("grade3")}
-                            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                              changeActiveGrade === "grade3"
-                                ? "bg-indigo-500 text-white shadow-md"
-                                : "text-slate-400 hover:text-slate-200"
-                            }`}
-                          >
-                            3학년
-                          </button>
+                              onClick={() => setChangeActiveGrade("grade2")}
+                              className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
+                                  ? "bg-indigo-500 text-white shadow-md"
+                                  : "text-slate-400 hover:text-slate-200"
+                                }`}
+                            >
+                              2학년
+                            </button>
+                            <button
+                              onClick={() => setChangeActiveGrade("grade3")}
+                              className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
+                                  ? "bg-indigo-500 text-white shadow-md"
+                                  : "text-slate-400 hover:text-slate-200"
+                                }`}
+                            >
+                              3학년
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
                       <div className="flex gap-2 flex-wrap mb-4">
                         {timeSlots[changeActiveGrade].map(slot => (
                           <button
                             key={slot}
                             onClick={() => setChangeRosterTimeSlot(slot)}
-                            className={`px-5 py-2 rounded-lg font-medium transition-all ${
-                              changeRosterTimeSlot === slot
+                            className={`px-5 py-2 rounded-lg font-medium transition-all ${changeRosterTimeSlot === slot
                                 ? "bg-indigo-600 text-white shadow-md"
                                 : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
-                            }`}
+                              }`}
                           >
                             {slot}타임
                           </button>
@@ -3831,70 +4399,70 @@ export default function Home() {
                                 classCols[changeActiveGrade].forEach(col => {
                                   colStudents[col] = [];
                                 });
-                                
+
                                 const allStudents = parsedSampleData[changeActiveGrade] || [];
-                                 // 1. Group columns by base subject
-                                 const subjectGroups: Record<string, { col: string, num: number, original: string }[]> = {};
-                                 classCols[changeActiveGrade].forEach(col => {
-                                   const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
-                                   if (!cellSubject) return;
-                                   
-                                   const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
-                                   const base = match ? match[1].trim() : cellSubject;
-                                   const numMatch = cellSubject.match(/\d+/);
-                                   const num = numMatch ? parseInt(numMatch[0], 10) : 1;
-                                   
-                                   if (!subjectGroups[base]) subjectGroups[base] = [];
-                                   subjectGroups[base].push({ col, num, original: cellSubject });
-                                 });
+                                // 1. Group columns by base subject
+                                const subjectGroups: Record<string, { col: string, num: number, original: string }[]> = {};
+                                classCols[changeActiveGrade].forEach(col => {
+                                  const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
+                                  if (!cellSubject) return;
 
-                                 // Sort each group by num (so class 1 gets the remainder if odd)
-                                 Object.values(subjectGroups).forEach(group => {
-                                   group.sort((a, b) => a.num - b.num);
-                                 });
+                                  const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
+                                  const base = match ? match[1].trim() : cellSubject;
+                                  const numMatch = cellSubject.match(/\d+/);
+                                  const num = numMatch ? parseInt(numMatch[0], 10) : 1;
 
-                                 // 2. Map students to their base subjects
-                                 const studentsByBase: Record<string, StudentTimeData[]> = {};
-                                 allStudents.forEach(student => {
-                                   const chosenSubject = student.timeSlotMap[changeRosterTimeSlot];
-                                   if (!chosenSubject) return;
-                                   
-                                   let matchedBase = Object.keys(subjectGroups).find(base => {
-                                     const cleanChosen = chosenSubject.replace(/\s+/g, '');
-                                     const cleanBase = base.replace(/\s+/g, '');
-                                     if (!cleanBase) return false;
-                                     return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
-                                   });
+                                  if (!subjectGroups[base]) subjectGroups[base] = [];
+                                  subjectGroups[base].push({ col, num, original: cellSubject });
+                                });
 
-                                   if (matchedBase) {
-                                     if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
-                                     studentsByBase[matchedBase].push(student);
-                                   }
-                                 });
+                                // Sort each group by num (so class 1 gets the remainder if odd)
+                                Object.values(subjectGroups).forEach(group => {
+                                  group.sort((a, b) => a.num - b.num);
+                                });
 
-                                 // 3. Distribute students into columns
-                                 Object.keys(studentsByBase).forEach(base => {
-                                   const students = studentsByBase[base].sort((a, b) => {
-                                     return a.id.localeCompare(b.id, undefined, { numeric: true });
-                                   });
-                                   const cols = subjectGroups[base];
-                                   
-                                   const baseCount = Math.floor(students.length / cols.length);
-                                   const remainder = students.length % cols.length;
+                                // 2. Map students to their base subjects
+                                const studentsByBase: Record<string, StudentTimeData[]> = {};
+                                allStudents.forEach(student => {
+                                  const chosenSubject = student.timeSlotMap[changeRosterTimeSlot];
+                                  if (!chosenSubject) return;
 
-                                   let sIdx = 0;
-                                   cols.forEach((colObj, idx) => {
-                                     const count = baseCount + (idx < remainder ? 1 : 0);
-                                     const assigned = students.slice(sIdx, sIdx + count);
-                                     colStudents[colObj.col].push(...assigned);
-                                     sIdx += count;
-                                   });
-                                 });
+                                  let matchedBase = Object.keys(subjectGroups).find(base => {
+                                    const cleanChosen = chosenSubject.replace(/\s+/g, '');
+                                    const cleanBase = base.replace(/\s+/g, '');
+                                    if (!cleanBase) return false;
+                                    return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
+                                  });
+
+                                  if (matchedBase) {
+                                    if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
+                                    studentsByBase[matchedBase].push(student);
+                                  }
+                                });
+
+                                // 3. Distribute students into columns
+                                Object.keys(studentsByBase).forEach(base => {
+                                  const students = studentsByBase[base].sort((a, b) => {
+                                    return a.id.localeCompare(b.id, undefined, { numeric: true });
+                                  });
+                                  const cols = subjectGroups[base];
+
+                                  const baseCount = Math.floor(students.length / cols.length);
+                                  const remainder = students.length % cols.length;
+
+                                  let sIdx = 0;
+                                  cols.forEach((colObj, idx) => {
+                                    const count = baseCount + (idx < remainder ? 1 : 0);
+                                    const assigned = students.slice(sIdx, sIdx + count);
+                                    colStudents[colObj.col].push(...assigned);
+                                    sIdx += count;
+                                  });
+                                });
                                 let maxStudents = 0;
                                 classCols[changeActiveGrade].forEach(col => {
                                   if (colStudents[col].length > maxStudents) maxStudents = colStudents[col].length;
                                 });
-                                
+
                                 const rows = [];
                                 for (let r = 0; r < maxStudents; r++) {
                                   rows.push(
@@ -3916,7 +4484,7 @@ export default function Home() {
                                     </tr>
                                   );
                                 }
-                                
+
                                 return (
                                   <>
                                     {rows}
@@ -3950,9 +4518,9 @@ export default function Home() {
                             * 위계성 검사는 '수요조사' 탭의 2단계에서 설정한 위계 규칙을 공유하여 그대로 적용합니다.
                           </p>
                         </div>
-                        
+
                         <div className="flex items-center gap-4 -mt-4">
-                          <button 
+                          <button
                             onClick={handleExportStep6}
                             className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-500/25 flex items-center gap-2"
                             disabled={step6Data.length === 0}
@@ -3963,21 +4531,19 @@ export default function Home() {
                           <div className="flex bg-slate-800/50 p-1 rounded-xl">
                             <button
                               onClick={() => setChangeActiveGrade("grade2")}
-                              className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                                changeActiveGrade === "grade2"
+                              className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
                                   ? "bg-slate-700 text-white shadow"
                                   : "text-slate-400 hover:text-slate-200"
-                              }`}
+                                }`}
                             >
                               2학년
                             </button>
                             <button
                               onClick={() => setChangeActiveGrade("grade3")}
-                              className={`px-6 py-2 rounded-lg font-medium transition-all ${
-                                changeActiveGrade === "grade3"
+                              className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
                                   ? "bg-slate-700 text-white shadow"
                                   : "text-slate-400 hover:text-slate-200"
-                              }`}
+                                }`}
                             >
                               3학년
                             </button>
@@ -4023,7 +4589,7 @@ export default function Home() {
                                         if (isHierarchyViolation) cellClass += "text-cyan-400 font-bold bg-cyan-400/10";
                                         else if (isDuplicate) cellClass += "text-yellow-400 font-bold bg-yellow-400/10";
                                         else cellClass += "bg-slate-800 text-slate-300";
-                                        
+
                                         return (
                                           <span key={`cur-${i}`} className={cellClass}>{subject}</span>
                                         );
@@ -4053,7 +4619,7 @@ export default function Home() {
                 </div>
               </Fragment>
             )}
-            
+
           </div>
         </div>
       </main>
