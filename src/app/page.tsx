@@ -5,7 +5,7 @@ import { Upload, FileText, Settings, Download, CheckCircle2, ChevronRight, Trash
 import * as XLSX from "xlsx-js-style";
 
 type SubjectCategory = "기초" | "사회" | "과학" | "기타";
-type GradeKey = "grade1" | "grade2";
+type GradeKey = "pre1" | "grade1" | "grade2";
 
 interface SubjectMap {
   [subjectName: string]: SubjectCategory;
@@ -52,6 +52,7 @@ interface DesignatedSubject {
   subject: string;
   category: SubjectCategory;
   detailedCategory: string;
+  isSplit?: boolean;
   sem1: number;
   sem2: number;
 }
@@ -76,7 +77,7 @@ export interface ParsedCurriculumSubject {
 export default function Home() {
   const [activeTab, setActiveTab] = useState("curriculum");
   const [activeSidebarTab, setActiveSidebarTab] = useState<"survey" | "change">("survey");
-  const [activeGrade, setActiveGrade] = useState<GradeKey>("grade1");
+  const [activeGrade, setActiveGrade] = useState<GradeKey>("pre1");
 
   const [changeActiveTab, setChangeActiveTab] = useState<"basic" | "upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis">("basic");
   const [changeActiveGrade, setChangeActiveGrade] = useState<"grade2" | "grade3">("grade2");
@@ -284,10 +285,10 @@ export default function Home() {
     }));
   };
 
-  const [parsedCurriculumList, setParsedCurriculumList] = useState<{ [key in GradeKey]: ParsedCurriculumSubject[] }>({ grade1: [], grade2: [] });
-  const [subjectMap, setSubjectMap] = useState<{ [key in GradeKey]: SubjectMap }>({ grade1: {}, grade2: {} });
-  const [isCurriculumParsed, setIsCurriculumParsed] = useState<{ [key in GradeKey]: boolean }>({ grade1: false, grade2: false });
-  const [hierarchyRules, setHierarchyRules] = useState<{ [key in GradeKey]: HierarchyRule[] }>({ grade1: [], grade2: [] });
+  const [parsedCurriculumList, setParsedCurriculumList] = useState<{ [key in GradeKey]: ParsedCurriculumSubject[] }>({ pre1: [], grade1: [], grade2: [] });
+  const [subjectMap, setSubjectMap] = useState<{ [key in GradeKey]: SubjectMap }>({ pre1: {}, grade1: {}, grade2: {} });
+  const [isCurriculumParsed, setIsCurriculumParsed] = useState<{ [key in GradeKey]: boolean }>({ pre1: false, grade1: false, grade2: false });
+  const [hierarchyRules, setHierarchyRules] = useState<{ [key in GradeKey]: HierarchyRule[] }>({ pre1: [], grade1: [], grade2: [] });
 
   const [changeParsedCurriculumList, setChangeParsedCurriculumList] = useState<Record<string, ParsedCurriculumSubject[]>>({});
   const [changeSubjectMap, setChangeSubjectMap] = useState<Record<string, SubjectMap>>({});
@@ -344,16 +345,25 @@ export default function Home() {
     e.target.value = "";
   };
 
-  const [uploadedFiles, setUploadedFiles] = useState<{ [key in GradeKey]: { name: string, size: number, data: string } | null }>({ grade1: null, grade2: null });
-  const [processedData, setProcessedData] = useState<{ [key in GradeKey]: ProcessedStudent[] }>({ grade1: [], grade2: [] });
-  const [rawSheetData, setRawSheetData] = useState<{ [key in GradeKey]: any[] }>({ grade1: [], grade2: [] });
-  const [previousHistoryFiles, setPreviousHistoryFiles] = useState<{ [key in GradeKey]: { name: string, size: number, data: string } | null }>({ grade1: null, grade2: null });
-  const [previousSubjectMap, setPreviousSubjectMap] = useState<{ [key in GradeKey]: { [studentId: string]: { name: string, subjects: string[] } } }>({ grade1: {}, grade2: {} });
+  const [uploadedFiles, setUploadedFiles] = useState<{ [key in GradeKey]: { name: string, size: number, data: string } | null }>({ pre1: null, grade1: null, grade2: null });
+  const [processedData, setProcessedData] = useState<{ [key in GradeKey]: ProcessedStudent[] }>({ pre1: [], grade1: [], grade2: [] });
+  const [rawSheetData, setRawSheetData] = useState<{ [key in GradeKey]: any[] }>({ pre1: [], grade1: [], grade2: [] });
+  const [previousHistoryFiles, setPreviousHistoryFiles] = useState<{ [key in GradeKey]: { name: string, size: number, data: string } | null }>({ pre1: null, grade1: null, grade2: null });
+  const [previousSubjectMap, setPreviousSubjectMap] = useState<{ [key in GradeKey]: { [studentId: string]: { name: string, subjects: string[] } } }>({ pre1: {}, grade1: {}, grade2: {} });
 
-  const [subjectStats, setSubjectStats] = useState<{ [key in GradeKey]: SubjectStat[] }>({ grade1: [], grade2: [] });
-  const [standardClassSize, setStandardClassSize] = useState<{ [key in GradeKey]: number }>({ grade1: 25, grade2: 25 });
-  const [designatedSubjects, setDesignatedSubjects] = useState<{ [key in GradeKey]: DesignatedSubject[] }>({ grade1: [], grade2: [] });
-  const [selectedSubjectHours, setSelectedSubjectHours] = useState<{ [key in GradeKey]: SelectedSubjectHours[] }>({ grade1: [], grade2: [] });
+  const [subjectStats, setSubjectStats] = useState<{ [key in GradeKey]: SubjectStat[] }>({ pre1: [], grade1: [], grade2: [] });
+  const [standardClassSize, setStandardClassSize] = useState<{ [key in GradeKey]: number }>({ pre1: 25, grade1: 25, grade2: 25 });
+  const [designatedSubjects, setDesignatedSubjects] = useState<{ [key in GradeKey]: DesignatedSubject[] }>({ pre1: [], grade1: [], grade2: [] });
+  const [selectedSubjectHours, setSelectedSubjectHours] = useState<{ [key in GradeKey]: SelectedSubjectHours[] }>({ pre1: [], grade1: [], grade2: [] });
+  const [totalClasses, setTotalClasses] = useState<{ [key in GradeKey]: number }>({ pre1: 10, grade1: 10, grade2: 10 });
+  const [manualClassCounts, setManualClassCounts] = useState<{ [subjectKey: string]: number }>({});
+  const [editingClasses, setEditingClasses] = useState<{ [subjectKey: string]: boolean }>({});
+  const [teacherCounts, setTeacherCounts] = useState<{ [category: string]: number }>({});
+  const [editingTeachers, setEditingTeachers] = useState<{ [category: string]: boolean }>({});
+  const [editingDetailedCategory, setEditingDetailedCategory] = useState<{ grade: GradeKey, index: number } | null>(null);
+  const [detailedCategoryEditValue, setDetailedCategoryEditValue] = useState("");
+  const [manualStep5Classes, setManualStep5Classes] = useState<{ [key: string]: string }>({});
+  const [editingStep5Classes, setEditingStep5Classes] = useState<{ [key: string]: boolean }>({});
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -375,6 +385,10 @@ export default function Home() {
       previousSubjectMap,
       subjectStats,
       standardClassSize,
+      totalClasses,
+      manualClassCounts,
+      manualStep5Classes,
+      teacherCounts,
       designatedSubjects,
       selectedSubjectHours,
       parsedSampleData,
@@ -431,23 +445,27 @@ export default function Home() {
       try {
         const content = evt.target?.result as string;
         const parsed = JSON.parse(content);
-        if (parsed.parsedCurriculumList) setParsedCurriculumList(parsed.parsedCurriculumList);
-        if (parsed.subjectMap) setSubjectMap(parsed.subjectMap);
-        if (parsed.isCurriculumParsed) setIsCurriculumParsed(parsed.isCurriculumParsed);
-        if (parsed.hierarchyRules) setHierarchyRules(parsed.hierarchyRules);
+        if (parsed.parsedCurriculumList) setParsedCurriculumList({ pre1: [], ...parsed.parsedCurriculumList });
+        if (parsed.subjectMap) setSubjectMap({ pre1: {}, ...parsed.subjectMap });
+        if (parsed.isCurriculumParsed) setIsCurriculumParsed({ pre1: false, ...parsed.isCurriculumParsed });
+        if (parsed.hierarchyRules) setHierarchyRules({ pre1: [], ...parsed.hierarchyRules });
         if (parsed.changeParsedCurriculumList) setChangeParsedCurriculumList(parsed.changeParsedCurriculumList);
         if (parsed.changeSubjectMap) setChangeSubjectMap(parsed.changeSubjectMap);
         if (parsed.changeIsCurriculumParsed) setChangeIsCurriculumParsed(parsed.changeIsCurriculumParsed);
         if (parsed.changeHierarchyRules) setChangeHierarchyRules(parsed.changeHierarchyRules);
-        if (parsed.uploadedFiles) setUploadedFiles(parsed.uploadedFiles);
-        if (parsed.processedData) setProcessedData(parsed.processedData);
-        if (parsed.rawSheetData) setRawSheetData(parsed.rawSheetData);
-        if (parsed.previousHistoryFiles) setPreviousHistoryFiles(parsed.previousHistoryFiles);
-        if (parsed.previousSubjectMap) setPreviousSubjectMap(parsed.previousSubjectMap);
-        if (parsed.subjectStats) setSubjectStats(parsed.subjectStats);
-        if (parsed.standardClassSize) setStandardClassSize(parsed.standardClassSize);
-        if (parsed.designatedSubjects) setDesignatedSubjects(parsed.designatedSubjects);
-        if (parsed.selectedSubjectHours) setSelectedSubjectHours(parsed.selectedSubjectHours);
+        if (parsed.uploadedFiles) setUploadedFiles({ pre1: null, ...parsed.uploadedFiles });
+        if (parsed.processedData) setProcessedData({ pre1: [], ...parsed.processedData });
+        if (parsed.rawSheetData) setRawSheetData({ pre1: [], ...parsed.rawSheetData });
+        if (parsed.previousHistoryFiles) setPreviousHistoryFiles({ pre1: null, ...parsed.previousHistoryFiles });
+        if (parsed.previousSubjectMap) setPreviousSubjectMap({ pre1: {}, ...parsed.previousSubjectMap });
+        if (parsed.subjectStats) setSubjectStats({ pre1: [], ...parsed.subjectStats });
+        if (parsed.standardClassSize) setStandardClassSize({ pre1: 25, ...parsed.standardClassSize });
+        if (parsed.totalClasses) setTotalClasses({ pre1: 10, grade1: 10, grade2: 10, ...parsed.totalClasses });
+        if (parsed.manualClassCounts) setManualClassCounts(parsed.manualClassCounts);
+        if (parsed.manualStep5Classes) setManualStep5Classes(parsed.manualStep5Classes);
+        if (parsed.teacherCounts) setTeacherCounts(parsed.teacherCounts);
+        if (parsed.designatedSubjects) setDesignatedSubjects({ pre1: [], ...parsed.designatedSubjects });
+        if (parsed.selectedSubjectHours) setSelectedSubjectHours({ pre1: [], ...parsed.selectedSubjectHours });
         if (parsed.parsedSampleData) setParsedSampleData(parsed.parsedSampleData);
         if (parsed.timetableData) setTimetableData(parsed.timetableData);
         if (parsed.electiveChanges) setElectiveChanges(parsed.electiveChanges);
@@ -505,6 +523,13 @@ export default function Home() {
 
   const renderGradeTabs = () => (
     <div className="flex gap-2 mb-6 border-b border-slate-800 pb-4">
+      <button
+        onClick={() => setActiveGrade("pre1")}
+        className={`px-6 py-2.5 rounded-xl font-medium transition-all ${activeGrade === "pre1" ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-inner" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+          }`}
+      >
+        예비 1학년
+      </button>
       <button
         onClick={() => setActiveGrade("grade1")}
         className={`px-6 py-2.5 rounded-xl font-medium transition-all ${activeGrade === "grade1" ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-inner" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
@@ -624,8 +649,8 @@ export default function Home() {
             individualSubjects.forEach(sub => {
               if (sub && sub.length > 1) {
                 const actualCredits = sem1_1 || sem1_2 || sem2_1 || sem2_2 || sem3_1 || sem3_2 || 0;
-                const sem1Val = activeGrade === "grade1" ? sem1_1 : activeGrade === "grade2" ? sem2_1 : 0;
-                const sem2Val = activeGrade === "grade1" ? sem1_2 : activeGrade === "grade2" ? sem2_2 : 0;
+                const sem1Val = activeGrade === "pre1" ? sem1_1 : activeGrade === "grade1" ? sem2_1 : activeGrade === "grade2" ? sem3_1 : 0;
+                const sem2Val = activeGrade === "pre1" ? sem1_2 : activeGrade === "grade1" ? sem2_2 : activeGrade === "grade2" ? sem3_2 : 0;
                 
                 const existing = newParsed.find(p => p.subject === sub);
                 if (existing) {
@@ -649,10 +674,12 @@ export default function Home() {
 
                 // Populate backward compatibility states for the chosen grade
                 let sem1ForGrade = 0, sem2ForGrade = 0;
-                if (activeGrade === "grade1") {
+                if (activeGrade === "pre1") {
                   sem1ForGrade = sem1_1; sem2ForGrade = sem1_2;
-                } else {
+                } else if (activeGrade === "grade1") {
                   sem1ForGrade = sem2_1; sem2ForGrade = sem2_2;
+                } else {
+                  sem1ForGrade = sem3_1; sem2ForGrade = sem3_2;
                 }
 
                 // Determine broad category
@@ -663,7 +690,7 @@ export default function Home() {
 
                 if (type === "지정") {
                   if (sem1ForGrade > 0 || sem2ForGrade > 0) {
-                    newDesignated.push({ subject: sub, category: broadCat, detailedCategory: category, sem1: sem1ForGrade, sem2: sem2ForGrade });
+                    newDesignated.push({ subject: sub, category: broadCat, detailedCategory: category, isSplit: individualSubjects.length > 1, sem1: sem1ForGrade, sem2: sem2ForGrade });
                   }
                 } else {
                   newMap[sub] = broadCat;
@@ -692,6 +719,34 @@ export default function Home() {
       ...prev,
       [activeGrade]: { ...prev[activeGrade], [subject]: category }
     }));
+  };
+
+  const handleDetailedCategoryUpdate = (grade: GradeKey, index: number, subjectName: string, newDetailedCategory: string) => {
+    if (!newDetailedCategory.trim()) {
+      setEditingDetailedCategory(null);
+      return;
+    }
+
+    setParsedCurriculumList(prev => {
+      const next = { ...prev };
+      next[grade] = [...next[grade]];
+      next[grade][index] = { ...next[grade][index], category: newDetailedCategory };
+      return next;
+    });
+
+    setDesignatedSubjects(prev => {
+      const next = { ...prev };
+      next[grade] = next[grade].map(s => s.subject === subjectName ? { ...s, detailedCategory: newDetailedCategory } : s);
+      return next;
+    });
+
+    setSelectedSubjectHours(prev => {
+      const next = { ...prev };
+      next[grade] = next[grade].map(s => s.subject === subjectName ? { ...s, detailedCategory: newDetailedCategory } : s);
+      return next;
+    });
+
+    setEditingDetailedCategory(null);
   };
 
   const handleChangeCurriculumUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -954,6 +1009,20 @@ export default function Home() {
         }
       }
 
+      const uniqueClasses = new Set<string>();
+      dataObjects.forEach(obj => {
+        const studentId = String(obj["학번"] || "").trim();
+        if (studentId.length >= 5) {
+          uniqueClasses.add(studentId.substring(1, 3));
+        } else if (studentId.length === 4) {
+          uniqueClasses.add(studentId.substring(1, 2));
+        }
+      });
+      const classCount = uniqueClasses.size;
+      if (classCount > 0) {
+        setTotalClasses(prev => ({ ...prev, [activeGrade]: classCount }));
+      }
+
       setRawSheetData(prev => ({ ...prev, [activeGrade]: dataObjects }));
     };
     reader.readAsArrayBuffer(file);
@@ -1096,6 +1165,7 @@ export default function Home() {
     setUploadedFiles(prev => ({ ...prev, [activeGrade]: null }));
     setRawSheetData(prev => ({ ...prev, [activeGrade]: [] }));
     setProcessedData(prev => ({ ...prev, [activeGrade]: [] }));
+    setSubjectStats(prev => ({ ...prev, [activeGrade]: [] }));
   };
 
   const handleRemovePrevHistoryFile = () => {
@@ -1421,6 +1491,7 @@ export default function Home() {
       processData(currentData);
     } else {
       setProcessedData(prev => ({ ...prev, [activeGrade]: [] }));
+      setSubjectStats(prev => ({ ...prev, [activeGrade]: [] }));
     }
   }, [activeGrade, rawSheetData, subjectMap, hierarchyRules, previousSubjectMap]);
 
@@ -1572,11 +1643,11 @@ export default function Home() {
       XLSX.utils.book_append_sheet(wb, ws, cls);
     });
 
-    XLSX.writeFile(wb, `Subject_Selection_${activeGrade === "grade1" ? "1학년" : "2학년"}_Processed.xlsx`);
+    XLSX.writeFile(wb, `Subject_Selection_${activeGrade === "pre1" ? "1학년" : activeGrade === "grade1" ? "2학년" : "3학년"}_Processed.xlsx`);
   };
 
   const getClassRecommendation = (applicants: number, standardSize: number) => {
-    if (applicants < 5) return "폐강";
+    if (applicants < 10) return "폐강";
     if (applicants < 0.7 * standardSize) return "논의";
 
     const k = Math.round(applicants / standardSize);
@@ -1599,29 +1670,37 @@ export default function Home() {
     const standardSize = standardClassSize[activeGrade] || 25;
     const wb = XLSX.utils.book_new();
 
-    const titleText = `2026학년도 ${activeGrade === "grade1" ? "1학년" : "2학년(현 1학년)"} 선택과목 수요조사 결과`;
+    const titleText = `2026학년도 ${activeGrade === "pre1" ? "1학년" : activeGrade === "grade1" ? "2학년" : "3학년"} 선택과목 수요조사 결과`;
 
     const aoa: any[][] = [
-      [titleText, "", "", "", ""],
-      ["", "", "", "", ""],
-      ["선택군", "학기", "과목", "신청자수", "비고"]
+      [titleText, "", "", "", "", ""],
+      ["", "", "", "", "", ""],
+      ["선택군", "학기", "과목", "신청자수", "개설 반 수", "개설여부"]
     ];
 
     stats.forEach(s => {
-      const remark = getClassRecommendation(s.applicants, standardSize);
+      const baseRemark = getClassRecommendation(s.applicants, standardSize);
+      const key = `${activeGrade}_${s.semester}_${s.subject}`;
+      const displayRemark = manualStep5Classes[key] !== undefined ? manualStep5Classes[key] : baseRemark;
+      
+      let openingStatus = "미정";
+      if (displayRemark === "폐강") openingStatus = "폐강";
+      else if (!isNaN(Number(displayRemark))) openingStatus = "확정";
+
       aoa.push([
         s.group,
         s.semester,
         s.subject,
         s.applicants,
-        remark
+        displayRemark,
+        openingStatus
       ]);
     });
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
 
     const merges: any[] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }
     ];
 
     const dataStartRowIndex = 3;
@@ -1742,7 +1821,7 @@ export default function Home() {
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "과목 개설 여부");
-    XLSX.writeFile(wb, `Subject_Opening_${activeGrade === "grade1" ? "1학년" : "2학년"}_Analysis.xlsx`);
+    XLSX.writeFile(wb, `Subject_Opening_${activeGrade === "pre1" ? "1학년" : activeGrade === "grade1" ? "2학년" : "3학년"}_Analysis.xlsx`);
   };
 
   const activeData = processedData[activeGrade];
@@ -2555,6 +2634,133 @@ export default function Home() {
     XLSX.utils.book_append_sheet(wb, ws, "다년도분석");
     XLSX.writeFile(wb, `${gradeNum}학년_다년도분석결과.xlsx`);
   };
+  const categorySummaryData = useMemo(() => {
+    const getElectiveSubjects = (gradeKey: GradeKey, gradeLabel: string) => {
+      const stats = subjectStats[gradeKey] || [];
+      return stats.map(stat => {
+        const baseRemark = getClassRecommendation(stat.applicants, standardClassSize[gradeKey] || 25);
+        const key = `${gradeKey}_${stat.semester}_${stat.subject}`;
+        const displayRemark = manualStep5Classes[key] !== undefined ? manualStep5Classes[key] : baseRemark;
+        
+        if (displayRemark === "폐강" || isNaN(Number(displayRemark))) return null;
+
+        const classes = Number(displayRemark);
+        const parsedSubj = parsedCurriculumList[gradeKey]?.find(p => p.subject === stat.subject);
+        
+        let sem1 = 0, sem2 = 0;
+        if (stat.semester.includes("1학기") && parsedSubj?.sem1) sem1 = parsedSubj.sem1;
+        if (stat.semester.includes("2학기") && parsedSubj?.sem2) sem2 = parsedSubj.sem2;
+        
+        return {
+          subject: stat.subject,
+          category: subjectMap[gradeKey]?.[stat.subject] || "기타",
+          detailedCategory: parsedSubj?.category || "기타",
+          isSplit: false,
+          sem1,
+          sem2,
+          gradeLabel,
+          isElective: true,
+          electiveClasses: classes
+        };
+      }).filter(Boolean) as any[];
+    };
+
+    const items = [
+      ...designatedSubjects.pre1.map(d => ({ ...d, gradeLabel: "1", isElective: false })),
+      ...designatedSubjects.grade1.map(d => ({ ...d, gradeLabel: "2", isElective: false })),
+      ...designatedSubjects.grade2.map(d => ({ ...d, gradeLabel: "3", isElective: false })),
+      ...getElectiveSubjects("pre1", "1"),
+      ...getElectiveSubjects("grade1", "2"),
+      ...getElectiveSubjects("grade2", "3"),
+    ];
+
+    const preferredOrder = ["국어", "수학", "영어", "한국사", "사회", "과학", "체육", "예술", "기술·가정", "제2외국어", "한문", "교양"];
+    let categories = Array.from(new Set(items.map(item => item.detailedCategory).filter(Boolean)));
+    categories.sort((a, b) => {
+      const idxA = preferredOrder.indexOf(a);
+      const idxB = preferredOrder.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    const rows: Array<{
+      category: string;
+      isFirstRow: boolean;
+      rowSpan: number;
+      sem1Total: number;
+      sem2Total: number;
+      yearTotal: number;
+      sem1Avg: string;
+      sem2Avg: string;
+      yearAvg: string;
+      sem1: { gradeLabel: string; subject: string; credits: number; isSplit?: boolean; subjectHours: number; isElective?: boolean; classCount: number } | null;
+      sem2: { gradeLabel: string; subject: string; credits: number; isSplit?: boolean; subjectHours: number; isElective?: boolean; classCount: number } | null;
+    }> = [];
+
+    categories.forEach(cat => {
+      const catItems = items.filter(i => i.detailedCategory === cat);
+      const sem1Items = catItems.filter(i => i.sem1 > 0).sort((a, b) => a.gradeLabel.localeCompare(b.gradeLabel));
+      const sem2Items = catItems.filter(i => i.sem2 > 0).sort((a, b) => a.gradeLabel.localeCompare(b.gradeLabel));
+      
+      const maxLen = Math.max(sem1Items.length, sem2Items.length);
+      if (maxLen === 0) return;
+
+      let sem1Total = 0;
+      let sem2Total = 0;
+
+      const getClasses = (item: any, sem: number) => {
+        const gk = item.gradeLabel === "1" ? "pre1" : item.gradeLabel === "2" ? "grade1" : "grade2";
+        const key = `${item.gradeLabel}_${item.subject}_${sem}${item.isSplit ? '_split' : ''}`;
+        
+        if (item.isElective) return item.electiveClasses;
+        if (manualClassCounts[key] !== undefined) return manualClassCounts[key];
+        
+        return item.isSplit ? 0 : totalClasses[gk];
+      };
+
+      const computedSem1Items = sem1Items.map(item => {
+        const classes = getClasses(item, 1);
+        const subjectHours = item.sem1 * classes;
+        sem1Total += subjectHours;
+        return { ...item, subjectHours, classCount: classes };
+      });
+
+      const computedSem2Items = sem2Items.map(item => {
+        const classes = getClasses(item, 2);
+        const subjectHours = item.sem2 * classes;
+        sem2Total += subjectHours;
+        return { ...item, subjectHours, classCount: classes };
+      });
+
+      const yearTotal = sem1Total + sem2Total;
+      const tc = teacherCounts[cat] || 0;
+      const sem1Avg = tc > 0 ? (sem1Total / tc).toFixed(1) : "0.0";
+      const sem2Avg = tc > 0 ? (sem2Total / tc).toFixed(1) : "0.0";
+      const yearAvg = tc > 0 ? (yearTotal / tc).toFixed(1) : "0.0";
+      const semesterAvg = tc > 0 ? ((yearTotal / tc) / 2).toFixed(1) : "0.0";
+      const yearAvgFormatted = `${yearAvg} (${semesterAvg})`;
+      
+      for (let i = 0; i < maxLen; i++) {
+        rows.push({
+          category: cat,
+          isFirstRow: i === 0,
+          rowSpan: maxLen,
+          sem1Total,
+          sem2Total,
+          yearTotal,
+          sem1Avg,
+          sem2Avg,
+          yearAvg: yearAvgFormatted,
+          sem1: computedSem1Items[i] ? { gradeLabel: computedSem1Items[i].gradeLabel, subject: computedSem1Items[i].subject, credits: computedSem1Items[i].sem1, isSplit: computedSem1Items[i].isSplit, subjectHours: computedSem1Items[i].subjectHours, isElective: computedSem1Items[i].isElective, classCount: computedSem1Items[i].classCount } : null,
+          sem2: computedSem2Items[i] ? { gradeLabel: computedSem2Items[i].gradeLabel, subject: computedSem2Items[i].subject, credits: computedSem2Items[i].sem2, isSplit: computedSem2Items[i].isSplit, subjectHours: computedSem2Items[i].subjectHours, isElective: computedSem2Items[i].isElective, classCount: computedSem2Items[i].classCount } : null,
+        });
+      }
+    });
+    
+    return rows;
+  }, [designatedSubjects, manualClassCounts, totalClasses, teacherCounts, subjectStats, manualStep5Classes, standardClassSize, parsedCurriculumList, subjectMap]);
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30 font-sans">
@@ -2707,6 +2913,19 @@ export default function Home() {
                       <span>과목 개설 여부</span>
                     </div>
                   </button>
+                  <button
+                    onClick={() => setActiveTab("categorySummary")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${activeTab === "categorySummary"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                      }`}
+                  >
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span>
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      <span>교과(군)별 시수 정리</span>
+                    </div>
+                  </button>
 
                 </div>
 
@@ -2744,7 +2963,7 @@ export default function Home() {
                         <div className="mt-8 p-6 bg-slate-950/50 border border-slate-800 rounded-2xl animate-in fade-in">
                           <h3 className="text-xl font-medium text-slate-200 mb-4 flex items-center gap-2">
                             <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                            추출된 교육과정 데이터 ({activeGrade === "grade1" ? "1학년 탭" : "2학년 탭"})
+                            추출된 교육과정 데이터 ({activeGrade === "pre1" ? "1학년 탭" : activeGrade === "grade1" ? "2학년 탭" : "3학년 탭"})
                           </h3>
                           <p className="text-sm text-slate-400 mb-6">
                             업로드된 엑셀 파일에서 1~3학년 전체 교육과정을 자동으로 분석했습니다. 내부적으로 기초/사회/과학 과목 매핑도 완료되었습니다.
@@ -2772,7 +2991,28 @@ export default function Home() {
                                       </span>
                                     </td>
                                     <td className="px-4 py-3 font-medium text-slate-200">{subj.subject}</td>
-                                    <td className="px-4 py-3 text-slate-400">{subj.category}</td>
+                                    <td className="px-4 py-3 text-slate-400">
+                                      {editingDetailedCategory?.grade === activeGrade && editingDetailedCategory?.index === idx ? (
+                                        <input
+                                          type="text"
+                                          autoFocus
+                                          className="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-slate-200"
+                                          value={detailedCategoryEditValue}
+                                          onChange={(e) => setDetailedCategoryEditValue(e.target.value)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleDetailedCategoryUpdate(activeGrade, idx, subj.subject, detailedCategoryEditValue);
+                                          }}
+                                          onBlur={() => handleDetailedCategoryUpdate(activeGrade, idx, subj.subject, detailedCategoryEditValue)}
+                                        />
+                                      ) : (
+                                        <span className="cursor-pointer hover:text-indigo-400" onClick={() => {
+                                          setEditingDetailedCategory({ grade: activeGrade, index: idx });
+                                          setDetailedCategoryEditValue(subj.category);
+                                        }} title="클릭하여 수동 수정">
+                                          {subj.category}
+                                        </span>
+                                      )}
+                                    </td>
                                     <td className="px-4 py-3 text-center text-amber-400/90 font-mono">{subj.credits}</td>
                                     <td className="px-4 py-3 text-slate-500 text-xs">{subj.semesters}</td>
                                     <td className="px-4 py-3 text-center">
@@ -3068,7 +3308,7 @@ export default function Home() {
                           disabled={activeData.length === 0}
                         >
                           <Download className="w-4 h-4" />
-                          {activeGrade === "grade1" ? "1학년" : "2학년"} 엑셀 다운로드
+                          {activeGrade === "pre1" ? "1학년" : activeGrade === "grade1" ? "2학년" : "3학년"} 엑셀 다운로드
                         </button>
                       </div>
 
@@ -3164,7 +3404,7 @@ export default function Home() {
                           disabled={subjectStats[activeGrade].length === 0}
                         >
                           <Download className="w-4 h-4" />
-                          {activeGrade === "grade1" ? "1학년" : "2학년"} 개설 여부 엑셀 다운로드
+                          {activeGrade === "pre1" ? "1학년" : activeGrade === "grade1" ? "2학년" : "3학년"} 개설 여부 엑셀 다운로드
                         </button>
                       </div>
 
@@ -3175,7 +3415,7 @@ export default function Home() {
                         <div>
                           <h3 className="font-semibold text-slate-200">학급 분반 및 개설 기준 설정</h3>
                           <p className="text-xs text-slate-400 mt-1">
-                            설정된 학급 기준 인원에 따라 개설(70% 이상), 논의(70% 미만), 분반 추천(120% 초과) 및 폐강(5명 미만) 여부를 자동으로 판단합니다.
+                            설정된 학급 기준 인원에 따라 개설(70% 이상), 논의(70% 미만), 분반 추천(120% 초과) 및 폐강(10명 미만) 여부를 자동으로 판단합니다.
                           </p>
                         </div>
                         <div className="flex items-center gap-3">
@@ -3235,26 +3475,33 @@ export default function Home() {
                             <div className="overflow-auto max-h-[650px]">
                               <table className="w-full text-sm text-left text-slate-300 border-collapse">
                                 <thead className="text-xs text-slate-400 uppercase bg-slate-900 border-b border-slate-800">
-                                  <tr>
-                                    <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[100px]">선택군</th>
-                                    <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">학기</th>
-                                    <th className="px-6 py-3 border-r border-slate-800/60">과목</th>
-                                    <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">신청자 수</th>
-                                    <th className="px-4 py-3 text-center min-w-[120px]">비고</th>
-                                  </tr>
+                                    <tr>
+                                      <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[100px]">선택군</th>
+                                      <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">학기</th>
+                                      <th className="px-6 py-3 border-r border-slate-800/60">과목</th>
+                                      <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">신청자 수</th>
+                                      <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">개설 반 수</th>
+                                      <th className="px-4 py-3 text-center min-w-[120px]">개설여부</th>
+                                    </tr>
                                 </thead>
                                 <tbody>
                                   {stats.map((row, idx) => {
-                                    const remark = getClassRecommendation(row.applicants, standardSize);
+                                    const baseRemark = getClassRecommendation(row.applicants, standardSize);
+                                    const key = `${activeGrade}_${row.semester}_${row.subject}`;
+                                    const displayRemark = manualStep5Classes[key] !== undefined ? manualStep5Classes[key] : baseRemark;
 
-                                    let remarkStyle = "text-slate-300 font-medium";
-                                    if (remark === "폐강") {
-                                      remarkStyle = "text-rose-400 font-bold bg-rose-500/10 px-2.5 py-1 rounded-md inline-block";
-                                    } else if (remark === "논의") {
-                                      remarkStyle = "text-amber-400 font-bold bg-amber-500/10 px-2.5 py-1 rounded-md inline-block";
-                                    } else if (remark !== "개설" && remark !== "") {
-                                      remarkStyle = "text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-md inline-block";
+                                    let openingStatus = "미정";
+                                    let openingStyle = "text-amber-400 font-bold bg-amber-500/10 px-2.5 py-1 rounded-md inline-block";
+
+                                    if (displayRemark === "폐강") {
+                                      openingStatus = "폐강";
+                                      openingStyle = "text-rose-400 font-bold bg-rose-500/10 px-2.5 py-1 rounded-md inline-block";
+                                    } else if (!isNaN(Number(displayRemark))) {
+                                      openingStatus = "확정";
+                                      openingStyle = "text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-md inline-block";
                                     }
+
+                                    const isEditable = displayRemark === "논의" || displayRemark.includes("~") || manualStep5Classes[key] !== undefined;
 
                                     return (
                                       <tr key={idx} className="border-b border-slate-800/50 hover:bg-slate-900/20 transition-colors">
@@ -3280,10 +3527,29 @@ export default function Home() {
                                         <td className="px-4 py-3.5 text-center border-r border-slate-800/50 font-semibold text-indigo-400">
                                           {row.applicants}명
                                         </td>
+                                        <td className="px-4 py-3.5 text-center align-middle border-r border-slate-800/50">
+                                          {editingStep5Classes[key] ? (
+                                            <input
+                                              type="text"
+                                              autoFocus
+                                              className="w-16 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-center text-slate-200"
+                                              value={manualStep5Classes[key] !== undefined ? manualStep5Classes[key] : baseRemark}
+                                              onChange={(e) => setManualStep5Classes(p => ({ ...p, [key]: e.target.value }))}
+                                              onKeyDown={e => { if (e.key === 'Enter') setEditingStep5Classes(p => ({ ...p, [key]: false })) }}
+                                              onBlur={() => setEditingStep5Classes(p => ({ ...p, [key]: false }))}
+                                            />
+                                          ) : (
+                                            <span 
+                                              className={isEditable ? "cursor-pointer hover:text-indigo-400 font-medium" : "text-slate-300 font-medium"} 
+                                              onClick={() => { if (isEditable || true) setEditingStep5Classes(p => ({ ...p, [key]: true })) }}
+                                              title={isEditable || true ? "클릭하여 수동 입력" : undefined}
+                                            >
+                                              {displayRemark}
+                                            </span>
+                                          )}
+                                        </td>
                                         <td className="px-4 py-3.5 text-center align-middle">
-                                          <span className={remarkStyle}>
-                                            {remark}
-                                          </span>
+                                          <span className={openingStyle}>{openingStatus}</span>
                                         </td>
                                       </tr>
                                     );
@@ -3294,6 +3560,210 @@ export default function Home() {
                           </div>
                         );
                       })()}
+                    </div>
+                  )}
+
+                  {activeTab === "categorySummary" && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                          <FileText className="w-6 h-6 text-indigo-400" />
+                          교과(군)별 시수 정리
+                        </h2>
+                        <div className="flex gap-4 bg-slate-800/50 p-3 rounded-xl border border-slate-700/50">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-slate-300">1학년 전체 반:</span>
+                            <input type="number" className="w-16 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-center text-sm text-slate-200" value={totalClasses.pre1 || ""} onChange={e => {
+                              setTotalClasses(p => ({ ...p, pre1: Number(e.target.value) || 0 }));
+                              setManualClassCounts(p => { const next = { ...p }; Object.keys(next).forEach(k => { if (k.startsWith("1_") && !k.endsWith("_split")) delete next[k]; }); return next; });
+                            }} />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-slate-300">2학년 전체 반:</span>
+                            <input type="number" className="w-16 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-center text-sm text-slate-200" value={totalClasses.grade1 || ""} onChange={e => {
+                              setTotalClasses(p => ({ ...p, grade1: Number(e.target.value) || 0 }));
+                              setManualClassCounts(p => { const next = { ...p }; Object.keys(next).forEach(k => { if (k.startsWith("2_") && !k.endsWith("_split")) delete next[k]; }); return next; });
+                            }} />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-slate-300">3학년 전체 반:</span>
+                            <input type="number" className="w-16 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-center text-sm text-slate-200" value={totalClasses.grade2 || ""} onChange={e => {
+                              setTotalClasses(p => ({ ...p, grade2: Number(e.target.value) || 0 }));
+                              setManualClassCounts(p => { const next = { ...p }; Object.keys(next).forEach(k => { if (k.startsWith("3_") && !k.endsWith("_split")) delete next[k]; }); return next; });
+                            }} />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 overflow-hidden shadow-inner overflow-x-auto">
+                        <table className="w-full text-sm text-left text-slate-300">
+                          <thead className="text-xs text-slate-400 bg-slate-900/80 sticky top-0 uppercase z-10 border-b border-slate-700/50">
+                            <tr>
+                              <th rowSpan={2} className="px-4 py-3 text-center border-r border-slate-700/50">교과</th>
+                              <th rowSpan={2} className="px-4 py-3 text-center border-r border-slate-700/50">교사 수</th>
+                              <th colSpan={7} className="px-4 py-3 text-center border-r border-slate-700/50 border-b border-slate-700/50">1학기</th>
+                              <th colSpan={7} className="px-4 py-3 text-center border-r border-slate-700/50 border-b border-slate-700/50">2학기</th>
+                              <th rowSpan={2} className="px-4 py-3 text-center border-r border-slate-700/50">교과별<br/>1년 시수</th>
+                              <th rowSpan={2} className="px-4 py-3 text-center">교과별<br/>1년 평균<br/>(학기당 평균)</th>
+                            </tr>
+                            <tr>
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">학년</th>
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">과목명</th>
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">운영학점</th>
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">개설반</th>
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">과목별 시수</th>
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">교과별 총 시수</th>
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">교과별 평균시수</th>
+                              
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">학년</th>
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">과목명</th>
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">운영학점</th>
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">개설반</th>
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">과목별 시수</th>
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">교과별 총 시수</th>
+                              <th className="px-4 py-2 text-center border-r border-slate-700/50">교과별 평균시수</th>
+                            </tr>
+                          </thead>
+                          <tbody className="">
+                            {categorySummaryData.length > 0 ? (
+                              categorySummaryData.map((row, idx) => (
+                                <tr key={`${row.category}-${idx}`} className={`hover:bg-slate-800/30 transition-colors border-b border-slate-700/50 ${row.isFirstRow ? 'border-t-2 border-t-slate-600/80' : ''}`}>
+                                  {row.isFirstRow && (
+                                    <td rowSpan={row.rowSpan} className="px-4 py-3 text-center border-r border-slate-700/50 font-medium align-middle">
+                                      {row.category}
+                                    </td>
+                                  )}
+                                  {row.isFirstRow && (
+                                    <td rowSpan={row.rowSpan} className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 align-middle">
+                                      {editingTeachers[row.category] ? (
+                                        <input
+                                          type="number"
+                                          autoFocus
+                                          className="w-16 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-center text-slate-200"
+                                          value={teacherCounts[row.category] || ""}
+                                          onChange={(e) => setTeacherCounts(p => ({ ...p, [row.category]: Number(e.target.value) || 0 }))}
+                                          onKeyDown={e => { if (e.key === 'Enter') setEditingTeachers(p => ({ ...p, [row.category]: false })) }}
+                                          onBlur={() => setEditingTeachers(p => ({ ...p, [row.category]: false }))}
+                                          placeholder="0"
+                                        />
+                                      ) : (
+                                        <span className="cursor-pointer hover:text-indigo-400 font-medium" onClick={() => setEditingTeachers(p => ({ ...p, [row.category]: true }))} title="클릭하여 수동 입력">
+                                          {teacherCounts[row.category] || 0}
+                                        </span>
+                                      )}
+                                    </td>
+                                  )}
+                                  
+                                  {/* 1학기 */}
+                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem1?.gradeLabel || ""}</td>
+                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-200">{row.sem1?.subject || ""}</td>
+                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem1?.credits || ""}</td>
+                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-500">
+                                    {row.sem1 ? (() => {
+                                      const gk = row.sem1.gradeLabel === "1" ? "pre1" : row.sem1.gradeLabel === "2" ? "grade1" : "grade2";
+                                      const key = `${row.sem1.gradeLabel}_${row.sem1.subject}_1${row.sem1.isSplit ? '_split' : ''}`;
+                                      const displayVal = manualClassCounts[key] !== undefined ? manualClassCounts[key] : row.sem1.classCount;
+                                      
+                                      if (editingClasses[key]) {
+                                        return (
+                                          <input
+                                            type="number"
+                                            autoFocus
+                                            className="w-16 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-center text-slate-200"
+                                            value={manualClassCounts[key] !== undefined ? manualClassCounts[key] : ""}
+                                            onChange={(e) => setManualClassCounts(p => ({ ...p, [key]: Number(e.target.value) || 0 }))}
+                                            onKeyDown={e => { if (e.key === 'Enter') setEditingClasses(p => ({ ...p, [key]: false })) }}
+                                            onBlur={() => setEditingClasses(p => ({ ...p, [key]: false }))}
+                                            placeholder={displayVal.toString()}
+                                          />
+                                        );
+                                      } else {
+                                        return (
+                                          <span className="cursor-pointer hover:text-indigo-400 font-medium" onClick={() => setEditingClasses(p => ({ ...p, [key]: true }))} title="클릭하여 수동 입력">
+                                            {displayVal || 0}
+                                          </span>
+                                        );
+                                      }
+                                    })() : ""}
+                                  </td>
+                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem1?.subjectHours !== undefined ? row.sem1.subjectHours : ""}</td>
+                                  {row.isFirstRow && (
+                                    <td rowSpan={row.rowSpan} className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 font-semibold align-middle">
+                                      {row.sem1Total || 0}
+                                    </td>
+                                  )}
+                                  {row.isFirstRow && (
+                                    <td rowSpan={row.rowSpan} className="px-4 py-3 text-center border-r border-slate-700/50 text-indigo-300 font-semibold align-middle">
+                                      {row.sem1Avg}
+                                    </td>
+                                  )}
+                                  
+                                  {/* 2학기 */}
+                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem2?.gradeLabel || ""}</td>
+                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-200">{row.sem2?.subject || ""}</td>
+                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem2?.credits || ""}</td>
+                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-500">
+                                    {row.sem2 ? (() => {
+                                      const gk = row.sem2.gradeLabel === "1" ? "pre1" : row.sem2.gradeLabel === "2" ? "grade1" : "grade2";
+                                      const key = `${row.sem2.gradeLabel}_${row.sem2.subject}_2${row.sem2.isSplit ? '_split' : ''}`;
+                                      const displayVal = manualClassCounts[key] !== undefined ? manualClassCounts[key] : row.sem2.classCount;
+                                      
+                                      if (editingClasses[key]) {
+                                        return (
+                                          <input
+                                            type="number"
+                                            autoFocus
+                                            className="w-16 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-center text-slate-200"
+                                            value={manualClassCounts[key] !== undefined ? manualClassCounts[key] : ""}
+                                            onChange={(e) => setManualClassCounts(p => ({ ...p, [key]: Number(e.target.value) || 0 }))}
+                                            onKeyDown={e => { if (e.key === 'Enter') setEditingClasses(p => ({ ...p, [key]: false })) }}
+                                            onBlur={() => setEditingClasses(p => ({ ...p, [key]: false }))}
+                                            placeholder={displayVal.toString()}
+                                          />
+                                        );
+                                      } else {
+                                        return (
+                                          <span className="cursor-pointer hover:text-indigo-400 font-medium" onClick={() => setEditingClasses(p => ({ ...p, [key]: true }))} title="클릭하여 수동 입력">
+                                            {displayVal || 0}
+                                          </span>
+                                        );
+                                      }
+                                    })() : ""}
+                                  </td>
+                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem2?.subjectHours !== undefined ? row.sem2.subjectHours : ""}</td>
+                                  {row.isFirstRow && (
+                                    <td rowSpan={row.rowSpan} className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 font-semibold align-middle">
+                                      {row.sem2Total || 0}
+                                    </td>
+                                  )}
+                                  {row.isFirstRow && (
+                                    <td rowSpan={row.rowSpan} className="px-4 py-3 text-center border-r border-slate-700/50 text-indigo-300 font-semibold align-middle">
+                                      {row.sem2Avg}
+                                    </td>
+                                  )}
+                                  
+                                  {/* 1년 시수 및 1년 평균 */}
+                                  {row.isFirstRow && (
+                                    <td rowSpan={row.rowSpan} className="px-4 py-3 text-center border-r border-slate-700/50 text-emerald-300 font-bold align-middle">
+                                      {row.yearTotal || 0}
+                                    </td>
+                                  )}
+                                  {row.isFirstRow && (
+                                    <td rowSpan={row.rowSpan} className="px-4 py-3 text-center text-emerald-400 font-bold align-middle">
+                                      {row.yearAvg}
+                                    </td>
+                                  )}
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={18} className="px-4 py-8 text-center text-slate-500">
+                                  데이터가 없습니다. 1단계 교육과정 편성표를 업로드해주세요.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </div>
