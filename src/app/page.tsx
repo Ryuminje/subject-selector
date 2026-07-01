@@ -2088,7 +2088,9 @@ export default function Home() {
         // 반복이 끝나면 가장 최적화된 로그를 전체 log 객체에 병합
         studentsWithChanges.forEach(studentId => {
           if (!log[studentId]) log[studentId] = [];
-          log[studentId].push(...optimizedLogs[studentId]);
+          if (optimizedLogs[studentId]) {
+            log[studentId].push(...optimizedLogs[studentId]);
+          }
         });
       }
     });
@@ -2310,7 +2312,7 @@ export default function Home() {
     const gradeNum = grade === 'grade2' ? '2' : '3';
     const data = electiveChanges[grade];
 
-    const studentsWithChanges = Array.from(new Set(data.map(d => d.studentId))).filter(id => id);
+    const studentsWithChanges = Array.from(new Set(data.map(d => d.studentId))).filter(id => id).sort((a, b) => String(a).localeCompare(String(b)));
 
     let changeIndex = 1;
     const rows: any[][] = [];
@@ -4021,6 +4023,18 @@ export default function Home() {
                                                       return { ...prev, [changeActiveGrade]: newData };
                                                     });
                                                   }}
+                                                  onBlur={() => {
+                                                    setElectiveChanges(prev => {
+                                                      const newData = [...prev[changeActiveGrade]].sort((a, b) => {
+                                                        const valA = String(a.studentId || "");
+                                                        const valB = String(b.studentId || "");
+                                                        if (valA === "" && valB !== "") return 1;
+                                                        if (valA !== "" && valB === "") return -1;
+                                                        return valA.localeCompare(valB);
+                                                      });
+                                                      return { ...prev, [changeActiveGrade]: newData };
+                                                    });
+                                                  }}
                                                   className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
                                                   placeholder="학번"
                                                 />
@@ -4146,7 +4160,7 @@ export default function Home() {
                                     );
                                   }
 
-                                  const studentsWithChanges = Array.from(new Set(data.map(d => d.studentId))).filter(id => id);
+                                  const studentsWithChanges = Array.from(new Set(data.map(d => d.studentId))).filter(id => id).sort((a, b) => String(a).localeCompare(String(b)));
 
                                   if (studentsWithChanges.length === 0) {
                                     return (
