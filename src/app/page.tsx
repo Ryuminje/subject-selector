@@ -78,6 +78,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState("curriculum");
   const [activeSidebarTab, setActiveSidebarTab] = useState<"survey" | "change">("survey");
   const [activeGrade, setActiveGrade] = useState<GradeKey>("pre1");
+  const [isExampleModalOpen, setIsExampleModalOpen] = useState(false);
 
   const [changeActiveTab, setChangeActiveTab] = useState<"basic" | "upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis">("basic");
   const [changeActiveGrade, setChangeActiveGrade] = useState<"grade2" | "grade3">("grade2");
@@ -2945,6 +2946,13 @@ export default function Home() {
                         선택하신 학년의 교육과정 편성표 엑셀 파일을 업로드해 주세요. 3개년 데이터가 모두 포함된 원본 엑셀 파일을 그대로 올리시면 됩니다.
                       </p>
 
+                                            <button
+                        onClick={() => setIsExampleModalOpen(true)}
+                        className="mb-4 flex items-center gap-2 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 text-sm font-semibold rounded-xl border border-indigo-500/30 transition-all shadow-sm"
+                      >
+                        <span className="text-base">💡</span> 올바른 엑셀 입력 예시 보기
+                      </button>
+
                       <div className="relative group">
                         <input
                           type="file"
@@ -5249,7 +5257,52 @@ export default function Home() {
 
           </div>
         </div>
+
       </main>
+      {/* Example Modal */}
+      {isExampleModalOpen && (
+        <div style={{ zIndex: 99999 }} className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col my-auto max-h-[95vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 md:p-6 border-b border-slate-800/80 shrink-0">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                💡 올바른 엑셀 시수 입력 예시
+              </h3>
+              <button onClick={() => setIsExampleModalOpen(false)} className="text-slate-400 hover:text-white transition-colors p-2 rounded-full hover:bg-slate-800">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-4 md:p-6 overflow-y-auto flex-1 bg-slate-950/50">
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="bg-slate-950 rounded-xl p-4 border-2 border-rose-500/30 flex-1">
+                  <h4 className="text-rose-400 font-bold mb-3 flex items-center gap-2 text-base">
+                    <span>❌ 잘못된 예 (수정 전)</span>
+                  </h4>
+                  <p className="text-sm text-slate-400 mb-4">동일한 선택과목군에서 4과목 선택하는 경우 편제표</p>
+                  <div className="bg-slate-900 rounded-lg border border-slate-800 flex justify-center items-center p-4">
+                     <img src="/excel-wrong.png" alt="잘못된 엑셀 입력 예시" className="w-auto h-auto max-w-full max-h-[35vh] object-contain shadow-lg rounded" />
+                  </div>
+                </div>
+                <div className="bg-slate-950 rounded-xl p-4 border-2 border-emerald-500/30 flex-1">
+                  <h4 className="text-emerald-400 font-bold mb-3 flex items-center gap-2 text-base">
+                    <span>⭕ 올바른 예 (수정 후)</span>
+                  </h4>
+                  <p className="text-sm text-slate-400 mb-4">동일한 선택과목군에 모두 같은 학점을 입력하고 업로드 하세요</p>
+                  <div className="bg-slate-900 rounded-lg border border-slate-800 flex justify-center items-center p-4">
+                     <img src="/excel-right.png" alt="올바른 엑셀 입력 예시" className="w-auto h-auto max-w-full max-h-[35vh] object-contain shadow-lg rounded" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 md:p-6 border-t border-slate-800/80 flex justify-end shrink-0 bg-slate-900">
+              <button onClick={() => setIsExampleModalOpen(false)} className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-colors shadow-lg">
+                확인 및 닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
