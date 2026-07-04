@@ -3706,7 +3706,7 @@ export default function Home() {
                             onChange={e => setHeadTeacherCategoryInput(e.target.value)}
                           >
                             <option value="">교과 선택</option>
-                            {preferredOrder.map(cat => (
+                            {Array.from(new Set(categorySummaryData.filter(r => r.isFirstRow).map(r => r.category))).map(cat => (
                               <option key={cat} value={cat}>
                                 {cat} {headTeacherReductions[cat] ? `(-${headTeacherReductions[cat]})` : ""}
                               </option>
