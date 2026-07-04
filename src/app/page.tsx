@@ -2721,7 +2721,38 @@ export default function Home() {
           isElective: true,
           electiveClasses: classes
         };
-      }).filter(Boolean) as any[];
+      }).filter(Boolean).flatMap(item => {
+        const result = [item];
+        
+        // 일본어, 중국어 특수 처리
+        if (item.subject.includes("일본어") && !item.subject.includes("회화")) {
+          item.sem2 = 0; // 강제로 2학기 제외
+          if (item.sem1 === 0) item.sem1 = 2; // 기본 시수
+          item.detailedCategory = "일본어"; // 카테고리 강제 지정
+          
+          result.push({
+            ...item,
+            subject: "일본어 회화",
+            sem1: 0,
+            sem2: item.sem1,
+            detailedCategory: "일본어",
+          });
+        } else if (item.subject.includes("중국어") && !item.subject.includes("회화")) {
+          item.sem2 = 0; // 강제로 2학기 제외
+          if (item.sem1 === 0) item.sem1 = 2; // 기본 시수
+          item.detailedCategory = "중국어"; // 카테고리 강제 지정
+          
+          result.push({
+            ...item,
+            subject: "중국어 회화",
+            sem1: 0,
+            sem2: item.sem1,
+            detailedCategory: "중국어",
+          });
+        }
+        
+        return result;
+      }) as any[];
     };
 
     const items = [
@@ -2733,7 +2764,7 @@ export default function Home() {
       ...getElectiveSubjects("grade2", "3"),
     ];
 
-    const preferredOrder = ["국어", "수학", "영어", "한국사", "사회", "과학", "체육", "예술", "기술·가정", "제2외국어", "한문", "교양"];
+    const preferredOrder = ["국어", "수학", "영어", "한국사", "사회", "과학", "일본어", "중국어", "체육", "예술", "미술", "음악", "기술·가정", "정보", "제2외국어", "한문", "진로", "교양"];
     let categories = Array.from(new Set(items.map(item => item.detailedCategory).filter(Boolean)));
     categories.sort((a, b) => {
       const idxA = preferredOrder.indexOf(a);
