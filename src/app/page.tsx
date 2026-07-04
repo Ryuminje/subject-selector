@@ -205,6 +205,7 @@ export default function Home() {
   };
 
   const [electiveChanges, setElectiveChanges] = useState<Record<string, any[]>>({ grade2: [], grade3: [] });
+  const [electiveChangesArbitrary, setElectiveChangesArbitrary] = useState<Record<string, any[]>>({ grade2: [], grade3: [] });
   const [enableOptimization, setEnableOptimization] = useState(false);
   const handleTimetablePaste = (e: React.ClipboardEvent, startRowIndex: number, startColIndex: number, field: "subject" | "teacher") => {
     e.preventDefault();
@@ -1855,11 +1856,13 @@ export default function Home() {
 
 
   const adjustmentLog = useMemo(() => {
-    const log: Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string }[]> = {};
+    const log: Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary' }[]> = {};
     if (!parsedSampleData || (!parsedSampleData.grade2.length && !parsedSampleData.grade3.length) || !electiveChanges) return log;
 
     (['grade2', 'grade3'] as ('grade2' | 'grade3')[]).forEach(grade => {
-      const changes = electiveChanges[grade] || [];
+      const upperChanges = (electiveChanges[grade] || []).map(c => ({ ...c, source: 'applicant' as const }));
+      const lowerChanges = (electiveChangesArbitrary[grade] || []).map(c => ({ ...c, source: 'arbitrary' as const }));
+      const changes = [...upperChanges, ...lowerChanges];
       const studentsInGrade = parsedSampleData[grade] || [];
       const gradeTimetable = timetableData[grade] || {};
       const gradeTimeSlots = timeSlots[grade] || [];
@@ -1915,7 +1918,7 @@ export default function Home() {
           const targetStudent = studentsInGrade.find(s => s.id === c.studentId);
           if (!targetStudent) {
             if (!log[c.studentId]) log[c.studentId] = [];
-            log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: '학생을 찾을 수 없음' });
+            log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: '학생을 찾을 수 없음', source: c.source });
             return;
           }
 
@@ -1935,7 +1938,7 @@ export default function Home() {
           }
           if (!beforeSlot) {
             if (!log[c.studentId]) log[c.studentId] = [];
-            log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `현재 수강중인 과목이 아님 (이전 변경으로 사라졌을 수 있음)` });
+            log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `현재 수강중인 과목이 아님`, source: c.source });
             return;
           }
 
@@ -1944,7 +1947,8 @@ export default function Home() {
             log[c.studentId].push({
               beforeStr: `${c.beforeSubject}(${beforeSlot})`,
               afterStr: `${c.afterSubject}(${beforeSlot})`,
-              status: 'success'
+              status: 'success',
+              source: c.source
             });
             currentSchedule[beforeSlot] = c.afterSubject;
             return;
@@ -1953,7 +1957,7 @@ export default function Home() {
           const afterSlots = findSlotsWithSubject(c.afterSubject);
           if (afterSlots.length === 0) {
             if (!log[c.studentId]) log[c.studentId] = [];
-            log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목` });
+            log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목`, source: c.source });
             return;
           }
 
@@ -1972,12 +1976,14 @@ export default function Home() {
               log[c.studentId].push({
                 beforeStr: `${studentSubjectInAfterSlot}(${afterSlot})`,
                 afterStr: `${studentSubjectInAfterSlot}(${beforeSlot})`,
-                status: 'success'
+                status: 'success',
+                source: c.source
               });
               log[c.studentId].push({
                 beforeStr: `${c.beforeSubject}(${beforeSlot})`,
                 afterStr: `${c.afterSubject}(${afterSlot})`,
-                status: 'success'
+                status: 'success',
+                source: c.source
               });
 
               currentSchedule[beforeSlot] = studentSubjectInAfterSlot;
@@ -1996,7 +2002,8 @@ export default function Home() {
               beforeStr: c.beforeSubject,
               afterStr: c.afterSubject,
               status: 'failed',
-              reason: afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 2단계 교환 실패` : lastFailedReason
+              reason: afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 2단계 교환 실패` : lastFailedReason,
+              source: c.source
             });
           }
         });
@@ -2060,13 +2067,13 @@ export default function Home() {
                }
                
                if (!beforeSlot) {
-                  studentLog.push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `현재 수강중인 과목이 아님` });
+                  studentLog.push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `현재 수강중인 과목이 아님`, source: c.source });
                   return;
                }
 
                const afterSlots = findSlotsWithSubject(c.afterSubject);
                if (afterSlots.length === 0) {
-                  studentLog.push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목` });
+                  studentLog.push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목`, source: c.source });
                   return;
                }
 
@@ -4409,9 +4416,11 @@ export default function Home() {
                       </div>
 
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-inner">
+                        
+                        <div className="flex flex-col gap-6 w-full min-w-0">
+                          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-inner">
                           <div className="p-4 bg-slate-800/80 border-b border-slate-700/50">
-                            <h3 className="font-semibold text-slate-200">변경 신청 입력</h3>
+                            <h3 className="font-semibold text-slate-200">변경 신청 입력(신청자)</h3>
                           </div>
                           <div className="overflow-auto max-h-[600px] relative">
                             <table className="w-full text-sm text-left text-slate-300 border-collapse">
@@ -4593,7 +4602,191 @@ export default function Home() {
                             </table>
                           </div>
                         </div>
+                          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-inner">
+                          <div className="p-4 bg-slate-800/80 border-b border-slate-700/50">
+                            <h3 className="font-semibold text-emerald-300">인원 균등 분배를 위한 임의 변경</h3>
+                          </div>
+                          <div className="overflow-auto max-h-[600px] relative">
+                            <table className="w-full text-sm text-left text-slate-300 border-collapse">
+                              <thead className="text-xs text-slate-400 bg-slate-800 border-b border-slate-700 uppercase">
+                                <tr>
+                                  <th className="px-3 py-3 font-semibold text-center w-12 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">순번</th>
+                                  <th className="px-4 py-3 font-semibold text-center w-24 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">학번</th>
+                                  <th className="px-4 py-3 font-semibold text-center w-24 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">이름</th>
+                                  <th className="px-4 py-3 font-semibold text-center border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">변경전</th>
+                                  <th className="px-2 py-3 font-semibold text-center w-8 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">→</th>
+                                  <th className="px-4 py-3 font-semibold text-center border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">변경후</th>
+                                  <th className="px-2 py-3 font-semibold text-center w-12 sticky top-0 z-10 bg-slate-800 shadow-sm">
+                                    <button onClick={() => {
+                                      setElectiveChangesArbitrary(prev => ({
+                                        ...prev,
+                                        [changeActiveGrade]: [...prev[changeActiveGrade], {
+                                          id: Date.now().toString() + Math.random().toString(36).substring(7),
+                                          studentId: "",
+                                          studentName: "",
+                                          beforeSubject: "",
+                                          afterSubject: ""
+                                        }]
+                                      }));
+                                    }} className="p-1 text-slate-400 hover:text-emerald-400 transition-colors">
+                                      <Plus className="w-5 h-5 mx-auto" />
+                                    </button>
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(() => {
+                                  const data = electiveChangesArbitrary[changeActiveGrade];
+                                  if (data.length === 0) {
+                                    return (
+                                      <tr>
+                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                                          등록된 선택과목 변경 신청 내역이 없습니다.<br />
+                                          우측 상단의 <Plus className="w-4 h-4 inline mx-1" /> 버튼을 눌러 추가하세요.
+                                        </td>
+                                      </tr>
+                                    );
+                                  }
 
+                                  const groupedData: any[] = [];
+                                  data.forEach(item => {
+                                    const lastGroup = groupedData[groupedData.length - 1];
+                                    if (lastGroup && lastGroup.studentId === item.studentId && lastGroup.studentId !== "") {
+                                      lastGroup.items.push(item);
+                                    } else {
+                                      groupedData.push({ studentId: item.studentId, items: [item] });
+                                    }
+                                  });
+
+                                  let globalIndex = 0;
+                                  return groupedData.map((group: any, groupIdx: number) => {
+                                    return group.items.map((item: any, itemIdx: number) => {
+                                      const currentIndex = globalIndex++;
+                                      const isFirstInGroup = itemIdx === 0;
+                                      const rowSpan = group.items.length;
+
+                                      const updateItem = (field: string, value: string) => {
+                                        setElectiveChangesArbitrary(prev => {
+                                          const newData = [...prev[changeActiveGrade]];
+                                          const index = newData.findIndex(x => x.id === item.id);
+                                          if (index > -1) newData[index] = { ...newData[index], [field]: value };
+                                          return { ...prev, [changeActiveGrade]: newData };
+                                        });
+                                      };
+
+                                      return (
+                                        <tr key={item.id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
+                                          <td className="px-3 py-2 text-center border-r border-slate-700/50 text-slate-500">{currentIndex + 1}</td>
+                                          {isFirstInGroup && (
+                                            <>
+                                              <td rowSpan={rowSpan} className="px-2 py-2 border-r border-slate-700/50 align-top">
+                                                <input
+                                                  type="text"
+                                                  value={item.studentId}
+                                                  onChange={e => {
+                                                    const val = e.target.value;
+                                                    setElectiveChangesArbitrary(prev => {
+                                                      const newData = [...prev[changeActiveGrade]];
+                                                      group.items.forEach((gItem: any) => {
+                                                        const idx = newData.findIndex(x => x.id === gItem.id);
+                                                        if (idx > -1) newData[idx] = { ...newData[idx], studentId: val };
+                                                      });
+                                                      return { ...prev, [changeActiveGrade]: newData };
+                                                    });
+                                                  }}
+                                                  onBlur={() => {
+                                                    setElectiveChangesArbitrary(prev => {
+                                                      const newData = [...prev[changeActiveGrade]].sort((a, b) => {
+                                                        const valA = String(a.studentId || "");
+                                                        const valB = String(b.studentId || "");
+                                                        if (valA === "" && valB !== "") return 1;
+                                                        if (valA !== "" && valB === "") return -1;
+                                                        return valA.localeCompare(valB);
+                                                      });
+                                                      return { ...prev, [changeActiveGrade]: newData };
+                                                    });
+                                                  }}
+                                                  className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
+                                                  placeholder="학번"
+                                                />
+                                              </td>
+                                              <td rowSpan={rowSpan} className="px-2 py-2 border-r border-slate-700/50 align-top">
+                                                <input
+                                                  type="text"
+                                                  value={item.studentName}
+                                                  onChange={e => {
+                                                    const val = e.target.value;
+                                                    setElectiveChangesArbitrary(prev => {
+                                                      const newData = [...prev[changeActiveGrade]];
+                                                      group.items.forEach((gItem: any) => {
+                                                        const idx = newData.findIndex(x => x.id === gItem.id);
+                                                        if (idx > -1) newData[idx] = { ...newData[idx], studentName: val };
+                                                      });
+                                                      return { ...prev, [changeActiveGrade]: newData };
+                                                    });
+                                                  }}
+                                                  className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
+                                                  placeholder="이름"
+                                                />
+                                              </td>
+                                            </>
+                                          )}
+                                          <td className="px-2 py-2 border-r border-slate-700/50">
+                                            <input
+                                              type="text"
+                                              value={item.beforeSubject}
+                                              onChange={e => updateItem("beforeSubject", e.target.value)}
+                                              className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
+                                            />
+                                          </td>
+                                          <td className="px-2 py-2 text-center text-slate-600 border-r border-slate-700/50">→</td>
+                                          <td className="px-2 py-2 border-r border-slate-700/50">
+                                            <input
+                                              type="text"
+                                              value={item.afterSubject}
+                                              onChange={e => updateItem("afterSubject", e.target.value)}
+                                              className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
+                                            />
+                                          </td>
+                                          <td className="px-2 py-2 text-center">
+                                            <div className="flex items-center justify-center gap-1">
+                                              <button onClick={() => {
+                                                setElectiveChangesArbitrary(prev => {
+                                                  const newData = [...prev[changeActiveGrade]];
+                                                  const currentIdx = newData.findIndex(x => x.id === item.id);
+                                                  const newItem = {
+                                                    id: Date.now().toString() + Math.random().toString(36).substring(7),
+                                                    studentId: item.studentId,
+                                                    studentName: item.studentName,
+                                                    beforeSubject: "",
+                                                    afterSubject: ""
+                                                  };
+                                                  newData.splice(currentIdx + 1, 0, newItem);
+                                                  return { ...prev, [changeActiveGrade]: newData };
+                                                });
+                                              }} className="p-1 text-slate-500 hover:text-emerald-400 transition-colors" title="같은 학생 과목 추가">
+                                                <Plus className="w-3.5 h-3.5" />
+                                              </button>
+                                              <button onClick={() => {
+                                                setElectiveChangesArbitrary(prev => ({
+                                                  ...prev,
+                                                  [changeActiveGrade]: prev[changeActiveGrade].filter(x => x.id !== item.id)
+                                                }));
+                                              }} className="p-1 text-slate-500 hover:text-red-400 transition-colors" title="삭제">
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    });
+                                  });
+                                })()}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                        </div>
                         <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-inner flex flex-col">
                           <div className="p-4 bg-slate-800/80 border-b border-slate-700/50 flex justify-between items-center">
                             <div className="flex items-center gap-4">
@@ -4627,8 +4820,10 @@ export default function Home() {
                               </thead>
                               <tbody>
                                 {(() => {
-                                  const data = electiveChanges[changeActiveGrade];
-                                  if (data.length === 0) {
+                                  const data = electiveChanges[changeActiveGrade] || [];
+                                  const dataLower = electiveChangesArbitrary[changeActiveGrade] || [];
+                                  
+                                  if (data.length === 0 && dataLower.length === 0) {
                                     return (
                                       <tr>
                                         <td colSpan={3} className="px-6 py-12 text-center text-slate-500">
@@ -4638,9 +4833,10 @@ export default function Home() {
                                     );
                                   }
 
-                                  const studentsWithChanges = Array.from(new Set(data.map(d => d.studentId))).filter(id => id).sort((a, b) => String(a).localeCompare(String(b)));
+                                  const studentsUpper = Array.from(new Set(data.map(d => d.studentId))).filter(id => id).sort((a, b) => String(a).localeCompare(String(b)));
+                                  const studentsLower = Array.from(new Set(dataLower.map(d => d.studentId))).filter(id => id).sort((a, b) => String(a).localeCompare(String(b)));
 
-                                  if (studentsWithChanges.length === 0) {
+                                  if (studentsUpper.length === 0 && studentsLower.length === 0) {
                                     return (
                                       <tr>
                                         <td colSpan={3} className="px-6 py-12 text-center text-slate-500">
@@ -4650,38 +4846,65 @@ export default function Home() {
                                     );
                                   }
 
-                                  return studentsWithChanges.map(studentId => {
-                                    const logs = adjustmentLog[studentId] || [];
-                                    const studentName = data.find(d => d.studentId === studentId)?.studentName || "";
+                                  const renderSection = (students: string[], source: 'applicant' | 'arbitrary', title: string, originalData: any[]) => {
+                                    if (students.length === 0) return null;
+                                    
+                                    const rows = students.map(studentId => {
+                                      const logs = adjustmentLog[studentId] || [];
+                                      const filteredLogs = logs.filter(l => l.source === source);
+                                      if (filteredLogs.length === 0) return null;
+                                      
+                                      const studentName = originalData.find(d => d.studentId === studentId)?.studentName || "";
+
+                                      return (
+                                        <tr key={studentId} className="border-b border-slate-800/50 hover:bg-slate-800/20">
+                                          <td className="px-4 py-3 text-center border-r border-slate-700/50 font-medium">{studentId}</td>
+                                          <td className="px-4 py-3 text-center border-r border-slate-700/50">{studentName}</td>
+                                          <td className="px-4 py-3">
+                                            {filteredLogs.length > 0 ? (
+                                              <div className="space-y-1">
+                                                {filteredLogs.map((log, i) => (
+                                                  <div
+                                                    key={i}
+                                                    className={`inline-block px-2 py-1 rounded border text-xs mr-2 mb-1 ${log.status === 'success'
+                                                        ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
+                                                        : 'text-rose-300 bg-rose-500/10 border-rose-500/20 cursor-help'
+                                                      }`}
+                                                    title={log.reason}
+                                                  >
+                                                    {log.beforeStr} → {log.afterStr}
+                                                    {log.status === 'failed' && <span className="ml-1 font-bold">(불가)</span>}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            ) : (
+                                              <span className="text-slate-500 italic text-xs">일치하는 수강 명단 없음</span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      );
+                                    }).filter(Boolean);
+
+                                    if (rows.length === 0) return null;
 
                                     return (
-                                      <tr key={studentId} className="border-b border-slate-800/50 hover:bg-slate-800/20">
-                                        <td className="px-4 py-3 text-center border-r border-slate-700/50 font-medium">{studentId}</td>
-                                        <td className="px-4 py-3 text-center border-r border-slate-700/50">{studentName}</td>
-                                        <td className="px-4 py-3">
-                                          {logs.length > 0 ? (
-                                            <div className="space-y-1">
-                                              {logs.map((log, i) => (
-                                                <div
-                                                  key={i}
-                                                  className={`inline-block px-2 py-1 rounded border text-xs mr-2 mb-1 ${log.status === 'success'
-                                                      ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
-                                                      : 'text-rose-300 bg-rose-500/10 border-rose-500/20 cursor-help'
-                                                    }`}
-                                                  title={log.reason}
-                                                >
-                                                  {log.beforeStr} → {log.afterStr}
-                                                  {log.status === 'failed' && <span className="ml-1 font-bold">(불가)</span>}
-                                                </div>
-                                              ))}
-                                            </div>
-                                          ) : (
-                                            <span className="text-slate-500 italic text-xs">일치하는 수강 명단 없음</span>
-                                          )}
-                                        </td>
-                                      </tr>
+                                      <>
+                                        <tr>
+                                          <td colSpan={3} className="px-4 py-2 bg-slate-800/80 border-y border-slate-700/50 text-emerald-400 font-semibold text-sm">
+                                            {title}
+                                          </td>
+                                        </tr>
+                                        {rows}
+                                      </>
                                     );
-                                  });
+                                  };
+
+                                  return (
+                                    <>
+                                      {renderSection(studentsUpper, 'applicant', '■ 변경 신청 결과 (신청자)', data)}
+                                      {renderSection(studentsLower, 'arbitrary', '■ 인원 균등 분배 임의 변경 결과', dataLower)}
+                                    </>
+                                  );
                                 })()}
                               </tbody>
                             </table>
