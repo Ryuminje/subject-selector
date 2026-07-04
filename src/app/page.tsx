@@ -3867,8 +3867,11 @@ export default function Home() {
                                 <tr className="bg-indigo-900/40 font-bold border-t-2 border-slate-600/80 hover:bg-indigo-900/60 transition-colors">
                                   <td colSpan={6} className="px-4 py-4 text-center border-r border-slate-700/50 text-indigo-300">총계</td>
                                   <td className="px-4 py-4 text-center border-r border-slate-700/50 text-indigo-300">{totalSem1Hours}</td>
-                                  <td colSpan={4} className="px-4 py-4 border-r border-slate-700/50"></td>
+                                  <td className="px-4 py-4 text-center border-r border-slate-700/50 text-indigo-300">{totalSem1Hours}</td>
+                                  <td colSpan={5} className="px-4 py-4 border-r border-slate-700/50"></td>
                                   <td className="px-4 py-4 text-center border-r border-slate-700/50 text-indigo-300">{totalSem2Hours}</td>
+                                  <td className="px-4 py-4 text-center border-r border-slate-700/50 text-indigo-300">{totalSem2Hours}</td>
+                                  <td className="px-4 py-4 border-r border-slate-700/50"></td>
                                   <td className="px-4 py-4 text-center border-r border-slate-700/50 text-emerald-400 font-extrabold">{totalYearHours}</td>
                                   <td className="px-4 py-4 text-center text-emerald-400 font-extrabold"></td>
                                 </tr>
