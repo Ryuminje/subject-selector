@@ -2184,7 +2184,7 @@ export default function Home() {
     });
 
     return log;
-  }, [parsedSampleData, electiveChanges, timetableData, timeSlots, classCols, enableOptimization]);
+  }, [parsedSampleData, electiveChanges, electiveChangesArbitrary, timetableData, timeSlots, classCols, enableOptimization]);
 
   const handleExportRoster = (isAfter: boolean) => {
     const wb = XLSX.utils.book_new();
