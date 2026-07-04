@@ -361,6 +361,9 @@ export default function Home() {
   const [manualClassCounts, setManualClassCounts] = useState<{ [subjectKey: string]: number }>({});
   const [editingClasses, setEditingClasses] = useState<{ [subjectKey: string]: boolean }>({});
   const [teacherCounts, setTeacherCounts] = useState<{ [category: string]: number }>({});
+  const [headTeacherReductions, setHeadTeacherReductions] = useState<{ [category: string]: number }>({});
+  const [headTeacherCategoryInput, setHeadTeacherCategoryInput] = useState<string>("");
+  const [headTeacherHoursInput, setHeadTeacherHoursInput] = useState<string>("");
   const [editingTeachers, setEditingTeachers] = useState<{ [category: string]: boolean }>({});
   const [editingDetailedCategory, setEditingDetailedCategory] = useState<{ grade: GradeKey, index: number } | null>(null);
   const [detailedCategoryEditValue, setDetailedCategoryEditValue] = useState("");
@@ -2825,6 +2828,10 @@ export default function Home() {
         return { ...item, subjectHours, classCount: classes };
       });
 
+      const reduction = headTeacherReductions[cat] || 0;
+      sem1Total = Math.max(0, sem1Total - reduction);
+      sem2Total = Math.max(0, sem2Total - reduction);
+
       const yearTotal = sem1Total + sem2Total;
       const tc = teacherCounts[cat] || 0;
       const sem1Avg = tc > 0 ? (sem1Total / tc).toFixed(1) : "0.0";
@@ -2851,7 +2858,7 @@ export default function Home() {
     });
     
     return rows;
-  }, [designatedSubjects, manualClassCounts, totalClasses, teacherCounts, subjectStats, manualStep5Classes, standardClassSize, parsedCurriculumList, subjectMap]);
+  }, [designatedSubjects, manualClassCounts, totalClasses, teacherCounts, headTeacherReductions, subjectStats, manualStep5Classes, standardClassSize, parsedCurriculumList, subjectMap]);
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30 font-sans">
@@ -3690,6 +3697,47 @@ export default function Home() {
                               setManualClassCounts(p => { const next = { ...p }; Object.keys(next).forEach(k => { if (k.startsWith("3_") && !k.endsWith("_split")) delete next[k]; }); return next; });
                             }} />
                           </div>
+                        </div>
+                        <div className="flex gap-2 bg-rose-900/20 p-3 rounded-xl border border-rose-800/40 items-center mt-4 md:mt-0">
+                          <span className="text-sm text-rose-300 font-medium">수석교사 감축 시수:</span>
+                          <select
+                            className="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-sm text-slate-200 w-28"
+                            value={headTeacherCategoryInput}
+                            onChange={e => setHeadTeacherCategoryInput(e.target.value)}
+                          >
+                            <option value="">교과 선택</option>
+                            {preferredOrder.map(cat => (
+                              <option key={cat} value={cat}>
+                                {cat} {headTeacherReductions[cat] ? `(-${headTeacherReductions[cat]})` : ""}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            placeholder="시수"
+                            className="w-16 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-center text-sm text-slate-200"
+                            value={headTeacherHoursInput}
+                            onChange={e => setHeadTeacherHoursInput(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && headTeacherCategoryInput && headTeacherHoursInput) {
+                                setHeadTeacherReductions(p => ({ ...p, [headTeacherCategoryInput]: Number(headTeacherHoursInput) }));
+                                setHeadTeacherCategoryInput("");
+                                setHeadTeacherHoursInput("");
+                              }
+                            }}
+                          />
+                          <button
+                            onClick={() => {
+                              if (headTeacherCategoryInput && headTeacherHoursInput) {
+                                setHeadTeacherReductions(p => ({ ...p, [headTeacherCategoryInput]: Number(headTeacherHoursInput) }));
+                                setHeadTeacherCategoryInput("");
+                                setHeadTeacherHoursInput("");
+                              }
+                            }}
+                            className="px-3 py-1 bg-rose-500/20 text-rose-400 rounded hover:bg-rose-500/30 text-sm font-semibold transition-colors"
+                          >
+                            적용
+                          </button>
                         </div>
                       </div>
                       <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 overflow-hidden shadow-inner overflow-x-auto">
