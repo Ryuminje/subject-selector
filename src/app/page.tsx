@@ -2398,18 +2398,25 @@ export default function Home() {
   const handleExportChanges = () => {
     const grade = changeActiveGrade;
     const gradeNum = grade === 'grade2' ? '2' : '3';
-    const data = electiveChanges[grade];
+    
+    // 상단: 신청자
+    const dataApplicant = electiveChanges[grade] || [];
+    const studentsApplicant = Array.from(new Set(dataApplicant.map(d => d.studentId))).filter(id => id).sort((a, b) => String(a).localeCompare(String(b)));
+    
+    // 하단: 임의 변경자
+    const dataArbitrary = electiveChangesArbitrary[grade] || [];
+    const studentsArbitrary = Array.from(new Set(dataArbitrary.map(d => d.studentId))).filter(id => id).sort((a, b) => String(a).localeCompare(String(b)));
 
-    const studentsWithChanges = Array.from(new Set(data.map(d => d.studentId))).filter(id => id).sort((a, b) => String(a).localeCompare(String(b)));
-
-    let changeIndex = 1;
     const rows: any[][] = [];
     const merges: any[] = [];
-
-    studentsWithChanges.forEach(studentId => {
+    let changeIndex = 1;
+    let applicantCount = 0;
+    
+    // 신청자 처리
+    studentsApplicant.forEach(studentId => {
       const logs = adjustmentLog[studentId] || [];
-      const studentName = data.find(d => d.studentId === studentId)?.studentName || "";
-      const validLogs = logs.filter(log => log.status === 'success');
+      const studentName = dataApplicant.find(d => d.studentId === studentId)?.studentName || "";
+      const validLogs = logs.filter(log => log.status === 'success' && log.source === 'applicant');
 
       if (validLogs.length > 0) {
         validLogs.forEach((log, index) => {
@@ -2431,6 +2438,50 @@ export default function Home() {
           merges.push({ s: { r: startRow, c: 2 }, e: { r: endRow, c: 2 } });
         }
         changeIndex++;
+        applicantCount++;
+      }
+    });
+
+    const rowsApplicantCount = rows.length;
+    let arbitraryCount = 0;
+
+    // 임의 변경자 처리 (하단 구분선 및 데이터)
+    let arbitraryStartIndex = rows.length;
+    let hasArbitrary = false;
+    
+    studentsArbitrary.forEach(studentId => {
+      const logs = adjustmentLog[studentId] || [];
+      const studentName = dataArbitrary.find(d => d.studentId === studentId)?.studentName || "";
+      const validLogs = logs.filter(log => log.status === 'success' && log.source === 'arbitrary');
+
+      if (validLogs.length > 0) {
+        if (!hasArbitrary) {
+            rows.push(["■ 인원 균등 분배를 위한 임의 변경 내역", "", "", "", "", ""]);
+            merges.push({ s: { r: rows.length + 1, c: 0 }, e: { r: rows.length + 1, c: 5 } });
+            hasArbitrary = true;
+            changeIndex = 1; // 인덱스 초기화
+        }
+
+        validLogs.forEach((log, index) => {
+          rows.push([
+            index === 0 ? changeIndex : "",
+            index === 0 ? studentId : "",
+            index === 0 ? studentName : "",
+            log.beforeStr,
+            "→",
+            log.afterStr
+          ]);
+        });
+
+        if (validLogs.length > 1) {
+          const startRow = rows.length - validLogs.length + 2;
+          const endRow = rows.length + 1;
+          merges.push({ s: { r: startRow, c: 0 }, e: { r: endRow, c: 0 } });
+          merges.push({ s: { r: startRow, c: 1 }, e: { r: endRow, c: 1 } });
+          merges.push({ s: { r: startRow, c: 2 }, e: { r: endRow, c: 2 } });
+        }
+        changeIndex++;
+        arbitraryCount++;
       }
     });
 
@@ -2439,8 +2490,7 @@ export default function Home() {
       return;
     }
 
-    const totalStudents = changeIndex - 1;
-    const title = `${gradeNum}학년 2학기 선택 과목 변경 내역(${totalStudents}명)`;
+    const title = `${gradeNum}학년 2학기 선택 과목 변경 내역 (신청자: ${applicantCount}명, 임의변경: ${arbitraryCount}명)`;
 
     const wsData = [
       [title, "", "", "", "", ""],
