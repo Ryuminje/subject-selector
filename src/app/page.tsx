@@ -2126,7 +2126,7 @@ export default function Home() {
                    studentLog.push({
                      beforeStr: `${c.beforeSubject}(${beforeSlot})`,
                      afterStr: `${c.afterSubject}(${beforeSlot})`,
-                     status: 'success'
+                     status: 'success', source: c.source
                    });
                    newSched[beforeSlot] = c.afterSubject;
                  } else {
@@ -2134,12 +2134,12 @@ export default function Home() {
                    studentLog.push({
                      beforeStr: `${studentSubjectInAfterSlot}(${bestSlot})`,
                      afterStr: `${studentSubjectInAfterSlot}(${beforeSlot})`,
-                     status: 'success'
+                     status: 'success', source: c.source
                    });
                    studentLog.push({
                      beforeStr: `${c.beforeSubject}(${beforeSlot})`,
                      afterStr: `${c.afterSubject}(${bestSlot})`,
-                     status: 'success'
+                     status: 'success', source: c.source
                    });
                    newSched[beforeSlot] = studentSubjectInAfterSlot;
                    newSched[bestSlot] = c.afterSubject;
@@ -2149,7 +2149,8 @@ export default function Home() {
                    beforeStr: c.beforeSubject,
                    afterStr: c.afterSubject,
                    status: 'failed',
-                   reason: afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 교환 실패` : lastFailedReason
+                   reason: afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 교환 실패` : lastFailedReason,
+                   source: c.source
                  });
                }
             });
