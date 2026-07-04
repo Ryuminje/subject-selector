@@ -2722,6 +2722,7 @@ export default function Home() {
           electiveClasses: classes
         };
       }).filter(Boolean).flatMap(item => {
+        if (!item) return [];
         const result = [item];
         
         // 일본어, 중국어 특수 처리
