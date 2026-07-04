@@ -3859,6 +3859,21 @@ export default function Home() {
                                 </td>
                               </tr>
                             )}
+                            {categorySummaryData.length > 0 && (() => {
+                              const totalSem1Hours = categorySummaryData.reduce((acc, row) => acc + (row.sem1?.subjectHours || 0), 0);
+                              const totalSem2Hours = categorySummaryData.reduce((acc, row) => acc + (row.sem2?.subjectHours || 0), 0);
+                              const totalYearHours = categorySummaryData.filter(r => r.isFirstRow).reduce((acc, row) => acc + row.yearTotal, 0);
+                              return (
+                                <tr className="bg-indigo-900/40 font-bold border-t-2 border-slate-600/80 hover:bg-indigo-900/60 transition-colors">
+                                  <td colSpan={6} className="px-4 py-4 text-center border-r border-slate-700/50 text-indigo-300">총계</td>
+                                  <td className="px-4 py-4 text-center border-r border-slate-700/50 text-indigo-300">{totalSem1Hours}</td>
+                                  <td colSpan={4} className="px-4 py-4 border-r border-slate-700/50"></td>
+                                  <td className="px-4 py-4 text-center border-r border-slate-700/50 text-indigo-300">{totalSem2Hours}</td>
+                                  <td className="px-4 py-4 text-center border-r border-slate-700/50 text-emerald-400 font-extrabold">{totalYearHours}</td>
+                                  <td className="px-4 py-4 text-center text-emerald-400 font-extrabold"></td>
+                                </tr>
+                              );
+                            })()}
                           </tbody>
                         </table>
                       </div>
