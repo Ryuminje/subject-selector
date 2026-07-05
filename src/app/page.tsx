@@ -4001,7 +4001,7 @@ export default function Home() {
                     <span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span>
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4" />
-                      <span>3단계: 타임별 선택과목 명단</span>
+                      <span>타임별 선택과목 명단</span>
                     </div>
                   </button>
                   <button
@@ -4014,7 +4014,7 @@ export default function Home() {
                     <span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span>
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4" />
-                      <span>4단계: 선택과목 변경 신청</span>
+                      <span>선택과목 변경 신청</span>
                     </div>
                   </button>
                   <button
@@ -4027,7 +4027,7 @@ export default function Home() {
                     <span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span>
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4" />
-                      <span>5단계: 변경 후 명단</span>
+                      <span>변경 후 명단</span>
                     </div>
                   </button>
                   <button
@@ -4040,7 +4040,7 @@ export default function Home() {
                     <span className="text-[10px] tracking-wider font-semibold opacity-50">7단계</span>
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4" />
-                      <span>6단계: 다년도 분석</span>
+                      <span>다년도 분석</span>
                     </div>
                   </button>
                 </div>
@@ -4051,7 +4051,7 @@ export default function Home() {
                       <div className="flex justify-between items-center mb-6">
                         <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
                           <Settings className="w-6 h-6 text-indigo-400" />
-                          1단계: 선택과목 변경 기초자료 입력 (교육과정 및 위계)
+                          선택과목 변경 기초자료 입력 (교육과정 및 위계)
                         </h2>
                         
                         <div className="flex bg-slate-800/50 p-1 rounded-xl">
@@ -4555,7 +4555,7 @@ export default function Home() {
                       <div className="flex justify-between items-center mb-2">
                         <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
                           <FileText className="w-6 h-6 text-indigo-400" />
-                          4단계: 선택과목 변경 신청 내역
+                          선택과목 변경 신청 내역
                         </h2>
                         <div className="flex bg-slate-800/50 p-1 rounded-xl">
                           <button
@@ -5083,7 +5083,7 @@ export default function Home() {
                       <div className="flex justify-between items-center mb-2">
                         <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
                           <Users className="w-6 h-6 text-indigo-400" />
-                          5단계: 타임별 선택과목 명단(변경 후)
+                          타임별 선택과목 명단(변경 후)
                         </h2>
 
                         <div className="flex items-center gap-4">
@@ -5534,7 +5534,7 @@ export default function Home() {
                         <div>
                           <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
                             <FileText className="w-6 h-6 text-indigo-400" />
-                            6단계: 다년도 수강 내역 위계 및 분석
+                            다년도 수강 내역 위계 및 분석
                           </h2>
                           <p className="text-slate-400 text-sm mt-1 mb-4 ml-8">
                             * 위계성 검사는 '수요조사' 탭의 2단계에서 설정한 위계 규칙을 공유하여 그대로 적용합니다.
