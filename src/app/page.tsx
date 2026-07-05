@@ -82,6 +82,7 @@ export default function Home() {
 
   const [changeActiveTab, setChangeActiveTab] = useState<"basic" | "upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis">("basic");
   const [changeActiveGrade, setChangeActiveGrade] = useState<"grade2" | "grade3">("grade2");
+  const [showOnlyApplicants, setShowOnlyApplicants] = useState(false);
   const [changeRosterTimeSlot, setChangeRosterTimeSlot] = useState("A");
   const [rosterAfterSubjectFilter, setRosterAfterSubjectFilter] = useState<string>("전체");
 
@@ -1860,6 +1861,238 @@ export default function Home() {
 
 
 
+  // --- Global Load Balancer (Auto-Balancing) ---
+  useEffect(() => {
+    if (!enableOptimization) {
+      setElectiveChangesArbitrary(prev => ({ ...prev, [changeActiveGrade]: [] }));
+      return;
+    }
+
+    const normalizeSubject = (subject: string) => {
+      return subject.replace(/\s+/g, '')
+        .replace(/Ⅰ/g, 'I')
+        .replace(/Ⅱ/g, 'II')
+        .replace(/Ⅲ/g, 'III')
+        .replace(/Ⅳ/g, 'IV');
+    };
+
+    const students = parsedSampleData[changeActiveGrade] || [];
+    if (students.length === 0) return;
+
+    const manualChanges = electiveChanges[changeActiveGrade] || [];
+    const gradeTimetable = timetableData[changeActiveGrade] || {};
+    const gradeTimeSlots = timeSlots[changeActiveGrade] || [];
+    const gradeCols = classCols[changeActiveGrade] || [];
+
+    const subjectsInTimeSlot: Record<string, Set<string>> = {};
+    gradeTimeSlots.forEach((slot) => {
+      subjectsInTimeSlot[slot] = new Set();
+      gradeCols.forEach((col) => {
+        const subj = gradeTimetable[slot]?.[col]?.subject?.trim();
+        if (subj) subjectsInTimeSlot[slot].add(subj);
+      });
+    });
+
+    const subjectExistsInSlot = (subject: string, slot: string) => {
+      const subjects = subjectsInTimeSlot[slot];
+      if (!subjects) return false;
+      const clean = normalizeSubject(subject);
+      for (const s of subjects) {
+        const cleanS = normalizeSubject(s);
+        if (cleanS === clean || cleanS.includes(clean) || clean.includes(cleanS)) return true;
+      }
+      return false;
+    };
+
+    const vSchedules: Record<string, Record<string, string>> = {};
+    const lockedStudents = new Set(manualChanges.map(c => String(c.studentId)));
+
+    students.forEach(s => {
+      vSchedules[s.id] = { ...s.timeSlotMap };
+    });
+
+    const computeSizes = (schedules: Record<string, Record<string, string>>) => {
+      const sizes: Record<string, number> = {};
+      Object.entries(schedules).forEach(([sId, sched]) => {
+         Object.entries(sched).forEach(([slot, subj]) => {
+            const key = slot + "::" + normalizeSubject(subj);
+            sizes[key] = (sizes[key] || 0) + 1;
+         });
+      });
+      return sizes;
+    };
+
+    const getSubjectStats = (sizes: Record<string, number>) => {
+       const subjTotal: Record<string, number> = {};
+       const subjSlots: Record<string, Set<string>> = {};
+       
+       Object.keys(sizes).forEach(key => {
+          const [slot, subj] = key.split('::');
+          subjTotal[subj] = (subjTotal[subj] || 0) + sizes[key];
+          if (!subjSlots[subj]) subjSlots[subj] = new Set();
+          subjSlots[subj].add(slot);
+       });
+       
+       const ideal: Record<string, number> = {};
+       Object.keys(subjTotal).forEach(subj => {
+          ideal[subj] = subjTotal[subj] / subjSlots[subj].size;
+       });
+       return ideal;
+    };
+
+    const calcCost = (sizes: Record<string, number>, ideal: Record<string, number>) => {
+       let cost = 0;
+       Object.keys(sizes).forEach(key => {
+          const [slot, subj] = key.split('::');
+          if (ideal[subj]) {
+             cost += Math.pow(sizes[key] - ideal[subj], 2);
+          }
+       });
+       return cost;
+    };
+
+    const MAX_ITER = 2000;
+    let iterations = 0;
+    let stagnationCounter = 0;
+    
+    let currentSizes = computeSizes(vSchedules);
+    const idealSizes = getSubjectStats(currentSizes);
+
+    while (iterations < MAX_ITER) {
+       // Calculate deviations for all class slots
+       const deviations: { key: string; slot: string; subj: string; diff: number; rawDiff: number }[] = [];
+       Object.keys(currentSizes).forEach(key => {
+          const [slot, subj] = key.split('::');
+          if (idealSizes[subj]) {
+             const rawDiff = currentSizes[key] - idealSizes[subj];
+             deviations.push({ key, slot, subj, diff: Math.abs(rawDiff), rawDiff });
+          }
+       });
+
+       // Sort by largest absolute deviation first
+       deviations.sort((a, b) => b.diff - a.diff);
+
+       let swapMade = false;
+
+       for (const target of deviations) {
+           // Skip if this class is already well-balanced (difference <= 1.0)
+           // This prevents the algorithm from making trivial swaps just to fix fractions of a student.
+           if (target.diff <= 1.0) continue; 
+           
+           let bestSwap = null;
+           let bestCostReduction = 0;
+
+           for (const s of students) {
+              if (lockedStudents.has(String(s.id))) continue;
+              
+              const sched = vSchedules[s.id];
+              const slots = Object.keys(sched);
+              
+              for (let i = 0; i < slots.length; i++) {
+                 for (let j = i + 1; j < slots.length; j++) {
+                    const slotA = slots[i];
+                    const slotB = slots[j];
+                    const subjA = sched[slotA];
+                    const subjB = sched[slotB];
+                    
+                    if (!subjA || !subjB) continue;
+
+                    const normA = normalizeSubject(subjA);
+                    const normB = normalizeSubject(subjB);
+                    if (normA === normB) continue;
+                    
+                    // Does this swap involve the target class?
+                    const involvesTarget = (slotA === target.slot && normA === target.subj) || 
+                                           (slotB === target.slot && normB === target.subj) ||
+                                           (slotA === target.slot && normB === target.subj) ||
+                                           (slotB === target.slot && normA === target.subj);
+                                           
+                    if (!involvesTarget) continue;
+
+                    if (subjectExistsInSlot(subjA, slotB) && subjectExistsInSlot(subjB, slotA)) {
+                       const sizes = { ...currentSizes };
+                       sizes[slotA + "::" + normA]--;
+                       sizes[slotB + "::" + normB]--;
+                       sizes[slotB + "::" + normA] = (sizes[slotB + "::" + normA] || 0) + 1;
+                       sizes[slotA + "::" + normB] = (sizes[slotA + "::" + normB] || 0) + 1;
+
+                       const oldCost = calcCost(currentSizes, idealSizes);
+                       const newCost = calcCost(sizes, idealSizes);
+                       const reduction = oldCost - newCost;
+                       
+                       if (reduction > 0.01 && reduction > bestCostReduction) {
+                           bestCostReduction = reduction;
+                           bestSwap = { studentId: s.id, slotA, slotB, subjA, subjB, normA, normB };
+                       }
+                    }
+                 }
+              }
+           }
+
+           if (bestSwap) {
+              vSchedules[bestSwap.studentId][bestSwap.slotA] = bestSwap.subjB;
+              vSchedules[bestSwap.studentId][bestSwap.slotB] = bestSwap.subjA;
+              
+              currentSizes[bestSwap.slotA + "::" + bestSwap.normA]--;
+              currentSizes[bestSwap.slotB + "::" + bestSwap.normB]--;
+              currentSizes[bestSwap.slotB + "::" + bestSwap.normA] = (currentSizes[bestSwap.slotB + "::" + bestSwap.normA] || 0) + 1;
+              currentSizes[bestSwap.slotA + "::" + bestSwap.normB] = (currentSizes[bestSwap.slotA + "::" + bestSwap.normB] || 0) + 1;
+              
+              swapMade = true;
+              break; 
+           }
+       }
+
+       if (!swapMade) {
+           break; // Local minimum or fully balanced
+       }
+       iterations++;
+    }
+
+    // Compute net generated changes by comparing to original
+    const generated: any[] = [];
+    for (const s of students) {
+        if (lockedStudents.has(String(s.id))) continue;
+        const original = s.timeSlotMap;
+        const optimized = vSchedules[s.id];
+        
+        for (const slot of Object.keys(original)) {
+            if (original[slot] !== optimized[slot]) {
+                let targetSlot = null;
+                for (const ts of Object.keys(optimized)) {
+                    if (optimized[ts] === original[slot]) {
+                        targetSlot = ts;
+                        break;
+                    }
+                }
+                
+                generated.push({
+                    id: Date.now() + Math.random().toString(),
+                    studentId: s.id,
+                    studentName: s.name || "",
+                    beforeSubject: original[slot],
+                    afterSubject: original[slot],
+                    _targetSlot: targetSlot
+                });
+            }
+        }
+    }
+
+    const sortedGenerated = generated.sort((a, b) => {
+       const valA = String(a.studentId || "");
+       const valB = String(b.studentId || "");
+       if (valA === "" && valB !== "") return 1;
+       if (valA !== "" && valB === "") return -1;
+       return valA.localeCompare(valB);
+    });
+
+    setElectiveChangesArbitrary(prev => ({
+       ...prev,
+       [changeActiveGrade]: sortedGenerated
+    }));
+
+  }, [enableOptimization, electiveChanges, parsedSampleData, timetableData, timeSlots, classCols, changeActiveGrade]);
+
   const adjustmentLog = useMemo(() => {
     const log: Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary' }[]> = {};
     if (!parsedSampleData || (!parsedSampleData.grade2.length && !parsedSampleData.grade3.length) || !electiveChanges) return log;
@@ -1959,7 +2192,10 @@ export default function Home() {
             return;
           }
 
-          const afterSlots = findSlotsWithSubject(c.afterSubject);
+          let afterSlots = findSlotsWithSubject(c.afterSubject);
+          if (c._targetSlot) {
+            afterSlots = afterSlots.filter(s => s === c._targetSlot);
+          }
           if (afterSlots.length === 0) {
             if (!log[c.studentId]) log[c.studentId] = [];
             log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목`, source: c.source });
@@ -2076,7 +2312,10 @@ export default function Home() {
                   return;
                }
 
-               const afterSlots = findSlotsWithSubject(c.afterSubject);
+               let afterSlots = findSlotsWithSubject(c.afterSubject);
+          if (c._targetSlot) {
+            afterSlots = afterSlots.filter(s => s === c._targetSlot);
+          }
                if (afterSlots.length === 0) {
                   studentLog.push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목`, source: c.source });
                   return;
@@ -2128,13 +2367,15 @@ export default function Home() {
 
                if (bestSlot) {
                  if (bestSlot === beforeSlot) {
-                   studentLog.push({
-                     beforeStr: `${c.beforeSubject}(${beforeSlot})`,
-                     afterStr: `${c.afterSubject}(${beforeSlot})`,
-                     status: 'success', source: c.source
-                   });
-                   newSched[beforeSlot] = c.afterSubject;
-                 } else {
+                    if (c.beforeSubject !== c.afterSubject) {
+                        studentLog.push({
+                          beforeStr: `${c.beforeSubject}(${beforeSlot})`,
+                          afterStr: `${c.afterSubject}(${beforeSlot})`,
+                          status: 'success', source: c.source
+                        });
+                    }
+                    newSched[beforeSlot] = c.afterSubject;
+                  } else {
                    const studentSubjectInAfterSlot = newSched[bestSlot] as string;
                    studentLog.push({
                      beforeStr: `${studentSubjectInAfterSlot}(${bestSlot})`,
@@ -4055,7 +4296,8 @@ export default function Home() {
                           선택과목 변경 기초자료 입력 (교육과정 및 위계)
                         </h2>
                         
-                        <div className="flex bg-slate-800/50 p-1 rounded-xl">
+                        
+                          <div className="flex bg-slate-800/50 p-1 rounded-xl">
                           <button
                             onClick={() => setChangeActiveGrade("grade2")}
                             className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
@@ -4587,7 +4829,7 @@ export default function Home() {
                           <div className="p-4 bg-slate-800/80 border-b border-slate-700/50">
                             <h3 className="font-semibold text-slate-200">변경 신청 입력(신청자)</h3>
                           </div>
-                          <div className="overflow-auto max-h-[600px] relative">
+                          <div className="overflow-auto relative">
                             <table className="w-full text-sm text-left text-slate-300 border-collapse">
                               <thead className="text-xs text-slate-400 bg-slate-800 border-b border-slate-700 uppercase">
                                 <tr>
@@ -4618,7 +4860,14 @@ export default function Home() {
                               <tbody>
                                 {(() => {
                                   const data = electiveChanges[changeActiveGrade];
-                                  if (data.length === 0) {
+                                  const sortedData = [...data].sort((a, b) => {
+                                      const valA = String(a.studentId || "").trim();
+                                      const valB = String(b.studentId || "").trim();
+                                      if (valA === "" && valB !== "") return 1;
+                                      if (valA !== "" && valB === "") return -1;
+                                      return valA.localeCompare(valB);
+                                  });
+                                  if (sortedData.length === 0) {
                                     return (
                                       <tr>
                                         <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
@@ -4630,7 +4879,7 @@ export default function Home() {
                                   }
 
                                   const groupedData: any[] = [];
-                                  data.forEach(item => {
+                                  sortedData.forEach(item => {
                                     const lastGroup = groupedData[groupedData.length - 1];
                                     if (lastGroup && lastGroup.studentId === item.studentId && lastGroup.studentId !== "") {
                                       lastGroup.items.push(item);
@@ -4771,7 +5020,7 @@ export default function Home() {
                           <div className="p-4 bg-slate-800/80 border-b border-slate-700/50">
                             <h3 className="font-semibold text-emerald-300">인원 균등 분배를 위한 임의 변경</h3>
                           </div>
-                          <div className="overflow-auto max-h-[600px] relative">
+                          <div className="overflow-auto relative">
                             <table className="w-full text-sm text-left text-slate-300 border-collapse">
                               <thead className="text-xs text-slate-400 bg-slate-800 border-b border-slate-700 uppercase">
                                 <tr>
@@ -4781,22 +5030,7 @@ export default function Home() {
                                   <th className="px-4 py-3 font-semibold text-center border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">변경전</th>
                                   <th className="px-2 py-3 font-semibold text-center w-8 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">→</th>
                                   <th className="px-4 py-3 font-semibold text-center border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">변경후</th>
-                                  <th className="px-2 py-3 font-semibold text-center w-12 sticky top-0 z-10 bg-slate-800 shadow-sm">
-                                    <button onClick={() => {
-                                      setElectiveChangesArbitrary(prev => ({
-                                        ...prev,
-                                        [changeActiveGrade]: [...prev[changeActiveGrade], {
-                                          id: Date.now().toString() + Math.random().toString(36).substring(7),
-                                          studentId: "",
-                                          studentName: "",
-                                          beforeSubject: "",
-                                          afterSubject: ""
-                                        }]
-                                      }));
-                                    }} className="p-1 text-slate-400 hover:text-emerald-400 transition-colors">
-                                      <Plus className="w-5 h-5 mx-auto" />
-                                    </button>
-                                  </th>
+                                  
                                 </tr>
                               </thead>
                               <tbody>
@@ -4952,7 +5186,7 @@ export default function Home() {
                           </div>
                         </div>
                         </div>
-                        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-inner flex flex-col">
+                        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-inner flex flex-col h-full">
                           <div className="p-4 bg-slate-800/80 border-b border-slate-700/50 flex justify-between items-center">
                             <div className="flex items-center gap-4">
                               <h3 className="font-semibold text-emerald-400">자동 변경 결과 내역</h3>
@@ -4974,7 +5208,7 @@ export default function Home() {
                               엑셀 다운로드
                             </button>
                           </div>
-                          <div className="overflow-auto max-h-[600px] flex-1">
+                          <div className="overflow-auto flex-1">
                             <table className="w-full text-sm text-left text-slate-300 border-collapse">
                               <thead className="text-xs text-slate-400 bg-slate-800/50 border-b border-slate-700 uppercase">
                                 <tr>
@@ -5082,10 +5316,22 @@ export default function Home() {
                   {changeActiveTab === "roster_after" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                       <div className="flex justify-between items-center mb-2">
-                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
-                          <Users className="w-6 h-6 text-indigo-400" />
-                          타임별 선택과목 명단(변경 후)
-                        </h2>
+                        <div className="flex items-center gap-4">
+                          <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                            <Users className="w-6 h-6 text-indigo-400" />
+                            타임별 선택과목 명단(변경 후)
+                          </h2>
+                          <div className="flex items-center gap-3 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700/50 text-xs font-medium">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                              <span className="text-amber-200">학생 신청 변경</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                              <span className="text-emerald-200">인원 균등 분배(자동)</span>
+                            </div>
+                          </div>
+                        </div>
 
                         <div className="flex items-center gap-4">
                           <button
@@ -5275,6 +5521,7 @@ export default function Home() {
 
                                           let effectiveSubject = chosenSubject;
                                           let isModified = false;
+                                          let modifiedSource = null;
                                           const studentLogs = adjustmentLog[student.id];
                                           if (studentLogs) {
                                             let movedInto = null;
@@ -5295,6 +5542,7 @@ export default function Home() {
                                                 if (logAfterSlot === slot) {
                                                   movedInto = logAfterSubject;
                                                   isModified = true;
+                                                  modifiedSource = entry.source;
                                                 }
                                               }
                                             }
@@ -5313,7 +5561,7 @@ export default function Home() {
 
                                           if (matchedBase) {
                                             if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
-                                            studentsByBase[matchedBase].push({ ...student, isModified });
+                                            studentsByBase[matchedBase].push({ ...student, isModified, modifiedSource });
                                           }
                                         });
 
@@ -5355,11 +5603,11 @@ export default function Home() {
                                               const tooltipText = studentChangeLogs.map(l => `${l.beforeStr} → ${l.afterStr}`).join('\n');
                                               return (
                                                 <Fragment key={`${c.slot}-${c.col}-${r}`}>
-                                                  <td className={`px-2 py-1.5 border-r border-slate-700/50 text-center border-r-slate-800/30 text-xs ${isModified ? 'bg-amber-500/10 text-amber-300 font-bold' : 'text-slate-400'}`}>
+                                                  <td className={`px-2 py-1.5 border-r border-slate-700/50 text-center border-r-slate-800/30 text-xs ${isModified ? (student.modifiedSource === 'applicant' ? 'bg-amber-500/10 text-amber-300 font-bold' : 'bg-emerald-500/10 text-emerald-300 font-bold') : 'text-slate-400'}`}>
                                                     {student ? student.id : ""}
                                                   </td>
                                                   <td 
-                                                    className={`px-2 py-1.5 border-r border-slate-700/50 text-center text-xs ${isModified ? 'bg-amber-500/10 text-amber-400 font-bold cursor-help' : 'text-slate-300 font-medium'}`}
+                                                    className={`px-2 py-1.5 border-r border-slate-700/50 text-center text-xs ${isModified ? (student.modifiedSource === 'applicant' ? 'bg-amber-500/10 text-amber-400 font-bold cursor-help' : 'bg-emerald-500/10 text-emerald-400 font-bold cursor-help') : 'text-slate-300 font-medium'}`}
                                                     title={isModified && tooltipText ? tooltipText : undefined}
                                                   >
                                                     {student ? student.name : ""}
@@ -5602,10 +5850,16 @@ export default function Home() {
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                       <div className="flex justify-between items-center mb-2">
                         <div>
-                          <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
-                            <FileText className="w-6 h-6 text-indigo-400" />
-                            다년도 수강 내역 위계 및 분석
-                          </h2>
+                          <div className="flex items-center gap-4">
+                            <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                              <FileText className="w-6 h-6 text-indigo-400" />
+                              다년도 수강 내역 위계 및 분석
+                            </h2>
+                            <div className="flex items-center gap-2 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700/50 text-xs font-medium mt-1">
+                              <span className="w-2.5 h-2.5 rounded-full bg-amber-500/50 border border-amber-500"></span>
+                              <span className="text-amber-200">학생 직접 변경자 (5단계 수동 신청 반영)</span>
+                            </div>
+                          </div>
                           <p className="text-slate-400 text-sm mt-1 mb-4 ml-8">
                             * 위계성 검사는 '수요조사' 탭의 2단계에서 설정한 위계 규칙을 공유하여 그대로 적용합니다.
                           </p>
@@ -5619,6 +5873,16 @@ export default function Home() {
                           >
                             <Download className="w-4 h-4" />
                             엑셀 다운로드
+                          </button>
+                          <button
+                            onClick={() => setShowOnlyApplicants(!showOnlyApplicants)}
+                            className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors flex items-center gap-2 ${
+                              showOnlyApplicants
+                                ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
+                                : "bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-slate-300"
+                            }`}
+                          >
+                            직접 변경자만 보기
                           </button>
                           <div className="flex bg-slate-800/50 p-1 rounded-xl">
                             <button
@@ -5665,27 +5929,55 @@ export default function Home() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {step6Data.map((row, idx) => (
+                                {(showOnlyApplicants ? step6Data.filter(row => adjustmentLog[row.id]?.some(l => l.status === 'success' && l.source === 'applicant')) : step6Data).map((row, idx) => {
+                                  const hasChanges = adjustmentLog[row.id] && adjustmentLog[row.id].some(l => l.status === 'success' && l.source === 'applicant');
+                                  const highlightClass = hasChanges ? "bg-amber-500/10 text-amber-300" : "bg-slate-950 text-white";
+                                  const nameHighlightClass = hasChanges ? "bg-amber-500/10 text-amber-300" : "bg-slate-950 text-slate-300";
+                                  const hoverClass = hasChanges ? "group-hover:bg-amber-500/20" : "group-hover:bg-slate-900";
+                                  return (
                                   <tr key={idx} className="group border-b border-slate-800/50 hover:bg-slate-900/50">
                                     <td className="px-2 py-2.5 whitespace-nowrap sticky left-0 z-20 bg-slate-950 group-hover:bg-slate-900 min-w-[50px] max-w-[50px] border-r border-slate-800 text-center">{idx + 1}</td>
-                                    <td className="px-2 py-2.5 font-medium text-white whitespace-nowrap sticky left-[50px] z-20 bg-slate-950 group-hover:bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800 text-center">{row.id}</td>
-                                    <td className="px-2 py-2.5 whitespace-nowrap sticky left-[130px] z-20 bg-slate-950 group-hover:bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800/50 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)]">{row.name}</td>
-                                    <td className="px-2 py-2.5 border-r border-slate-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title={row.completedBefore.join(", ")}>
+                                    <td className={`px-2 py-2.5 font-medium whitespace-nowrap sticky left-[50px] z-20 min-w-[80px] max-w-[80px] border-r border-slate-800 text-center ${highlightClass} ${hoverClass}`}>{row.id}</td>
+                                    <td className={`px-2 py-2.5 font-medium whitespace-nowrap sticky left-[130px] z-20 min-w-[80px] max-w-[80px] border-r border-slate-800/50 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)] ${nameHighlightClass} ${hoverClass}`}>{row.name}</td>
+                                    <td className="px-2 py-2.5 border-r border-slate-800 max-w-[250px] text-xs leading-relaxed break-words" title={row.completedBefore.join(", ")}>
                                       {row.completedBefore.length > 0 ? row.completedBefore.join(", ") : <span className="text-slate-600">-</span>}
                                     </td>
-                                    <td className="px-2 py-2.5 border-r border-slate-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title={row.currentSubjects.join(", ")}>
+                                    <td className="px-2 py-2.5 border-r border-slate-800 max-w-[250px]" title={row.currentSubjects.join(", ")}>
+                                      <div className="flex flex-wrap gap-1.5">
                                       {row.currentSubjects.map((subject, i) => {
                                         const isDuplicate = subject && row.duplicateSubjects?.includes(subject);
                                         const isHierarchyViolation = subject && row.hierarchyViolations?.some((v: any) => v.subject === subject || v.prereq === subject);
-                                        let cellClass = "inline-block mr-1.5 mb-1 px-1.5 py-0.5 rounded text-xs ";
-                                        if (isHierarchyViolation) cellClass += "text-cyan-400 font-bold bg-cyan-400/10";
-                                        else if (isDuplicate) cellClass += "text-yellow-400 font-bold bg-yellow-400/10";
-                                        else cellClass += "bg-slate-800 text-slate-300";
+                                        
+                                        let isChangedByApplicant = false;
+                                        if (adjustmentLog[row.id]) {
+                                            isChangedByApplicant = adjustmentLog[row.id].some(l => {
+                                                if (l.status !== 'success' || l.source !== 'applicant') return false;
+                                                const match = l.afterStr.match(/^(.+)\(([^)]+)\)$/);
+                                                const afterSubj = match ? match[1] : l.afterStr;
+                                                return afterSubj === subject;
+                                            });
+                                        }
+
+                                        let cellClass = "inline-block px-1.5 py-0.5 rounded text-xs ";
+                                        if (isChangedByApplicant) {
+                                            if (isHierarchyViolation) {
+                                                cellClass += "bg-amber-400 text-blue-900 font-black ring-1 ring-blue-600 shadow-[0_0_8px_rgba(59,130,246,0.5)]";
+                                            } else if (isDuplicate) {
+                                                cellClass += "bg-amber-400 text-rose-900 font-black ring-1 ring-rose-600 shadow-[0_0_8px_rgba(225,29,72,0.5)]";
+                                            } else {
+                                                cellClass += "bg-amber-400 text-amber-950 font-bold ring-1 ring-amber-300";
+                                            }
+                                        } else {
+                                            if (isHierarchyViolation) cellClass += "text-cyan-400 font-bold bg-cyan-400/10";
+                                            else if (isDuplicate) cellClass += "text-yellow-400 font-bold bg-yellow-400/10";
+                                            else cellClass += "bg-slate-800 text-slate-300";
+                                        }
 
                                         return (
                                           <span key={`cur-${i}`} className={cellClass}>{subject}</span>
                                         );
                                       })}
+                                      </div>
                                     </td>
                                     <td className="px-2 py-2.5 text-center text-indigo-400 font-medium whitespace-nowrap">{row.basicCount}</td>
                                     <td className="px-2 py-2.5 text-center text-rose-400 font-medium whitespace-nowrap">{row.socialCount}</td>
@@ -5700,7 +5992,7 @@ export default function Home() {
                                       ))}
                                     </td>
                                   </tr>
-                                ))}
+                                );})}
                               </tbody>
                             </table>
                           </div>
