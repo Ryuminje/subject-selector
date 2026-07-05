@@ -363,7 +363,6 @@ export default function Home() {
   const [teacherCounts, setTeacherCounts] = useState<{ [category: string]: number }>({});
   const [headTeacherReductions, setHeadTeacherReductions] = useState<{ [category: string]: number }>({});
   const [headTeacherCategoryInput, setHeadTeacherCategoryInput] = useState<string>("");
-  const [headTeacherHoursInput, setHeadTeacherHoursInput] = useState<string>("");
   const [editingTeachers, setEditingTeachers] = useState<{ [category: string]: boolean }>({});
   const [editingDetailedCategory, setEditingDetailedCategory] = useState<{ grade: GradeKey, index: number } | null>(null);
   const [detailedCategoryEditValue, setDetailedCategoryEditValue] = useState("");
@@ -404,7 +403,8 @@ export default function Home() {
       grade2HistoryData,
       grade3Sem1HistoryData,
       extraUploads,
-      changeUploadNames
+      changeUploadNames,
+      headTeacherReductions
     };
     
     const jsonString = JSON.stringify(backupData, null, 2);
@@ -469,6 +469,7 @@ export default function Home() {
         if (parsed.manualClassCounts) setManualClassCounts(parsed.manualClassCounts);
         if (parsed.manualStep5Classes) setManualStep5Classes(parsed.manualStep5Classes);
         if (parsed.teacherCounts) setTeacherCounts(parsed.teacherCounts);
+        if (parsed.headTeacherReductions) setHeadTeacherReductions(parsed.headTeacherReductions);
         if (parsed.designatedSubjects) setDesignatedSubjects({ pre1: [], ...parsed.designatedSubjects });
         if (parsed.selectedSubjectHours) setSelectedSubjectHours({ pre1: [], ...parsed.selectedSubjectHours });
         if (parsed.parsedSampleData) setParsedSampleData(parsed.parsedSampleData);
@@ -2783,6 +2784,9 @@ export default function Home() {
       category: string;
       isFirstRow: boolean;
       rowSpan: number;
+      reduction: number;
+      sem1TotalOriginal: number;
+      sem2TotalOriginal: number;
       sem1Total: number;
       sem2Total: number;
       yearTotal: number;
@@ -2829,6 +2833,9 @@ export default function Home() {
       });
 
       const reduction = headTeacherReductions[cat] || 0;
+      const sem1TotalOriginal = sem1Total;
+      const sem2TotalOriginal = sem2Total;
+      
       sem1Total = Math.max(0, sem1Total - reduction);
       sem2Total = Math.max(0, sem2Total - reduction);
 
@@ -2845,6 +2852,9 @@ export default function Home() {
           category: cat,
           isFirstRow: i === 0,
           rowSpan: maxLen,
+          reduction,
+          sem1TotalOriginal,
+          sem2TotalOriginal,
           sem1Total,
           sem2Total,
           yearTotal,
@@ -3712,32 +3722,23 @@ export default function Home() {
                               </option>
                             ))}
                           </select>
-                          <input
-                            type="number"
-                            placeholder="시수"
-                            className="w-16 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-center text-sm text-slate-200"
-                            value={headTeacherHoursInput}
-                            onChange={e => setHeadTeacherHoursInput(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter' && headTeacherCategoryInput && headTeacherHoursInput) {
-                                setHeadTeacherReductions(p => ({ ...p, [headTeacherCategoryInput]: Number(headTeacherHoursInput) }));
-                                setHeadTeacherCategoryInput("");
-                                setHeadTeacherHoursInput("");
-                              }
-                            }}
-                          />
-                          <button
-                            onClick={() => {
-                              if (headTeacherCategoryInput && headTeacherHoursInput) {
-                                setHeadTeacherReductions(p => ({ ...p, [headTeacherCategoryInput]: Number(headTeacherHoursInput) }));
-                                setHeadTeacherCategoryInput("");
-                                setHeadTeacherHoursInput("");
-                              }
-                            }}
-                            className="px-3 py-1 bg-rose-500/20 text-rose-400 rounded hover:bg-rose-500/30 text-sm font-semibold transition-colors"
-                          >
-                            적용
-                          </button>
+                          {headTeacherCategoryInput && (
+                            <input
+                              type="number"
+                              placeholder="시수"
+                              className="w-16 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-center text-sm text-slate-200"
+                              value={headTeacherReductions[headTeacherCategoryInput] || ""}
+                              onChange={e => {
+                                const val = Number(e.target.value);
+                                setHeadTeacherReductions(p => {
+                                  const next = { ...p };
+                                  if (!val || val === 0) delete next[headTeacherCategoryInput];
+                                  else next[headTeacherCategoryInput] = val;
+                                  return next;
+                                });
+                              }}
+                            />
+                          )}
                         </div>
                       </div>
                       <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 overflow-hidden shadow-inner overflow-x-auto">
@@ -3834,7 +3835,14 @@ export default function Home() {
                                   <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem1?.subjectHours !== undefined ? row.sem1.subjectHours : ""}</td>
                                   {row.isFirstRow && (
                                     <td rowSpan={row.rowSpan} className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 font-semibold align-middle">
-                                      {row.sem1Total || 0}
+                                      {row.reduction > 0 ? (
+                                        <div className="flex flex-col items-center">
+                                          <span>{row.sem1Total}</span>
+                                          <span className="text-[10px] text-rose-400 font-normal opacity-80 mt-1">({row.sem1TotalOriginal}-{row.reduction})</span>
+                                        </div>
+                                      ) : (
+                                        row.sem1Total || 0
+                                      )}
                                     </td>
                                   )}
                                   {row.isFirstRow && (
@@ -3878,7 +3886,14 @@ export default function Home() {
                                   <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem2?.subjectHours !== undefined ? row.sem2.subjectHours : ""}</td>
                                   {row.isFirstRow && (
                                     <td rowSpan={row.rowSpan} className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 font-semibold align-middle">
-                                      {row.sem2Total || 0}
+                                      {row.reduction > 0 ? (
+                                        <div className="flex flex-col items-center">
+                                          <span>{row.sem2Total}</span>
+                                          <span className="text-[10px] text-rose-400 font-normal opacity-80 mt-1">({row.sem2TotalOriginal}-{row.reduction})</span>
+                                        </div>
+                                      ) : (
+                                        row.sem2Total || 0
+                                      )}
                                     </td>
                                   )}
                                   {row.isFirstRow && (
