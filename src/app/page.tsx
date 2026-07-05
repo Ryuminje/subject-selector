@@ -83,6 +83,7 @@ export default function Home() {
   const [changeActiveTab, setChangeActiveTab] = useState<"basic" | "upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis">("basic");
   const [changeActiveGrade, setChangeActiveGrade] = useState<"grade2" | "grade3">("grade2");
   const [changeRosterTimeSlot, setChangeRosterTimeSlot] = useState("A");
+  const [rosterAfterSubjectFilter, setRosterAfterSubjectFilter] = useState<string>("전체");
 
   const [changeTimeSlots, setChangeTimeSlots] = useState<{ grade2: string[], grade3: string[] }>({ grade2: [], grade3: [] });
   const [changeClassCols, setChangeClassCols] = useState<{ grade2: string[], grade3: string[] }>({ grade2: [], grade3: [] });
@@ -5117,213 +5118,282 @@ export default function Home() {
                         </div>
                       </div>
 
-                      <div className="flex gap-2 flex-wrap mb-4">
-                        {timeSlots[changeActiveGrade].map(slot => (
-                          <button
-                            key={slot}
-                            onClick={() => setChangeRosterTimeSlot(slot)}
-                            className={`px-5 py-2 rounded-lg font-medium transition-all ${changeRosterTimeSlot === slot
-                                ? "bg-indigo-600 text-white shadow-md"
-                                : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
-                              }`}
-                          >
-                            {slot}타임
-                          </button>
-                        ))}
-                      </div>
+                      {(() => {
+                        const currentSubjects = Array.from(new Set(
+                          timeSlots[changeActiveGrade].flatMap(slot => 
+                            classCols[changeActiveGrade]
+                              .map(col => {
+                                const cellSubject = timetableData[changeActiveGrade]?.[slot]?.[col]?.subject?.trim();
+                                if (!cellSubject) return null;
+                                const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
+                                return match ? match[1].trim() : cellSubject;
+                              })
+                              .filter(Boolean)
+                          )
+                        )).sort() as string[];
 
-                      <div className="bg-slate-900 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm text-left border-collapse">
-                            <thead>
-                              <tr className="bg-amber-400/20 text-amber-200 border-b-2 border-slate-700">
-                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-bold min-w-[80px]">과목명</th>
-                                {classCols[changeActiveGrade].map(col => (
-                                  <th key={col} colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-bold min-w-[120px]">
-                                    {timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject || "-"}
-                                  </th>
+                        const displayCols: { slot: string, col: string, original: string }[] = [];
+                        if (rosterAfterSubjectFilter === "전체") {
+                          classCols[changeActiveGrade].forEach(col => {
+                            const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
+                            if (cellSubject) {
+                              displayCols.push({ slot: changeRosterTimeSlot, col, original: cellSubject });
+                            }
+                          });
+                        } else {
+                          timeSlots[changeActiveGrade].forEach(slot => {
+                            classCols[changeActiveGrade].forEach(col => {
+                              const cellSubject = timetableData[changeActiveGrade]?.[slot]?.[col]?.subject?.trim();
+                              if (!cellSubject) return;
+                              const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
+                              const base = match ? match[1].trim() : cellSubject;
+                              if (base === rosterAfterSubjectFilter) {
+                                displayCols.push({ slot, col, original: cellSubject });
+                              }
+                            });
+                          });
+                        }
+
+                                                const maxCols = classCols[changeActiveGrade].length;
+                        const firstColWidth = 8;
+                        const dataColWidth = (100 - firstColWidth) / maxCols;
+                        const emptyColCount = maxCols - displayCols.length;
+
+                        return (
+                          <>
+                            <div className="flex gap-2 flex-wrap mb-4">
+                              {timeSlots[changeActiveGrade].map(slot => (
+                                <button
+                                  key={slot}
+                                  onClick={() => {
+                                    setChangeRosterTimeSlot(slot);
+                                    setRosterAfterSubjectFilter("전체");
+                                  }}
+                                  className={`px-5 py-2 rounded-lg font-medium transition-all ${changeRosterTimeSlot === slot && rosterAfterSubjectFilter === "전체"
+                                      ? "bg-indigo-600 text-white shadow-md"
+                                      : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                                    }`}
+                                >
+                                  {slot}타임
+                                </button>
+                              ))}
+                            </div>
+                            
+                            {currentSubjects.length > 0 && (
+                              <div className="flex gap-2 flex-wrap mb-4">
+                                <button
+                                  onClick={() => setRosterAfterSubjectFilter("전체")}
+                                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${rosterAfterSubjectFilter === "전체"
+                                      ? "bg-amber-500 text-white shadow-md"
+                                      : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                                    }`}
+                                >
+                                  전체 과목 (타임별)
+                                </button>
+                                {currentSubjects.map(sub => (
+                                  <button
+                                    key={sub}
+                                    onClick={() => setRosterAfterSubjectFilter(sub)}
+                                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${rosterAfterSubjectFilter === sub
+                                        ? "bg-amber-500 text-white shadow-md"
+                                        : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                                      }`}
+                                  >
+                                    {sub}
+                                  </button>
                                 ))}
-                              </tr>
-                              <tr className="bg-slate-800 border-b border-slate-700">
-                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">강의실</th>
-                                {classCols[changeActiveGrade].map(col => (
-                                  <Fragment key={`room-${col}`}>
-                                    <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300 bg-slate-800/80">
-                                      {col}
-                                    </th>
-                                  </Fragment>
-                                ))}
-                              </tr>
-                              <tr className="bg-slate-800/50 border-b border-slate-700">
-                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">교사</th>
-                                {classCols[changeActiveGrade].map(col => (
-                                  <Fragment key={`teacher-${col}`}>
-                                    <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center text-slate-400">
-                                      {timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.teacher || "-"}
-                                    </th>
-                                  </Fragment>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(() => {
-                                const colStudents: Record<string, any[]> = {};
-                                classCols[changeActiveGrade].forEach(col => {
-                                  colStudents[col] = [];
-                                });
+                              </div>
+                            )}
 
-                                const allStudents = parsedSampleData[changeActiveGrade] || [];
-                                // 1. Group columns by base subject
-                                const subjectGroups: Record<string, { col: string, num: number, original: string }[]> = {};
-                                classCols[changeActiveGrade].forEach(col => {
-                                  const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
-                                  if (!cellSubject) return;
-
-                                  const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
-                                  const base = match ? match[1].trim() : cellSubject;
-                                  const numMatch = cellSubject.match(/\d+/);
-                                  const num = numMatch ? parseInt(numMatch[0], 10) : 1;
-
-                                  if (!subjectGroups[base]) subjectGroups[base] = [];
-                                  subjectGroups[base].push({ col, num, original: cellSubject });
-                                });
-
-                                // Sort each group by num (so class 1 gets the remainder if odd)
-                                Object.values(subjectGroups).forEach(group => {
-                                  group.sort((a, b) => a.num - b.num);
-                                });
-
-                                // 2. Map students to their base subjects WITH VALIDATED CHANGES
-                                const studentsByBase: Record<string, any[]> = {};
-
-                                allStudents.forEach(student => {
-                                  const chosenSubject = student.timeSlotMap[changeRosterTimeSlot];
-                                  if (!chosenSubject) return;
-
-                                  // Use adjustmentLog to apply only validated changes
-                                  let effectiveSubject = chosenSubject;
-                                  let isModified = false;
-                                  const studentLogs = adjustmentLog[student.id];
-                                  if (studentLogs) {
-                                    let movedInto = null;
-                                    let movedOut = false;
-                                    // Check if any log entry changes this student's subject in this timeslot
-                                    for (const entry of studentLogs) {
-                                      if (entry.status !== 'success') continue;
-                                      // Parse the slot from beforeStr like "수학과제탐구(B)"
-                                      const beforeMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
-                                      const afterMatch = entry.afterStr.match(/^(.+)\(([^)]+)\)$/);
-                                      if (beforeMatch && afterMatch) {
-                                        const logBeforeSubject = beforeMatch[1];
-                                        const logBeforeSlot = beforeMatch[2];
-                                        const logAfterSubject = afterMatch[1];
-                                        const logAfterSlot = afterMatch[2];
-
-                                        // If this log moves the student OUT of this timeslot's subject
-                                        if (logBeforeSlot === changeRosterTimeSlot && logBeforeSubject === chosenSubject) {
-                                          movedOut = true;
-                                        }
-                                        // If this log moves a subject INTO this timeslot
-                                        if (logAfterSlot === changeRosterTimeSlot) {
-                                          movedInto = logAfterSubject;
-                                        }
-                                      }
-                                    }
-                                    if (movedInto) {
-                                      effectiveSubject = movedInto;
-                                      isModified = true;
-                                    } else if (movedOut) {
-                                      effectiveSubject = '__REMOVED__';
-                                      isModified = true;
-                                    }
-                                  }
-
-                                  if (effectiveSubject === '__REMOVED__') return;
-
-                                  let matchedBase = Object.keys(subjectGroups).find(base => {
-                                    const cleanChosen = effectiveSubject.replace(/\s+/g, '');
-                                    const cleanBase = base.replace(/\s+/g, '');
-                                    if (!cleanBase) return false;
-                                    return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
-                                  });
-
-                                  if (matchedBase) {
-                                    if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
-                                    studentsByBase[matchedBase].push({ ...student, isModified });
-                                  }
-                                });
-
-                                // 3. Distribute students into columns
-                                Object.keys(studentsByBase).forEach(base => {
-                                  const students = studentsByBase[base].sort((a, b) => {
-                                    return a.id.localeCompare(b.id, undefined, { numeric: true });
-                                  });
-                                  const cols = subjectGroups[base];
-
-                                  const baseCount = Math.floor(students.length / cols.length);
-                                  const remainder = students.length % cols.length;
-
-                                  let sIdx = 0;
-                                  cols.forEach((colObj, idx) => {
-                                    const count = baseCount + (idx < remainder ? 1 : 0);
-                                    const assigned = students.slice(sIdx, sIdx + count);
-                                    colStudents[colObj.col].push(...assigned);
-                                    sIdx += count;
-                                  });
-                                });
-                                let maxStudents = 0;
-                                classCols[changeActiveGrade].forEach(col => {
-                                  if (colStudents[col].length > maxStudents) maxStudents = colStudents[col].length;
-                                });
-
-                                const rows = [];
-                                for (let r = 0; r < maxStudents; r++) {
-                                  rows.push(
-                                    <tr key={r} className="border-b border-slate-800/30 hover:bg-slate-800/20">
-                                      <td className="px-3 py-1.5 border-r border-slate-700/50 text-center text-slate-500 bg-slate-900/50">{r + 1}</td>
-                                      {classCols[changeActiveGrade].map(col => {
-                                        const student = colStudents[col][r];
-                                        const isModified = student?.isModified;
-                                        const studentChangeLogs = student ? (adjustmentLog[student.id] || []) : [];
-                                        const tooltipText = studentChangeLogs.map(l => `${l.beforeStr} → ${l.afterStr}`).join('\n');
-                                        return (
-                                          <Fragment key={`data-${col}-${r}`}>
-                                            <td className={`px-2 py-1.5 border-r border-slate-700/50 text-center border-r-slate-800/30 text-xs ${isModified ? 'bg-amber-500/10 text-amber-300 font-bold' : 'text-slate-400'
-                                              }`}>
-                                              {student ? student.id : ""}
-                                            </td>
-                                            <td
-                                              className={`px-2 py-1.5 border-r border-slate-700/50 text-center text-xs ${isModified ? 'bg-amber-500/10 text-amber-400 font-bold cursor-help' : 'text-slate-300 font-medium'
-                                                }`}
-                                              title={isModified && tooltipText ? tooltipText : undefined}
-                                            >
-                                              {student ? student.name : ""}
-                                            </td>
-                                          </Fragment>
-                                        );
-                                      })}
-                                    </tr>
-                                  );
-                                }
-
-                                return (
-                                  <>
-                                    {rows}
-                                    <tr className="bg-indigo-900/20 border-t-2 border-indigo-500/30">
-                                      <td className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">총 인원</td>
-                                      {classCols[changeActiveGrade].map(col => (
-                                        <td key={`total-${col}`} colSpan={2} className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">
-                                          {colStudents[col].length}명
-                                        </td>
+                            <div className="bg-slate-900 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl">
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left border-collapse table-fixed">
+                                  <thead>
+                                    <tr className="bg-amber-400/20 text-amber-200 border-b-2 border-slate-700">
+                                      <th style={{ width: `${firstColWidth}%` }} className="px-3 py-2 border-r border-slate-700/50 text-center font-bold">과목명</th>
+                                      {displayCols.map(c => (
+                                        <th key={`${c.slot}-${c.col}`} colSpan={2} style={{ width: `${dataColWidth}%` }} className="px-3 py-2 border-r border-slate-700/50 text-center font-bold">
+                                          {rosterAfterSubjectFilter === "전체" ? c.original : `${c.slot}타임 ${c.original}`}
+                                        </th>
                                       ))}
+                                      {emptyColCount > 0 && <th style={{ width: `${emptyColCount * dataColWidth}%` }}></th>}
                                     </tr>
-                                  </>
-                                );
-                              })()}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
+                                    <tr className="bg-slate-800 border-b border-slate-700">
+                                      <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">강의실</th>
+                                      {displayCols.map(c => (
+                                        <Fragment key={`room-${c.slot}-${c.col}`}>
+                                          <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300 bg-slate-800/80">
+                                            {c.col}
+                                          </th>
+                                        </Fragment>
+                                      ))}
+                                      {emptyColCount > 0 && <th></th>}
+                                    </tr>
+                                    <tr className="bg-slate-800/50 border-b border-slate-700">
+                                      <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">교사</th>
+                                      {displayCols.map(c => (
+                                        <Fragment key={`teacher-${c.slot}-${c.col}`}>
+                                          <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center text-slate-400">
+                                            {timetableData[changeActiveGrade]?.[c.slot]?.[c.col]?.teacher || "-"}
+                                          </th>
+                                        </Fragment>
+                                      ))}
+                                      {emptyColCount > 0 && <th></th>}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(() => {
+                                      const colStudents: Record<string, any[]> = {};
+                                      displayCols.forEach(c => {
+                                        colStudents[`${c.slot}-${c.col}`] = [];
+                                      });
+
+                                      const allStudents = parsedSampleData[changeActiveGrade] || [];
+                                      
+                                      const slotGroups: Record<string, Record<string, { col: string, num: number, original: string }[]>> = {};
+                                      displayCols.forEach(c => {
+                                        if (!slotGroups[c.slot]) slotGroups[c.slot] = {};
+                                        const match = c.original.match(/^(.*?)([\d\s]*)$/);
+                                        const base = match ? match[1].trim() : c.original;
+                                        const numMatch = c.original.match(/\d+/);
+                                        const num = numMatch ? parseInt(numMatch[0], 10) : 1;
+                                        if (!slotGroups[c.slot][base]) slotGroups[c.slot][base] = [];
+                                        slotGroups[c.slot][base].push({ col: c.col, num, original: c.original });
+                                      });
+
+                                      Object.values(slotGroups).forEach(bases => {
+                                        Object.values(bases).forEach(group => group.sort((a, b) => a.num - b.num));
+                                      });
+
+                                      Object.keys(slotGroups).forEach(slot => {
+                                        const bases = slotGroups[slot];
+                                        const studentsByBase: Record<string, any[]> = {};
+
+                                        allStudents.forEach(student => {
+                                          const chosenSubject = student.timeSlotMap[slot];
+                                          if (!chosenSubject) return;
+
+                                          let effectiveSubject = chosenSubject;
+                                          let isModified = false;
+                                          const studentLogs = adjustmentLog[student.id];
+                                          if (studentLogs) {
+                                            let movedInto = null;
+                                            let movedOut = false;
+                                            for (const entry of studentLogs) {
+                                              if (entry.status !== 'success') continue;
+                                              const beforeMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
+                                              const afterMatch = entry.afterStr.match(/^(.+)\(([^)]+)\)$/);
+                                              if (beforeMatch && afterMatch) {
+                                                const logBeforeSubject = beforeMatch[1];
+                                                const logBeforeSlot = beforeMatch[2];
+                                                const logAfterSubject = afterMatch[1];
+                                                const logAfterSlot = afterMatch[2];
+
+                                                if (logBeforeSlot === slot && logBeforeSubject === chosenSubject) {
+                                                  movedOut = true;
+                                                }
+                                                if (logAfterSlot === slot) {
+                                                  movedInto = logAfterSubject;
+                                                  isModified = true;
+                                                }
+                                              }
+                                            }
+                                            if (movedOut && !movedInto) effectiveSubject = '__REMOVED__';
+                                            else if (movedInto) effectiveSubject = movedInto;
+                                          }
+
+                                          if (effectiveSubject === '__REMOVED__') return;
+
+                                          let matchedBase = Object.keys(bases).find(base => {
+                                            const cleanChosen = effectiveSubject.replace(/\s+/g, '');
+                                            const cleanBase = base.replace(/\s+/g, '');
+                                            if (!cleanBase) return false;
+                                            return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
+                                          });
+
+                                          if (matchedBase) {
+                                            if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
+                                            studentsByBase[matchedBase].push({ ...student, isModified });
+                                          }
+                                        });
+
+                                        Object.keys(studentsByBase).forEach(base => {
+                                          const students = studentsByBase[base].sort((a, b) => {
+                                            return a.id.localeCompare(b.id, undefined, { numeric: true });
+                                          });
+                                          const cols = bases[base];
+
+                                          const baseCount = Math.floor(students.length / cols.length);
+                                          const remainder = students.length % cols.length;
+
+                                          let sIdx = 0;
+                                          cols.forEach((colObj, idx) => {
+                                            const count = baseCount + (idx < remainder ? 1 : 0);
+                                            const assigned = students.slice(sIdx, sIdx + count);
+                                            colStudents[`${slot}-${colObj.col}`].push(...assigned);
+                                            sIdx += count;
+                                          });
+                                        });
+                                      });
+
+                                      let maxStudents = 0;
+                                      displayCols.forEach(c => {
+                                        if (colStudents[`${c.slot}-${c.col}`].length > maxStudents) maxStudents = colStudents[`${c.slot}-${c.col}`].length;
+                                      });
+
+                                      const rows = [];
+                                      for (let r = 0; r < maxStudents; r++) {
+                                        rows.push(
+                                          <tr key={`row-${r}`} className={`${r % 2 === 0 ? "bg-slate-900/20" : "bg-slate-800/20"} hover:bg-indigo-900/20 transition-colors`}>
+                                            <td className="px-3 py-1.5 border-r border-slate-700/50 text-center text-slate-500 bg-slate-900/50">
+                                              {r + 1}
+                                            </td>
+                                            {displayCols.map(c => {
+                                              const student = colStudents[`${c.slot}-${c.col}`][r];
+                                              const isModified = student?.isModified;
+                                              const studentChangeLogs = student ? (adjustmentLog[student.id] || []) : [];
+                                              const tooltipText = studentChangeLogs.map(l => `${l.beforeStr} → ${l.afterStr}`).join('\n');
+                                              return (
+                                                <Fragment key={`${c.slot}-${c.col}-${r}`}>
+                                                  <td className={`px-2 py-1.5 border-r border-slate-700/50 text-center border-r-slate-800/30 text-xs ${isModified ? 'bg-amber-500/10 text-amber-300 font-bold' : 'text-slate-400'}`}>
+                                                    {student ? student.id : ""}
+                                                  </td>
+                                                  <td 
+                                                    className={`px-2 py-1.5 border-r border-slate-700/50 text-center text-xs ${isModified ? 'bg-amber-500/10 text-amber-400 font-bold cursor-help' : 'text-slate-300 font-medium'}`}
+                                                    title={isModified && tooltipText ? tooltipText : undefined}
+                                                  >
+                                                    {student ? student.name : ""}
+                                                  </td>
+                                                </Fragment>
+                                              );
+                                            })}
+                                            {emptyColCount > 0 && <td></td>}
+                                          </tr>
+                                        );
+                                      }
+
+                                      return (
+                                        <>
+                                          {rows}
+                                          <tr className="bg-indigo-900/20 border-t-2 border-indigo-500/30">
+                                            <td className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">총 인원</td>
+                                            {displayCols.map(c => (
+                                              <td key={`total-${c.slot}-${c.col}`} colSpan={2} className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">
+                                                {colStudents[`${c.slot}-${c.col}`].length}명
+                                              </td>
+                                            ))}
+                                            {emptyColCount > 0 && <td></td>}
+                                          </tr>
+                                        </>
+                                      );
+                                    })()}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
 
