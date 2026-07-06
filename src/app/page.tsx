@@ -80,8 +80,9 @@ export default function Home() {
   const [activeGrade, setActiveGrade] = useState<GradeKey>("pre1");
   const [isExampleModalOpen, setIsExampleModalOpen] = useState(false);
 
-  const [changeActiveTab, setChangeActiveTab] = useState<"basic" | "upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis">("basic");
+  const [changeActiveTab, setChangeActiveTab] = useState<"basic" | "upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis" | "riroschool">("basic");
   const [changeActiveGrade, setChangeActiveGrade] = useState<"grade2" | "grade3">("grade2");
+  const [sampleRawData, setSampleRawData] = useState<{ grade2: string | null, grade3: string | null }>({ grade2: null, grade3: null });
   const [showOnlyApplicants, setShowOnlyApplicants] = useState(false);
   const [changeRosterTimeSlot, setChangeRosterTimeSlot] = useState("A");
   const [rosterAfterSubjectFilter, setRosterAfterSubjectFilter] = useState<string>("전체");
@@ -305,7 +306,8 @@ export default function Home() {
 
     const reader = new FileReader();
     reader.onload = (evt) => {
-      const bstr = evt.target?.result;
+      const bstr = evt.target?.result as string;
+      setSampleRawData(prev => ({ ...prev, [changeActiveGrade]: bstr }));
       const wb = XLSX.read(bstr, { type: "binary" });
       const sheetName = wb.SheetNames[0];
       const sheet = wb.Sheets[sheetName];
@@ -406,7 +408,8 @@ export default function Home() {
       grade3Sem1HistoryData,
       extraUploads,
       changeUploadNames,
-      headTeacherReductions
+      headTeacherReductions,
+      sampleRawData
     };
     
     const jsonString = JSON.stringify(backupData, null, 2);
@@ -475,6 +478,7 @@ export default function Home() {
         if (parsed.designatedSubjects) setDesignatedSubjects({ pre1: [], ...parsed.designatedSubjects });
         if (parsed.selectedSubjectHours) setSelectedSubjectHours({ pre1: [], ...parsed.selectedSubjectHours });
         if (parsed.parsedSampleData) setParsedSampleData(parsed.parsedSampleData);
+        if (parsed.sampleRawData) setSampleRawData(parsed.sampleRawData);
         if (parsed.timetableData) setTimetableData(parsed.timetableData);
         if (parsed.electiveChanges) setElectiveChanges(parsed.electiveChanges);
         if (parsed.timeSlots) setTimeSlots(parsed.timeSlots);
@@ -2821,14 +2825,38 @@ export default function Home() {
           let movedOut = false;
           for (const entry of studentLogs) {
             if (entry.status !== 'success') continue;
-            const beforeMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
-            const afterMatch = entry.afterStr.match(/^(.+)\(([^)]+)\)$/);
-            if (beforeMatch && afterMatch) {
-              const logBeforeSubject = beforeMatch[1];
-              const logBeforeSlot = beforeMatch[2];
-              const logAfterSubject = afterMatch[1];
-              const logAfterSlot = afterMatch[2];
-              if (logBeforeSlot === slot && logBeforeSubject === chosenSubject) movedOut = true;
+            let logBeforeSubject = entry.beforeStr;
+            let logBeforeSlot = '';
+            let logAfterSubject = entry.afterStr;
+            let logAfterSlot = '';
+            
+            for (const s of timeSlotsForGrade) {
+              if (entry.beforeStr.endsWith(`(${s})`)) {
+                logBeforeSubject = entry.beforeStr.slice(0, -(s.length + 2));
+                logBeforeSlot = s;
+                break;
+              }
+            }
+            if (!logBeforeSlot) {
+              const bMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
+              if (bMatch) { logBeforeSubject = bMatch[1]; logBeforeSlot = bMatch[2]; }
+            }
+
+            for (const s of timeSlotsForGrade) {
+              if (entry.afterStr.endsWith(`(${s})`)) {
+                logAfterSubject = entry.afterStr.slice(0, -(s.length + 2));
+                logAfterSlot = s;
+                break;
+              }
+            }
+            if (!logAfterSlot) {
+              const aMatch = entry.afterStr.match(/^(.+)\(([^)]+)\)$/);
+              if (aMatch) { logAfterSubject = aMatch[1]; logAfterSlot = aMatch[2]; }
+            }
+
+            if (logBeforeSlot && logAfterSlot) {
+              const norm = (s: string) => s.replace(/\s+/g, '').replace(/Ⅰ/g, 'I').replace(/Ⅱ/g, 'II').replace(/Ⅲ/g, 'III');
+              if (logBeforeSlot === slot && norm(logBeforeSubject) === norm(chosenSubject as string)) movedOut = true;
               if (logAfterSlot === slot) movedInto = logAfterSubject;
             }
           }
@@ -2898,6 +2926,107 @@ export default function Home() {
     processed.sort((a, b) => parseInt(a.id) - parseInt(b.id));
     return processed;
   }, [changeActiveTab, parsedSampleData, changeActiveGrade, grade2HistoryData, grade3Sem1HistoryData, adjustmentLog, changeHierarchyRules, timeSlots, getChangeSubjectCategory]);
+
+  const handleDownloadRiroschool = (grade: "grade2" | "grade3") => {
+    const rawData = sampleRawData[grade];
+    if (!rawData) {
+      alert("원본 엑셀 데이터가 없습니다. 2단계에서 파일을 다시 업로드해주세요.");
+      return;
+    }
+
+    try {
+      const wb = XLSX.read(rawData, { type: "binary" });
+      const sheetName = wb.SheetNames[0];
+      const sheet = wb.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+      if (json.length < 2) {
+        alert("데이터 형식이 올바르지 않습니다.");
+        return;
+      }
+      
+      const subjectHeaders = json[1];
+      const norm = (s: string) => s.replace(/\s+/g, '').replace(/Ⅰ/g, 'I').replace(/Ⅱ/g, 'II').replace(/Ⅲ/g, 'III');
+      const subjectColMap: Record<string, number> = {};
+      
+      for (let c = 8; c < subjectHeaders.length; c++) {
+        if (subjectHeaders[c]) {
+          subjectColMap[norm(String(subjectHeaders[c]).trim())] = c;
+        }
+      }
+
+      for (let r = 2; r < json.length; r++) {
+        const row = json[r];
+        if (!row || row.length === 0 || !row[1]) continue;
+        const studentId = String(row[1]).trim();
+        
+        const logs = adjustmentLog[studentId];
+        const hasChanges = logs && logs.some(l => l.status === 'success' && (l.source === 'applicant' || l.source === 'arbitrary'));
+        
+        if (hasChanges) {
+          const studentInitData = parsedSampleData[grade].find(s => s.id === studentId);
+          if (!studentInitData) continue;
+          
+          let finalTimeSlotMap = { ...studentInitData.timeSlotMap };
+          
+          logs.forEach(l => {
+            if (l.status !== 'success' || (l.source !== 'applicant' && l.source !== 'arbitrary')) return;
+            
+            let beforeSubj = l.beforeStr;
+            let afterSubj = l.afterStr;
+            let beforeSlot = "";
+            let afterSlot = "";
+            
+            const timeSlotsForGrade = timeSlots[grade] || [];
+            for (const slot of timeSlotsForGrade) {
+              if (l.beforeStr.endsWith(`(${slot})`)) {
+                beforeSubj = l.beforeStr.slice(0, -(slot.length + 2));
+                beforeSlot = slot;
+              }
+              if (l.afterStr.endsWith(`(${slot})`)) {
+                afterSubj = l.afterStr.slice(0, -(slot.length + 2));
+                afterSlot = slot;
+              }
+            }
+            if (!beforeSlot) {
+              const match = l.beforeStr.match(/^(.+)\(([^)]+)\)$/);
+              if (match) { beforeSubj = match[1]; beforeSlot = match[2]; }
+            }
+            if (!afterSlot) {
+              const match = l.afterStr.match(/^(.+)\(([^)]+)\)$/);
+              if (match) { afterSubj = match[1]; afterSlot = match[2]; }
+            }
+            
+            if (beforeSlot && finalTimeSlotMap[beforeSlot] && norm(finalTimeSlotMap[beforeSlot]) === norm(beforeSubj)) {
+              delete finalTimeSlotMap[beforeSlot];
+            }
+            if (afterSlot) {
+              finalTimeSlotMap[afterSlot] = afterSubj;
+            }
+          });
+          
+          const range = XLSX.utils.decode_range(sheet['!ref'] || "A1:A1");
+          for (let c = 8; c <= range.e.c; c++) {
+            const cellRef = XLSX.utils.encode_cell({ r, c });
+            if (sheet[cellRef]) {
+              delete sheet[cellRef];
+            }
+          }
+          
+          Object.entries(finalTimeSlotMap).forEach(([slot, subj]) => {
+            const col = subjectColMap[norm(subj)];
+            if (col !== undefined) {
+              sheet[XLSX.utils.encode_cell({ r, c: col })] = { t: 's', v: slot };
+            }
+          });
+        }
+      }
+
+      XLSX.writeFile(wb, `${grade === 'grade2' ? '2학년' : '3학년'}_리로스쿨_업로드용_최종.xlsx`);
+    } catch (e) {
+      console.error(e);
+      alert("엑셀 생성 중 오류가 발생했습니다.");
+    }
+  };
 
   const handleExportStep6 = () => {
     if (step6Data.length === 0) return;
@@ -4285,6 +4414,19 @@ export default function Home() {
                       <span>다년도 분석</span>
                     </div>
                   </button>
+                  <button
+                    onClick={() => setChangeActiveTab("riroschool")}
+                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "riroschool"
+                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                      }`}
+                  >
+                    <span className="text-[10px] tracking-wider font-semibold opacity-50">8단계</span>
+                    <div className="flex items-center gap-2">
+                      <Download className="w-4 h-4" />
+                      <span>리로스쿨 파일</span>
+                    </div>
+                  </button>
                 </div>
 
                 <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 rounded-3xl p-8 shadow-2xl">
@@ -4843,13 +4985,14 @@ export default function Home() {
                                     <button onClick={() => {
                                       setElectiveChanges(prev => ({
                                         ...prev,
-                                        [changeActiveGrade]: [...prev[changeActiveGrade], {
+                                        [changeActiveGrade]: [{
                                           id: Date.now().toString() + Math.random().toString(36).substring(7),
                                           studentId: "",
                                           studentName: "",
                                           beforeSubject: "",
-                                          afterSubject: ""
-                                        }]
+                                          afterSubject: "",
+                                          isNew: true
+                                        }, ...prev[changeActiveGrade]]
                                       }));
                                     }} className="p-1 text-slate-400 hover:text-emerald-400 transition-colors">
                                       <Plus className="w-5 h-5 mx-auto" />
@@ -4861,10 +5004,15 @@ export default function Home() {
                                 {(() => {
                                   const data = electiveChanges[changeActiveGrade];
                                   const sortedData = [...data].sort((a, b) => {
+                                      const isCompleteA = (a.studentId||'').trim() && (a.studentName||'').trim() && (a.beforeSubject||'').trim() && (a.afterSubject||'').trim();
+                                      const isCompleteB = (b.studentId||'').trim() && (b.studentName||'').trim() && (b.beforeSubject||'').trim() && (b.afterSubject||'').trim();
+                                      const isPendingNewA = a.isNew;
+                                      const isPendingNewB = b.isNew;
+                                      if (isPendingNewA && !isPendingNewB) return -1;
+                                      if (!isPendingNewA && isPendingNewB) return 1;
+                                      if (isPendingNewA && isPendingNewB) return 0;
                                       const valA = String(a.studentId || "").trim();
                                       const valB = String(b.studentId || "").trim();
-                                      if (valA === "" && valB !== "") return 1;
-                                      if (valA !== "" && valB === "") return -1;
                                       return valA.localeCompare(valB);
                                   });
                                   if (sortedData.length === 0) {
@@ -4904,6 +5052,27 @@ export default function Home() {
                                         });
                                       };
 
+                                      const handleBlur = () => {
+                                        setElectiveChanges(prev => {
+                                          const newData = [...prev[changeActiveGrade]];
+                                          let modified = false;
+                                          group.items.forEach((gItem: any) => {
+                                            if (gItem.isNew) {
+                                              const isComplete = (gItem.studentId||'').trim() && (gItem.studentName||'').trim() && (gItem.beforeSubject||'').trim() && (gItem.afterSubject||'').trim();
+                                              if (isComplete) {
+                                                const idx = newData.findIndex(x => x.id === gItem.id);
+                                                if (idx > -1) {
+                                                  newData[idx] = { ...newData[idx] };
+                                                  delete newData[idx].isNew;
+                                                  modified = true;
+                                                }
+                                              }
+                                            }
+                                          });
+                                          return modified ? { ...prev, [changeActiveGrade]: newData } : prev;
+                                        });
+                                      };
+
                                       return (
                                         <tr key={item.id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
                                           <td className="px-3 py-2 text-center border-r border-slate-700/50 text-slate-500">{currentIndex + 1}</td>
@@ -4924,18 +5093,7 @@ export default function Home() {
                                                       return { ...prev, [changeActiveGrade]: newData };
                                                     });
                                                   }}
-                                                  onBlur={() => {
-                                                    setElectiveChanges(prev => {
-                                                      const newData = [...prev[changeActiveGrade]].sort((a, b) => {
-                                                        const valA = String(a.studentId || "");
-                                                        const valB = String(b.studentId || "");
-                                                        if (valA === "" && valB !== "") return 1;
-                                                        if (valA !== "" && valB === "") return -1;
-                                                        return valA.localeCompare(valB);
-                                                      });
-                                                      return { ...prev, [changeActiveGrade]: newData };
-                                                    });
-                                                  }}
+                                                  onBlur={handleBlur}
                                                   className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
                                                   placeholder="학번"
                                                 />
@@ -4955,6 +5113,7 @@ export default function Home() {
                                                       return { ...prev, [changeActiveGrade]: newData };
                                                     });
                                                   }}
+                                                  onBlur={handleBlur}
                                                   className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
                                                   placeholder="이름"
                                                 />
@@ -4966,6 +5125,7 @@ export default function Home() {
                                               type="text"
                                               value={item.beforeSubject}
                                               onChange={e => updateItem("beforeSubject", e.target.value)}
+                                              onBlur={handleBlur}
                                               className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
                                             />
                                           </td>
@@ -4975,6 +5135,7 @@ export default function Home() {
                                               type="text"
                                               value={item.afterSubject}
                                               onChange={e => updateItem("afterSubject", e.target.value)}
+                                              onBlur={handleBlur}
                                               className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
                                             />
                                           </td>
@@ -5030,13 +5191,41 @@ export default function Home() {
                                   <th className="px-4 py-3 font-semibold text-center border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">변경전</th>
                                   <th className="px-2 py-3 font-semibold text-center w-8 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">→</th>
                                   <th className="px-4 py-3 font-semibold text-center border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">변경후</th>
-                                  
+                                  <th className="px-2 py-3 font-semibold text-center w-12 sticky top-0 z-10 bg-slate-800 shadow-sm">
+                                    <button onClick={() => {
+                                      setElectiveChangesArbitrary(prev => ({
+                                        ...prev,
+                                        [changeActiveGrade]: [{
+                                          id: Date.now().toString() + Math.random().toString(36).substring(7),
+                                          studentId: "",
+                                          studentName: "",
+                                          beforeSubject: "",
+                                          afterSubject: "",
+                                          isNew: true
+                                        }, ...prev[changeActiveGrade]]
+                                      }));
+                                    }} className="p-1 text-slate-400 hover:text-emerald-400 transition-colors">
+                                      <Plus className="w-5 h-5 mx-auto" />
+                                    </button>
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {(() => {
                                   const data = electiveChangesArbitrary[changeActiveGrade];
-                                  if (data.length === 0) {
+                                  const sortedData = [...data].sort((a, b) => {
+                                      const isCompleteA = (a.studentId||'').trim() && (a.studentName||'').trim() && (a.beforeSubject||'').trim() && (a.afterSubject||'').trim();
+                                      const isCompleteB = (b.studentId||'').trim() && (b.studentName||'').trim() && (b.beforeSubject||'').trim() && (b.afterSubject||'').trim();
+                                      const isPendingNewA = a.isNew;
+                                      const isPendingNewB = b.isNew;
+                                      if (isPendingNewA && !isPendingNewB) return -1;
+                                      if (!isPendingNewA && isPendingNewB) return 1;
+                                      if (isPendingNewA && isPendingNewB) return 0;
+                                      const valA = String(a.studentId || "").trim();
+                                      const valB = String(b.studentId || "").trim();
+                                      return valA.localeCompare(valB);
+                                  });
+                                  if (sortedData.length === 0) {
                                     return (
                                       <tr>
                                         <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
@@ -5048,7 +5237,7 @@ export default function Home() {
                                   }
 
                                   const groupedData: any[] = [];
-                                  data.forEach(item => {
+                                  sortedData.forEach(item => {
                                     const lastGroup = groupedData[groupedData.length - 1];
                                     if (lastGroup && lastGroup.studentId === item.studentId && lastGroup.studentId !== "") {
                                       lastGroup.items.push(item);
@@ -5073,6 +5262,27 @@ export default function Home() {
                                         });
                                       };
 
+                                      const handleBlur = () => {
+                                        setElectiveChangesArbitrary(prev => {
+                                          const newData = [...prev[changeActiveGrade]];
+                                          let modified = false;
+                                          group.items.forEach((gItem: any) => {
+                                            if (gItem.isNew) {
+                                              const isComplete = (gItem.studentId||'').trim() && (gItem.studentName||'').trim() && (gItem.beforeSubject||'').trim() && (gItem.afterSubject||'').trim();
+                                              if (isComplete) {
+                                                const idx = newData.findIndex(x => x.id === gItem.id);
+                                                if (idx > -1) {
+                                                  newData[idx] = { ...newData[idx] };
+                                                  delete newData[idx].isNew;
+                                                  modified = true;
+                                                }
+                                              }
+                                            }
+                                          });
+                                          return modified ? { ...prev, [changeActiveGrade]: newData } : prev;
+                                        });
+                                      };
+
                                       return (
                                         <tr key={item.id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
                                           <td className="px-3 py-2 text-center border-r border-slate-700/50 text-slate-500">{currentIndex + 1}</td>
@@ -5093,18 +5303,7 @@ export default function Home() {
                                                       return { ...prev, [changeActiveGrade]: newData };
                                                     });
                                                   }}
-                                                  onBlur={() => {
-                                                    setElectiveChangesArbitrary(prev => {
-                                                      const newData = [...prev[changeActiveGrade]].sort((a, b) => {
-                                                        const valA = String(a.studentId || "");
-                                                        const valB = String(b.studentId || "");
-                                                        if (valA === "" && valB !== "") return 1;
-                                                        if (valA !== "" && valB === "") return -1;
-                                                        return valA.localeCompare(valB);
-                                                      });
-                                                      return { ...prev, [changeActiveGrade]: newData };
-                                                    });
-                                                  }}
+                                                  onBlur={handleBlur}
                                                   className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
                                                   placeholder="학번"
                                                 />
@@ -5124,6 +5323,7 @@ export default function Home() {
                                                       return { ...prev, [changeActiveGrade]: newData };
                                                     });
                                                   }}
+                                                  onBlur={handleBlur}
                                                   className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
                                                   placeholder="이름"
                                                 />
@@ -5135,6 +5335,7 @@ export default function Home() {
                                               type="text"
                                               value={item.beforeSubject}
                                               onChange={e => updateItem("beforeSubject", e.target.value)}
+                                              onBlur={handleBlur}
                                               className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
                                             />
                                           </td>
@@ -5144,6 +5345,7 @@ export default function Home() {
                                               type="text"
                                               value={item.afterSubject}
                                               onChange={e => updateItem("afterSubject", e.target.value)}
+                                              onBlur={handleBlur}
                                               className="w-full bg-slate-950/50 border border-slate-700 rounded px-2 py-1.5 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center text-sm"
                                             />
                                           </td>
@@ -5528,15 +5730,38 @@ export default function Home() {
                                             let movedOut = false;
                                             for (const entry of studentLogs) {
                                               if (entry.status !== 'success') continue;
-                                              const beforeMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
-                                              const afterMatch = entry.afterStr.match(/^(.+)\(([^)]+)\)$/);
-                                              if (beforeMatch && afterMatch) {
-                                                const logBeforeSubject = beforeMatch[1];
-                                                const logBeforeSlot = beforeMatch[2];
-                                                const logAfterSubject = afterMatch[1];
-                                                const logAfterSlot = afterMatch[2];
+                                              let logBeforeSubject = entry.beforeStr;
+                                              let logBeforeSlot = '';
+                                              let logAfterSubject = entry.afterStr;
+                                              let logAfterSlot = '';
+                                              
+                                              for (const s of (timeSlots[changeActiveGrade] || [])) {
+                                                if (entry.beforeStr.endsWith(`(${s})`)) {
+                                                  logBeforeSubject = entry.beforeStr.slice(0, -(s.length + 2));
+                                                  logBeforeSlot = s;
+                                                  break;
+                                                }
+                                              }
+                                              if (!logBeforeSlot) {
+                                                const bMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
+                                                if (bMatch) { logBeforeSubject = bMatch[1]; logBeforeSlot = bMatch[2]; }
+                                              }
 
-                                                if (logBeforeSlot === slot && logBeforeSubject === chosenSubject) {
+                                              for (const s of (timeSlots[changeActiveGrade] || [])) {
+                                                if (entry.afterStr.endsWith(`(${s})`)) {
+                                                  logAfterSubject = entry.afterStr.slice(0, -(s.length + 2));
+                                                  logAfterSlot = s;
+                                                  break;
+                                                }
+                                              }
+                                              if (!logAfterSlot) {
+                                                const aMatch = entry.afterStr.match(/^(.+)\(([^)]+)\)$/);
+                                                if (aMatch) { logAfterSubject = aMatch[1]; logAfterSlot = aMatch[2]; }
+                                              }
+
+                                              if (logBeforeSlot && logAfterSlot) {
+                                                const norm = (s: string) => s.replace(/\s+/g, '').replace(/Ⅰ/g, 'I').replace(/Ⅱ/g, 'II').replace(/Ⅲ/g, 'III');
+                                                if (logBeforeSlot === slot && norm(logBeforeSubject) === norm(chosenSubject as string)) {
                                                   movedOut = true;
                                                 }
                                                 if (logAfterSlot === slot) {
@@ -5949,12 +6174,26 @@ export default function Home() {
                                         const isHierarchyViolation = subject && row.hierarchyViolations?.some((v: any) => v.subject === subject || v.prereq === subject);
                                         
                                         let isChangedByApplicant = false;
+                                        let debugInfo = "";
                                         if (adjustmentLog[row.id]) {
                                             isChangedByApplicant = adjustmentLog[row.id].some(l => {
                                                 if (l.status !== 'success' || l.source !== 'applicant') return false;
-                                                const match = l.afterStr.match(/^(.+)\(([^)]+)\)$/);
-                                                const afterSubj = match ? match[1] : l.afterStr;
-                                                return afterSubj === subject;
+                                                const timeSlotsForGrade = timeSlots[changeActiveGrade] || [];
+                                                let afterSubj = l.afterStr;
+                                                let found = false;
+                                                for (const slot of timeSlotsForGrade) {
+                                                    if (l.afterStr.endsWith(`(${slot})`)) {
+                                                        afterSubj = l.afterStr.slice(0, -(slot.length + 2));
+                                                        found = true;
+                                                        break;
+                                                    }
+                                                }
+                                                if (!found) {
+                                                    const match = l.afterStr.match(/^(.+)\(([^)]+)\)$/);
+                                                    if (match) afterSubj = match[1];
+                                                }
+                                                const norm = (s: string) => s.replace(/\s+/g, '').replace(/Ⅰ/g, 'I').replace(/Ⅱ/g, 'II').replace(/Ⅲ/g, 'III');
+                                                return norm(afterSubj) === norm(subject);
                                             });
                                         }
 
@@ -5974,7 +6213,9 @@ export default function Home() {
                                         }
 
                                         return (
-                                          <span key={`cur-${i}`} className={cellClass}>{subject}</span>
+                                          <span key={`cur-${i}`} className={cellClass}>
+                                            {subject}
+                                          </span>
                                         );
                                       })}
                                       </div>
@@ -6000,6 +6241,66 @@ export default function Home() {
                       )}
                     </div>
                   )}
+                  
+                  {changeActiveTab === "riroschool" && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
+                          <Download className="w-6 h-6 text-indigo-400" />
+                          리로스쿨 업로드용 파일 다운로드
+                        </h2>
+                      </div>
+                      
+                      <div className="bg-slate-800/30 rounded-2xl p-6 md:p-10 border border-slate-700/50">
+                        <div className="flex flex-col items-center justify-center text-center space-y-4 max-w-2xl mx-auto">
+                          <div className="w-16 h-16 bg-indigo-500/10 border border-indigo-500/20 rounded-full flex items-center justify-center mb-2">
+                            <FileIcon className="w-8 h-8 text-indigo-400" />
+                          </div>
+                          <h3 className="text-xl font-bold text-white">
+                            최종 선택과목 데이터 엑셀 다운로드
+                          </h3>
+                          <p className="text-slate-400 text-sm md:text-base leading-relaxed">
+                            2단계에서 업로드했던 원본 엑셀 파일(sample3)의 형태와 서식을 그대로 유지한 채,<br />
+                            학생들의 변경 신청 결과에 맞춰 선택과목 알파벳 마킹(A, B, C, D)만 정확히 최신화하여 다운로드합니다.
+                          </p>
+
+                          <div className="flex gap-4 mt-8 pt-4">
+                            <button
+                              onClick={() => handleDownloadRiroschool('grade2')}
+                              disabled={!sampleRawData['grade2']}
+                              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg ${
+                                sampleRawData['grade2'] 
+                                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20 hover:scale-105' 
+                                  : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                              }`}
+                            >
+                              <Download className="w-5 h-5" />
+                              2학년 리로스쿨 엑셀 다운로드
+                            </button>
+                            <button
+                              onClick={() => handleDownloadRiroschool('grade3')}
+                              disabled={!sampleRawData['grade3']}
+                              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg ${
+                                sampleRawData['grade3'] 
+                                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20 hover:scale-105' 
+                                  : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                              }`}
+                            >
+                              <Download className="w-5 h-5" />
+                              3학년 리로스쿨 엑셀 다운로드
+                            </button>
+                          </div>
+                          
+                          {(!sampleRawData['grade2'] && !sampleRawData['grade3']) && (
+                            <p className="text-rose-400 text-sm mt-4">
+                              ⚠️ 2단계 탭에서 원본 파일을 먼저 업로드해야 다운로드가 가능합니다.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               </Fragment>
             )}
