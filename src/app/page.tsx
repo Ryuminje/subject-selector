@@ -86,6 +86,7 @@ export default function Home() {
   const [showOnlyApplicants, setShowOnlyApplicants] = useState(false);
   const [changeRosterTimeSlot, setChangeRosterTimeSlot] = useState("A");
   const [rosterAfterSubjectFilter, setRosterAfterSubjectFilter] = useState<string>("전체");
+  const [rosterBeforeSubjectFilter, setRosterBeforeSubjectFilter] = useState<string>("전체");
 
   const [changeTimeSlots, setChangeTimeSlots] = useState<{ grade2: string[], grade3: string[] }>({ grade2: [], grade3: [] });
   const [changeClassCols, setChangeClassCols] = useState<{ grade2: string[], grade3: string[] }>({ grade2: [], grade3: [] });
@@ -3223,50 +3224,251 @@ export default function Home() {
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-rose-600/20 blur-[120px]" />
       </div>
 
-      {/* Sidebar */}
-      <aside className="relative z-20 w-64 bg-slate-900/80 backdrop-blur-xl border-r border-slate-800/80 flex flex-col shrink-0 shadow-2xl">
-        <div className="p-6 pb-8 border-b border-slate-800/50">
-          <h2 className="text-xl font-extrabold bg-gradient-to-r from-indigo-400 to-purple-400 text-transparent bg-clip-text">
-            데이터 처리기
-          </h2>
-        </div>
+      {/* Floating Bookmark Tabs */}
+      <div className="fixed left-0 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-6">
+        {/* Tab 1: 수요조사 */}
+        <button
+          onClick={() => setActiveSidebarTab("survey")}
+          className={`group relative flex items-center h-24 w-14 hover:w-48 rounded-r-2xl transition-all duration-300 ease-out overflow-hidden shadow-[4px_4px_15px_rgba(0,0,0,0.5)] border-y border-r ${
+            activeSidebarTab === "survey"
+              ? "bg-indigo-600 border-indigo-400 shadow-indigo-500/30"
+              : "bg-slate-800 border-slate-700 hover:bg-slate-700"
+          }`}
+        >
+          <div className="w-14 shrink-0 flex items-center justify-center">
+            <FileText className={`w-6 h-6 ${activeSidebarTab === "survey" ? "text-white" : "text-slate-400 group-hover:text-indigo-300"}`} />
+          </div>
+          <span className={`absolute left-14 font-bold text-lg whitespace-nowrap transition-opacity duration-300 ${
+            activeSidebarTab === "survey" ? "text-white" : "text-slate-300"
+          }`}>
+            수요조사
+          </span>
+        </button>
 
-        <div className="flex flex-col gap-2 p-4">
-          <button
-            onClick={() => setActiveSidebarTab("survey")}
-            className={`flex items-center gap-3 px-4 py-3.5 rounded-xl font-semibold transition-all duration-300 ${activeSidebarTab === "survey"
-                ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
-                : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 border border-transparent"
-              }`}
-          >
-            <FileText className="w-5 h-5" />
-            <span>수요조사</span>
-          </button>
-          <button
-            onClick={() => setActiveSidebarTab("change")}
-            className={`flex items-center gap-3 px-4 py-3.5 rounded-xl font-semibold transition-all duration-300 ${activeSidebarTab === "change"
-                ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
-                : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 border border-transparent"
-              }`}
-          >
-            <GitBranch className="w-5 h-5" />
-            <span>선택과목 변경</span>
-          </button>
-        </div>
-      </aside>
+        {/* Tab 2: 선택과목 변경 */}
+        <button
+          onClick={() => setActiveSidebarTab("change")}
+          className={`group relative flex items-center h-24 w-14 hover:w-56 rounded-r-2xl transition-all duration-300 ease-out overflow-hidden shadow-[4px_4px_15px_rgba(0,0,0,0.5)] border-y border-r ${
+            activeSidebarTab === "change"
+              ? "bg-purple-600 border-purple-400 shadow-purple-500/30"
+              : "bg-slate-800 border-slate-700 hover:bg-slate-700"
+          }`}
+        >
+          <div className="w-14 shrink-0 flex items-center justify-center">
+            <GitBranch className={`w-6 h-6 ${activeSidebarTab === "change" ? "text-white" : "text-slate-400 group-hover:text-purple-300"}`} />
+          </div>
+          <span className={`absolute left-14 font-bold text-lg whitespace-nowrap transition-opacity duration-300 ${
+            activeSidebarTab === "change" ? "text-white" : "text-slate-300"
+          }`}>
+            선택과목 변경
+          </span>
+        </button>
+      </div>
 
-      <main className="relative z-10 flex-1 flex flex-col max-h-screen overflow-hidden">
+      <main className="relative z-10 flex-1 flex flex-col max-h-screen overflow-hidden pl-14">
         {/* Global Header */}
-        <header className="flex-none px-10 py-6 border-b border-slate-800/30 bg-slate-950/40 backdrop-blur-sm flex items-center justify-between">
+        <header className="flex-none px-8 py-3.5 border-b border-slate-800/30 bg-slate-950/40 backdrop-blur-sm flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tight text-white mb-2">
+            <h1 className="text-xl font-bold tracking-tight text-white">
               {activeSidebarTab === "survey" ? "수강 신청 데이터 처리기" : "선택과목 변경 시스템"}
             </h1>
-            <p className="text-slate-400 text-sm max-w-2xl">
-              {activeSidebarTab === "survey"
-                ? "학생 수강 신청 엑셀 파일을 업로드하면, 학급별 시트 분리 및 기초/사회/과학 과목 통계가 계산된 엑셀 파일로 변환해 드립니다."
-                : "수요조사 이후 선택과목을 변경하는 학생들의 데이터를 관리합니다."}
-            </p>
+            
+          </div>
+
+
+          {/* Moved Tab Grids Here */}
+          <div className="flex-1 flex justify-center">
+            {activeSidebarTab === "survey" && (
+              <div className="flex gap-1.5 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit mx-auto">
+                                <button
+                                  onClick={() => setActiveTab("curriculum")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${activeTab === "curriculum"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">1단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <Settings className="w-3.5 h-3.5 opacity-80" />
+                                    <span>교육과정 편성표 입력</span>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={() => setActiveTab("hierarchy")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${activeTab === "hierarchy"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">2단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <GitBranch className="w-3.5 h-3.5 opacity-80" />
+                                    <span>과목 위계 설정</span>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={() => setActiveTab("upload")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${activeTab === "upload"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">3단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <Upload className="w-3.5 h-3.5 opacity-80" />
+                                    <span>파일 업로드</span>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={() => setActiveTab("preview")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${activeTab === "preview"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">4단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <FileText className="w-3.5 h-3.5 opacity-80" />
+                                    <span>수요조사 결과</span>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={() => setActiveTab("classOpening")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${activeTab === "classOpening"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">5단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <CheckCircle2 className="w-3.5 h-3.5 opacity-80" />
+                                    <span>과목 개설 여부</span>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={() => setActiveTab("categorySummary")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${activeTab === "categorySummary"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">6단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <FileText className="w-3.5 h-3.5 opacity-80" />
+                                    <span>교과(군)별 시수 정리</span>
+                                  </div>
+                                </button>
+              
+                              </div>
+            )}
+            {activeSidebarTab === "change" && (
+              <div className="flex gap-1.5 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit mx-auto">
+                                <button
+                                  onClick={() => setChangeActiveTab("basic")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${changeActiveTab === "basic"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">1단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <Settings className="w-3.5 h-3.5 opacity-80" />
+                                    <span>기초자료 입력</span>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={() => setChangeActiveTab("upload")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${changeActiveTab === "upload"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">2단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <Upload className="w-3.5 h-3.5 opacity-80" />
+                                    <span>2학기 타임별 선택과목 데이터 업로드</span>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={() => setChangeActiveTab("timetable")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${changeActiveTab === "timetable"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">3단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <Settings className="w-3.5 h-3.5 opacity-80" />
+                                    <span>타임별 시간표 입력</span>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={() => setChangeActiveTab("roster")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${changeActiveTab === "roster"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">4단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <Users className="w-3.5 h-3.5 opacity-80" />
+                                    <span>타임별 선택과목 명단</span>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={() => setChangeActiveTab("application")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${changeActiveTab === "application"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">5단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <FileText className="w-3.5 h-3.5 opacity-80" />
+                                    <span>선택과목 변경 신청</span>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={() => setChangeActiveTab("roster_after")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${changeActiveTab === "roster_after"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">6단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <Users className="w-3.5 h-3.5 opacity-80" />
+                                    <span>변경 후 명단</span>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={() => setChangeActiveTab("analysis")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${changeActiveTab === "analysis"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">7단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <FileText className="w-3.5 h-3.5 opacity-80" />
+                                    <span>다년도 분석</span>
+                                  </div>
+                                </button>
+                                <button
+                                  onClick={() => setChangeActiveTab("riroschool")}
+                                  className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${changeActiveTab === "riroschool"
+                                      ? "bg-slate-800 text-white shadow-lg border border-slate-700"
+                                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                                    }`}
+                                >
+                                  <span className="text-[10px] tracking-widest font-bold opacity-60 text-slate-400">8단계</span>
+                                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                                    <Download className="w-3.5 h-3.5 opacity-80" />
+                                    <span>리로스쿨 파일</span>
+                                  </div>
+                                </button>
+                              </div>
+            )}
           </div>
 
           <div className="flex gap-2 shrink-0">
@@ -3295,92 +3497,12 @@ export default function Home() {
         </header>
 
         {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto p-10 pb-24">
-          <div className="max-w-[95%] 2xl:max-w-[1600px] mx-auto">
+        <div className="flex-1 overflow-y-auto px-4 py-8 pb-24">
+          <div className="w-full mx-auto">
 
             {activeSidebarTab === "survey" && (
               <Fragment>
-                <div className="flex gap-3 mb-8 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit mx-auto">
-                  <button
-                    onClick={() => setActiveTab("curriculum")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${activeTab === "curriculum"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span>
-                    <div className="flex items-center gap-2">
-                      <Settings className="w-4 h-4" />
-                      <span>교육과정 편성표 입력</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("hierarchy")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${activeTab === "hierarchy"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span>
-                    <div className="flex items-center gap-2">
-                      <GitBranch className="w-4 h-4" />
-                      <span>과목 위계 설정</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("upload")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${activeTab === "upload"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span>
-                    <div className="flex items-center gap-2">
-                      <Upload className="w-4 h-4" />
-                      <span>파일 업로드</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("preview")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${activeTab === "preview"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span>
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4" />
-                      <span>수요조사 결과</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("classOpening")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${activeTab === "classOpening"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>과목 개설 여부</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("categorySummary")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${activeTab === "categorySummary"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span>
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4" />
-                      <span>교과(군)별 시수 정리</span>
-                    </div>
-                  </button>
-
-                </div>
+                
 
                 <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 rounded-3xl p-8 shadow-2xl">
                   {activeTab === "curriculum" && (
@@ -4350,112 +4472,7 @@ export default function Home() {
 
             {activeSidebarTab === "change" && (
               <Fragment>
-                <div className="flex gap-3 mb-8 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit mx-auto">
-                  <button
-                    onClick={() => setChangeActiveTab("basic")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "basic"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span>
-                    <div className="flex items-center gap-2">
-                      <Settings className="w-4 h-4" />
-                      <span>기초자료 입력</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setChangeActiveTab("upload")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "upload"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span>
-                    <div className="flex items-center gap-2">
-                      <Upload className="w-4 h-4" />
-                      <span>2학기 타임별 선택과목 데이터 업로드</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setChangeActiveTab("timetable")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "timetable"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span>
-                    <div className="flex items-center gap-2">
-                      <Settings className="w-4 h-4" />
-                      <span>타임별 시간표 입력</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setChangeActiveTab("roster")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "roster"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span>
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4" />
-                      <span>타임별 선택과목 명단</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setChangeActiveTab("application")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "application"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span>
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4" />
-                      <span>선택과목 변경 신청</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setChangeActiveTab("roster_after")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "roster_after"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span>
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4" />
-                      <span>변경 후 명단</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setChangeActiveTab("analysis")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "analysis"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">7단계</span>
-                    <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4" />
-                      <span>다년도 분석</span>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setChangeActiveTab("riroschool")}
-                    className={`flex flex-col items-center gap-0.5 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === "riroschool"
-                        ? "bg-slate-800 text-white shadow-lg border border-slate-700"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                      }`}
-                  >
-                    <span className="text-[10px] tracking-wider font-semibold opacity-50">8단계</span>
-                    <div className="flex items-center gap-2">
-                      <Download className="w-4 h-4" />
-                      <span>리로스쿨 파일</span>
-                    </div>
-                  </button>
-                </div>
+                
 
                 <div className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/60 rounded-3xl p-8 shadow-2xl">
                                     {changeActiveTab === "basic" && (
@@ -5938,164 +5955,246 @@ export default function Home() {
                         </div>
                       </div>
 
-                      <div className="flex gap-2 flex-wrap mb-4">
-                        {timeSlots[changeActiveGrade].map(slot => (
-                          <button
-                            key={slot}
-                            onClick={() => setChangeRosterTimeSlot(slot)}
-                            className={`px-5 py-2 rounded-lg font-medium transition-all ${changeRosterTimeSlot === slot
-                                ? "bg-indigo-600 text-white shadow-md"
-                                : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
-                              }`}
-                          >
-                            {slot}타임
-                          </button>
-                        ))}
-                      </div>
+                                            {(() => {
+                        const currentSubjects = Array.from(new Set(
+                          timeSlots[changeActiveGrade].flatMap(slot => 
+                            classCols[changeActiveGrade]
+                              .map(col => {
+                                const cellSubject = timetableData[changeActiveGrade]?.[slot]?.[col]?.subject?.trim();
+                                if (!cellSubject) return null;
+                                const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
+                                return match ? match[1].trim() : cellSubject;
+                              })
+                              .filter(Boolean)
+                          )
+                        )).sort() as string[];
 
-                      <div className="bg-slate-900 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm text-left border-collapse">
-                            <thead>
-                              <tr className="bg-amber-400/20 text-amber-200 border-b-2 border-slate-700">
-                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-bold min-w-[80px]">과목명</th>
-                                {classCols[changeActiveGrade].map(col => (
-                                  <th key={col} colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-bold min-w-[120px]">
-                                    {timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject || "-"}
-                                  </th>
+                        const displayCols: { slot: string, col: string, original: string }[] = [];
+                        if (rosterBeforeSubjectFilter === "전체") {
+                          classCols[changeActiveGrade].forEach(col => {
+                            const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
+                            if (cellSubject) {
+                              displayCols.push({ slot: changeRosterTimeSlot, col, original: cellSubject });
+                            }
+                          });
+                        } else {
+                          timeSlots[changeActiveGrade].forEach(slot => {
+                            classCols[changeActiveGrade].forEach(col => {
+                              const cellSubject = timetableData[changeActiveGrade]?.[slot]?.[col]?.subject?.trim();
+                              if (!cellSubject) return;
+                              const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
+                              const base = match ? match[1].trim() : cellSubject;
+                              if (base === rosterBeforeSubjectFilter) {
+                                displayCols.push({ slot, col, original: cellSubject });
+                              }
+                            });
+                          });
+                        }
+
+                        const maxCols = classCols[changeActiveGrade].length;
+                        const firstColWidth = 8;
+                        const dataColWidth = (100 - firstColWidth) / maxCols;
+                        const emptyColCount = maxCols - displayCols.length;
+
+                        return (
+                          <>
+                            <div className="flex gap-2 flex-wrap mb-4">
+                              {timeSlots[changeActiveGrade].map(slot => (
+                                <button
+                                  key={slot}
+                                  onClick={() => {
+                                    setChangeRosterTimeSlot(slot);
+                                    setRosterBeforeSubjectFilter("전체");
+                                  }}
+                                  className={`px-5 py-2 rounded-lg font-medium transition-all ${changeRosterTimeSlot === slot && rosterBeforeSubjectFilter === "전체"
+                                      ? "bg-indigo-600 text-white shadow-md"
+                                      : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                                    }`}
+                                >
+                                  {slot}타임
+                                </button>
+                              ))}
+                            </div>
+                            
+                            {currentSubjects.length > 0 && (
+                              <div className="flex gap-2 flex-wrap mb-4">
+                                <button
+                                  onClick={() => setRosterBeforeSubjectFilter("전체")}
+                                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${rosterBeforeSubjectFilter === "전체"
+                                      ? "bg-amber-500 text-white shadow-md"
+                                      : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                                    }`}
+                                >
+                                  전체 과목 (타임별)
+                                </button>
+                                {currentSubjects.map(sub => (
+                                  <button
+                                    key={sub}
+                                    onClick={() => setRosterBeforeSubjectFilter(sub)}
+                                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${rosterBeforeSubjectFilter === sub
+                                        ? "bg-amber-500 text-white shadow-md"
+                                        : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                                      }`}
+                                  >
+                                    {sub}
+                                  </button>
                                 ))}
-                              </tr>
-                              <tr className="bg-slate-800 border-b border-slate-700">
-                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">강의실</th>
-                                {classCols[changeActiveGrade].map(col => (
-                                  <Fragment key={`room-${col}`}>
-                                    <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300 bg-slate-800/80">
-                                      {col}
-                                    </th>
-                                  </Fragment>
-                                ))}
-                              </tr>
-                              <tr className="bg-slate-800/50 border-b border-slate-700">
-                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">교사</th>
-                                {classCols[changeActiveGrade].map(col => (
-                                  <Fragment key={`teacher-${col}`}>
-                                    <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center text-slate-400">
-                                      {timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.teacher || "-"}
-                                    </th>
-                                  </Fragment>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(() => {
-                                const colStudents: Record<string, StudentTimeData[]> = {};
-                                classCols[changeActiveGrade].forEach(col => {
-                                  colStudents[col] = [];
-                                });
+                              </div>
+                            )}
 
-                                const allStudents = parsedSampleData[changeActiveGrade] || [];
-                                // 1. Group columns by base subject
-                                const subjectGroups: Record<string, { col: string, num: number, original: string }[]> = {};
-                                classCols[changeActiveGrade].forEach(col => {
-                                  const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
-                                  if (!cellSubject) return;
-
-                                  const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
-                                  const base = match ? match[1].trim() : cellSubject;
-                                  const numMatch = cellSubject.match(/\d+/);
-                                  const num = numMatch ? parseInt(numMatch[0], 10) : 1;
-
-                                  if (!subjectGroups[base]) subjectGroups[base] = [];
-                                  subjectGroups[base].push({ col, num, original: cellSubject });
-                                });
-
-                                // Sort each group by num (so class 1 gets the remainder if odd)
-                                Object.values(subjectGroups).forEach(group => {
-                                  group.sort((a, b) => a.num - b.num);
-                                });
-
-                                // 2. Map students to their base subjects
-                                const studentsByBase: Record<string, StudentTimeData[]> = {};
-                                allStudents.forEach(student => {
-                                  const chosenSubject = student.timeSlotMap[changeRosterTimeSlot];
-                                  if (!chosenSubject) return;
-
-                                  let matchedBase = Object.keys(subjectGroups).find(base => {
-                                    const cleanChosen = chosenSubject.replace(/\s+/g, '');
-                                    const cleanBase = base.replace(/\s+/g, '');
-                                    if (!cleanBase) return false;
-                                    return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
-                                  });
-
-                                  if (matchedBase) {
-                                    if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
-                                    studentsByBase[matchedBase].push(student);
-                                  }
-                                });
-
-                                // 3. Distribute students into columns
-                                Object.keys(studentsByBase).forEach(base => {
-                                  const students = studentsByBase[base].sort((a, b) => {
-                                    return a.id.localeCompare(b.id, undefined, { numeric: true });
-                                  });
-                                  const cols = subjectGroups[base];
-
-                                  const baseCount = Math.floor(students.length / cols.length);
-                                  const remainder = students.length % cols.length;
-
-                                  let sIdx = 0;
-                                  cols.forEach((colObj, idx) => {
-                                    const count = baseCount + (idx < remainder ? 1 : 0);
-                                    const assigned = students.slice(sIdx, sIdx + count);
-                                    colStudents[colObj.col].push(...assigned);
-                                    sIdx += count;
-                                  });
-                                });
-                                let maxStudents = 0;
-                                classCols[changeActiveGrade].forEach(col => {
-                                  if (colStudents[col].length > maxStudents) maxStudents = colStudents[col].length;
-                                });
-
-                                const rows = [];
-                                for (let r = 0; r < maxStudents; r++) {
-                                  rows.push(
-                                    <tr key={r} className="border-b border-slate-800/30 hover:bg-slate-800/20">
-                                      <td className="px-3 py-1.5 border-r border-slate-700/50 text-center text-slate-500 bg-slate-900/50">{r + 1}</td>
-                                      {classCols[changeActiveGrade].map(col => {
-                                        const student = colStudents[col][r];
-                                        return (
-                                          <Fragment key={`data-${col}-${r}`}>
-                                            <td className="px-2 py-1.5 border-r border-slate-700/50 text-center text-slate-400 border-r-slate-800/30 text-xs">
-                                              {student ? student.id : ""}
-                                            </td>
-                                            <td className="px-2 py-1.5 border-r border-slate-700/50 text-center text-slate-300 font-medium text-xs">
-                                              {student ? student.name : ""}
-                                            </td>
-                                          </Fragment>
-                                        );
-                                      })}
-                                    </tr>
-                                  );
-                                }
-
-                                return (
-                                  <>
-                                    {rows}
-                                    <tr className="bg-indigo-900/20 border-t-2 border-indigo-500/30">
-                                      <td className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">총 인원</td>
-                                      {classCols[changeActiveGrade].map(col => (
-                                        <td key={`total-${col}`} colSpan={2} className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">
-                                          {colStudents[col].length}명
-                                        </td>
+                            <div className="bg-slate-900 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl">
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left border-collapse" style={{ tableLayout: 'fixed' }}>
+                                  <thead>
+                                    <tr className="bg-amber-400/20 text-amber-200 border-b-2 border-slate-700">
+                                      <th style={{ width: `${firstColWidth}%` }} className="px-3 py-2 border-r border-slate-700/50 text-center font-bold">과목명</th>
+                                      {displayCols.map(c => (
+                                        <th key={`header-${c.slot}-${c.col}`} colSpan={2} style={{ width: `${dataColWidth}%` }} className="px-3 py-2 border-r border-slate-700/50 text-center font-bold">
+                                          {rosterBeforeSubjectFilter === "전체" ? c.original : `${c.slot}타임 ${c.original}`}
+                                        </th>
                                       ))}
+                                      {emptyColCount > 0 && <th style={{ width: `${emptyColCount * dataColWidth}%` }}></th>}
                                     </tr>
-                                  </>
-                                );
-                              })()}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
+                                    <tr className="bg-slate-800 border-b border-slate-700">
+                                      <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">강의실</th>
+                                      {displayCols.map(c => (
+                                        <Fragment key={`room-${c.slot}-${c.col}`}>
+                                          <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300 bg-slate-800/80">
+                                            {c.col}
+                                          </th>
+                                        </Fragment>
+                                      ))}
+                                      {emptyColCount > 0 && <th></th>}
+                                    </tr>
+                                    <tr className="bg-slate-800/50 border-b border-slate-700">
+                                      <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">교사</th>
+                                      {displayCols.map(c => (
+                                        <Fragment key={`teacher-${c.slot}-${c.col}`}>
+                                          <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center text-slate-400">
+                                            {timetableData[changeActiveGrade]?.[c.slot]?.[c.col]?.teacher || "-"}
+                                          </th>
+                                        </Fragment>
+                                      ))}
+                                      {emptyColCount > 0 && <th></th>}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(() => {
+                                      const colStudents: Record<string, StudentTimeData[]> = {};
+                                      displayCols.forEach(c => {
+                                        colStudents[`${c.slot}-${c.col}`] = [];
+                                      });
+
+                                      const allStudents = parsedSampleData[changeActiveGrade] || [];
+                                      
+                                      const slotGroups: Record<string, Record<string, { col: string, num: number, original: string }[]>> = {};
+                                      displayCols.forEach(c => {
+                                        if (!slotGroups[c.slot]) slotGroups[c.slot] = {};
+                                        const match = c.original.match(/^(.*?)([\d\s]*)$/);
+                                        const base = match ? match[1].trim() : c.original;
+                                        const numMatch = c.original.match(/\d+/);
+                                        const num = numMatch ? parseInt(numMatch[0], 10) : 1;
+
+                                        if (!slotGroups[c.slot][base]) slotGroups[c.slot][base] = [];
+                                        slotGroups[c.slot][base].push({ col: c.col, num, original: c.original });
+                                      });
+
+                                      Object.values(slotGroups).forEach(bases => {
+                                        Object.values(bases).forEach(group => group.sort((a, b) => a.num - b.num));
+                                      });
+
+                                      Object.keys(slotGroups).forEach(slot => {
+                                        const bases = slotGroups[slot];
+                                        const studentsByBase: Record<string, StudentTimeData[]> = {};
+
+                                        allStudents.forEach(student => {
+                                          const chosenSubject = student.timeSlotMap[slot];
+                                          if (!chosenSubject) return;
+
+                                          let matchedBase = Object.keys(bases).find(base => {
+                                            const cleanChosen = chosenSubject.replace(/\s+/g, '');
+                                            const cleanBase = base.replace(/\s+/g, '');
+                                            if (!cleanBase) return false;
+                                            return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
+                                          });
+
+                                          if (matchedBase) {
+                                            if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
+                                            studentsByBase[matchedBase].push(student);
+                                          }
+                                        });
+
+                                        Object.entries(studentsByBase).forEach(([base, students]) => {
+                                          const cols = bases[base];
+                                          if (!cols || cols.length === 0) return;
+
+                                          const totalStudents = students.length;
+                                          const numCols = cols.length;
+                                          const basePerCol = Math.floor(totalStudents / numCols);
+                                          const remainder = totalStudents % numCols;
+
+                                          let studentIndex = 0;
+                                          cols.forEach((colInfo, idx) => {
+                                            const countForThisCol = basePerCol + (idx < remainder ? 1 : 0);
+                                            for (let i = 0; i < countForThisCol; i++) {
+                                              if (studentIndex < students.length) {
+                                                colStudents[`${slot}-${colInfo.col}`].push(students[studentIndex]);
+                                                studentIndex++;
+                                              }
+                                            }
+                                          });
+                                        });
+                                      });
+
+                                      Object.values(colStudents).forEach(list => {
+                                        list.sort((a, b) => a.name.localeCompare(b.name, 'ko-KR'));
+                                      });
+
+                                      const maxStudents = Math.max(...Object.values(colStudents).map(s => s.length), 0);
+
+                                      const rows = Array.from({ length: maxStudents }).map((_, rowIndex) => (
+                                        <tr key={`row-${rowIndex}`} className="border-b border-slate-700/50 hover:bg-slate-800/30 transition-colors">
+                                          <td className="px-3 py-2 text-center text-slate-500 font-medium border-r border-slate-700/50">{rowIndex + 1}</td>
+                                          {displayCols.map((c) => {
+                                            const student = colStudents[`${c.slot}-${c.col}`]?.[rowIndex];
+                                            return (
+                                              <Fragment key={`${c.slot}-${c.col}-${rowIndex}`}>
+                                                <td className="px-3 py-2 border-r border-slate-700/50 text-center font-mono text-xs text-slate-400">
+                                                  {student ? student.id : ""}
+                                                </td>
+                                                <td className="px-3 py-2 border-r border-slate-700/50 text-center font-medium text-slate-200">
+                                                  {student ? student.name : ""}
+                                                </td>
+                                              </Fragment>
+                                            );
+                                          })}
+                                          {emptyColCount > 0 && <td colSpan={emptyColCount * 2}></td>}
+                                        </tr>
+                                      ));
+
+                                      return (
+                                        <>
+                                          {rows}
+                                          <tr className="bg-indigo-900/20 border-t-2 border-indigo-500/30">
+                                            <td className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">총 인원</td>
+                                            {displayCols.map(c => (
+                                              <td key={`total-${c.slot}-${c.col}`} colSpan={2} className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">
+                                                {colStudents[`${c.slot}-${c.col}`].length}명
+                                              </td>
+                                            ))}
+                                            {emptyColCount > 0 && <td colSpan={emptyColCount * 2}></td>}
+                                          </tr>
+                                        </>
+                                      );
+                                    })()}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
+
                     </div>
                   )}
 
