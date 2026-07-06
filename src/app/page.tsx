@@ -1486,11 +1486,23 @@ export default function Home() {
       };
     });
 
-    // Sort logic: by Group first, then Semester, then applicants descending
+    // Sort logic: by Group first, then Semester, then curriculum category (Step 6 order), then subject name
+    const preferredOrder = ["국어", "수학", "영어", "한국사", "사회", "과학", "일본어", "중국어", "체육", "예술", "미술", "음악", "기술·가정", "정보", "제2외국어", "한문", "진로", "교양"];
     newStats.sort((a, b) => {
       if (a.group !== b.group) return a.group.localeCompare(b.group);
       if (a.semester !== b.semester) return a.semester.localeCompare(b.semester);
-      return b.applicants - a.applicants;
+      
+      const catA = parsedCurriculumList[activeGrade]?.find(p => p.subject === a.subject)?.category || subjectMap[activeGrade]?.[a.subject] || "기타";
+      const catB = parsedCurriculumList[activeGrade]?.find(p => p.subject === b.subject)?.category || subjectMap[activeGrade]?.[b.subject] || "기타";
+      
+      const idxA = preferredOrder.indexOf(catA);
+      const idxB = preferredOrder.indexOf(catB);
+      
+      if (idxA !== -1 && idxB !== -1 && idxA !== idxB) return idxA - idxB;
+      if (idxA !== -1 && idxB === -1) return -1;
+      if (idxB !== -1 && idxA === -1) return 1;
+      
+      return a.subject.localeCompare(b.subject);
     });
 
     setProcessedData(prev => ({ ...prev, [activeGrade]: processed }));
@@ -1505,7 +1517,7 @@ export default function Home() {
       setProcessedData(prev => ({ ...prev, [activeGrade]: [] }));
       setSubjectStats(prev => ({ ...prev, [activeGrade]: [] }));
     }
-  }, [activeGrade, rawSheetData, subjectMap, hierarchyRules, previousSubjectMap]);
+  }, [activeGrade, rawSheetData, subjectMap, hierarchyRules, previousSubjectMap, parsedCurriculumList]);
 
   const handleExport = () => {
     const dataToExport = processedData[activeGrade];
