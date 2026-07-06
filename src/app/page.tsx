@@ -2649,144 +2649,106 @@ export default function Home() {
     const grade = changeActiveGrade;
     const gradeNum = grade === 'grade2' ? '2' : '3';
     
-    // 상단: 신청자
     const dataApplicant = electiveChanges[grade] || [];
     const studentsApplicant = Array.from(new Set(dataApplicant.map(d => d.studentId))).filter(id => id).sort((a, b) => String(a).localeCompare(String(b)));
     
-    // 하단: 임의 변경자
     const dataArbitrary = electiveChangesArbitrary[grade] || [];
     const studentsArbitrary = Array.from(new Set(dataArbitrary.map(d => d.studentId))).filter(id => id).sort((a, b) => String(a).localeCompare(String(b)));
 
-    const rows: any[][] = [];
-    const merges: any[] = [];
-    let changeIndex = 1;
-    let applicantCount = 0;
-    
-    // 신청자 처리
-    studentsApplicant.forEach(studentId => {
-      const logs = adjustmentLog[studentId] || [];
-      const studentName = dataApplicant.find(d => d.studentId === studentId)?.studentName || "";
-      const validLogs = logs.filter(log => log.status === 'success' && log.source === 'applicant');
+    const createSheet = (title: string, students: string[], dataSrc: any[], sourceFilter: string) => {
+      const rows: any[][] = [];
+      const merges: any[] = [];
+      let changeIndex = 1;
+      let count = 0;
+      
+      students.forEach(studentId => {
+        const logs = adjustmentLog[studentId] || [];
+        const studentName = dataSrc.find(d => d.studentId === studentId)?.studentName || "";
+        const validLogs = logs.filter(log => log.status === 'success' && log.source === sourceFilter);
 
-      if (validLogs.length > 0) {
-        validLogs.forEach((log, index) => {
-          rows.push([
-            index === 0 ? changeIndex : "",
-            index === 0 ? studentId : "",
-            index === 0 ? studentName : "",
-            log.beforeStr,
-            "→",
-            log.afterStr
-          ]);
-        });
+        if (validLogs.length > 0) {
+          validLogs.forEach((log, index) => {
+            rows.push([
+              index === 0 ? changeIndex : "",
+              index === 0 ? studentId : "",
+              index === 0 ? studentName : "",
+              log.beforeStr,
+              "→",
+              log.afterStr
+            ]);
+          });
 
-        if (validLogs.length > 1) {
-          const startRow = rows.length - validLogs.length + 2;
-          const endRow = rows.length + 1;
-          merges.push({ s: { r: startRow, c: 0 }, e: { r: endRow, c: 0 } });
-          merges.push({ s: { r: startRow, c: 1 }, e: { r: endRow, c: 1 } });
-          merges.push({ s: { r: startRow, c: 2 }, e: { r: endRow, c: 2 } });
+          if (validLogs.length > 1) {
+            const startRow = rows.length - validLogs.length + 2;
+            const endRow = rows.length + 1;
+            merges.push({ s: { r: startRow, c: 0 }, e: { r: endRow, c: 0 } });
+            merges.push({ s: { r: startRow, c: 1 }, e: { r: endRow, c: 1 } });
+            merges.push({ s: { r: startRow, c: 2 }, e: { r: endRow, c: 2 } });
+          }
+          changeIndex++;
+          count++;
         }
-        changeIndex++;
-        applicantCount++;
+      });
+
+      if (count === 0) return null;
+
+      const wsData = [
+        [`${title} (${count}명)`, "", "", "", "", ""],
+        ["순번", "학번", "이름", "변경전", "→", "변경후"],
+        ...rows
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } });
+      ws['!merges'] = merges;
+
+      for (const cell in ws) {
+        if (cell[0] === '!') continue;
+        if (!ws[cell].s) ws[cell].s = {};
+
+        const rowIndex = parseInt(cell.replace(/\D/g, '')) - 1;
+
+        ws[cell].s = {
+          alignment: { horizontal: "center", vertical: "center" },
+          border: {
+            top: { style: "thin", color: { rgb: "000000" } },
+            bottom: { style: "thin", color: { rgb: "000000" } },
+            left: { style: "thin", color: { rgb: "000000" } },
+            right: { style: "thin", color: { rgb: "000000" } }
+          }
+        };
+
+        if (rowIndex === 0) {
+          ws[cell].s.font = { sz: 16, bold: true };
+        } else if (rowIndex === 1) {
+          ws[cell].s.font = { bold: true };
+        }
       }
-    });
 
-    const rowsApplicantCount = rows.length;
-    let arbitraryCount = 0;
+      ws['!cols'] = [
+        { wpx: 40 },
+        { wpx: 70 },
+        { wpx: 80 },
+        { wpx: 180 },
+        { wpx: 30 },
+        { wpx: 180 },
+      ];
 
-    // 임의 변경자 처리 (하단 구분선 및 데이터)
-    let arbitraryStartIndex = rows.length;
-    let hasArbitrary = false;
-    
-    studentsArbitrary.forEach(studentId => {
-      const logs = adjustmentLog[studentId] || [];
-      const studentName = dataArbitrary.find(d => d.studentId === studentId)?.studentName || "";
-      const validLogs = logs.filter(log => log.status === 'success' && log.source === 'arbitrary');
+      return ws;
+    };
 
-      if (validLogs.length > 0) {
-        if (!hasArbitrary) {
-            rows.push(["■ 인원 균등 분배를 위한 임의 변경 내역", "", "", "", "", ""]);
-            merges.push({ s: { r: rows.length + 1, c: 0 }, e: { r: rows.length + 1, c: 5 } });
-            hasArbitrary = true;
-            changeIndex = 1; // 인덱스 초기화
-        }
+    const wsApplicant = createSheet(`${gradeNum}학년 2학기 수동 신청 변경 내역`, studentsApplicant, dataApplicant, 'applicant');
+    const wsArbitrary = createSheet(`${gradeNum}학년 2학기 인원 균등 분배 임의 변경 내역`, studentsArbitrary, dataArbitrary, 'arbitrary');
 
-        validLogs.forEach((log, index) => {
-          rows.push([
-            index === 0 ? changeIndex : "",
-            index === 0 ? studentId : "",
-            index === 0 ? studentName : "",
-            log.beforeStr,
-            "→",
-            log.afterStr
-          ]);
-        });
-
-        if (validLogs.length > 1) {
-          const startRow = rows.length - validLogs.length + 2;
-          const endRow = rows.length + 1;
-          merges.push({ s: { r: startRow, c: 0 }, e: { r: endRow, c: 0 } });
-          merges.push({ s: { r: startRow, c: 1 }, e: { r: endRow, c: 1 } });
-          merges.push({ s: { r: startRow, c: 2 }, e: { r: endRow, c: 2 } });
-        }
-        changeIndex++;
-        arbitraryCount++;
-      }
-    });
-
-    if (rows.length === 0) {
+    if (!wsApplicant && !wsArbitrary) {
       alert("다운로드할 변경 내역이 없습니다.");
       return;
     }
 
-    const title = `${gradeNum}학년 2학기 선택 과목 변경 내역 (신청자: ${applicantCount}명, 임의변경: ${arbitraryCount}명)`;
-
-    const wsData = [
-      [title, "", "", "", "", ""],
-      ["순번", "학번", "이름", "변경전", "→", "변경후"],
-      ...rows
-    ];
-
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-    merges.push({ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } });
-    ws['!merges'] = merges;
-
-    for (const cell in ws) {
-      if (cell[0] === '!') continue;
-      if (!ws[cell].s) ws[cell].s = {};
-
-      const rowIndex = parseInt(cell.replace(/\D/g, '')) - 1;
-
-      ws[cell].s = {
-        alignment: { horizontal: "center", vertical: "center" },
-        border: {
-          top: { style: "thin", color: { rgb: "000000" } },
-          bottom: { style: "thin", color: { rgb: "000000" } },
-          left: { style: "thin", color: { rgb: "000000" } },
-          right: { style: "thin", color: { rgb: "000000" } }
-        }
-      };
-
-      if (rowIndex === 0) {
-        ws[cell].s.font = { sz: 16, bold: true };
-      } else if (rowIndex === 1) {
-        ws[cell].s.font = { bold: true };
-      }
-    }
-
-    ws['!cols'] = [
-      { wpx: 40 },
-      { wpx: 70 },
-      { wpx: 80 },
-      { wpx: 180 },
-      { wpx: 30 },
-      { wpx: 180 },
-    ];
-
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "변경내역");
+    if (wsApplicant) XLSX.utils.book_append_sheet(wb, wsApplicant, "신청자 변경내역");
+    if (wsArbitrary) XLSX.utils.book_append_sheet(wb, wsArbitrary, "임의 변경내역");
+    
     XLSX.writeFile(wb, `${gradeNum}학년_선택과목_변경내역.xlsx`);
   };
 
