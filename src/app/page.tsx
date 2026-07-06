@@ -6132,8 +6132,9 @@ export default function Home() {
                                     <td className="px-2 py-2.5 border-r border-slate-800 max-w-[250px]" title={row.currentSubjects.join(", ")}>
                                       <div className="flex flex-wrap gap-1.5">
                                       {row.currentSubjects.map((subject, i) => {
-                                        const isDuplicate = subject && row.duplicateSubjects?.includes(subject);
-                                        const isHierarchyViolation = subject && row.hierarchyViolations?.some((v: any) => v.subject === subject || v.prereq === subject);
+                                        const normS = (s: string) => s ? s.replace(/\s+/g, '').replace(/Ⅰ/g, 'I').replace(/Ⅱ/g, 'II').replace(/Ⅲ/g, 'III') : '';
+                                        const isDuplicate = subject && row.duplicateSubjects?.some((d: string) => normS(d) === normS(subject));
+                                        const isHierarchyViolation = subject && row.hierarchyViolations?.some((v: any) => normS(v.subject) === normS(subject) || normS(v.prereq) === normS(subject));
                                         
                                         let isChangedByApplicant = false;
                                         let debugInfo = "";
