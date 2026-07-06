@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, Fragment, useMemo, useCallback } from "react";
-import { Upload, FileText, Settings, Download, CheckCircle2, ChevronRight, Trash2, File as FileIcon, Save, FolderOpen, GitBranch, Plus, Users } from "lucide-react";
+import { Upload, FileText, Settings, Download, CheckCircle2, ChevronRight, Trash2, File as FileIcon, Save, FolderOpen, GitBranch, Plus, Users, RotateCcw } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 
 type SubjectCategory = "기초" | "사회" | "과학" | "기타";
@@ -3866,21 +3866,71 @@ export default function Home() {
                             설정된 학급 기준 인원에 따라 개설(70% 이상), 논의(70% 미만), 분반 추천(120% 초과) 및 폐강(10명 미만) 여부를 자동으로 판단합니다.
                           </p>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <label htmlFor="standardSizeInput" className="text-sm text-slate-300 font-medium whitespace-nowrap">학급 기준 인원:</label>
-                          <input
-                            id="standardSizeInput"
-                            type="number"
-                            min={10}
-                            max={50}
-                            value={standardClassSize[activeGrade]}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value) || 25;
-                              setStandardClassSize(prev => ({ ...prev, [activeGrade]: val }));
+                        <div className="flex flex-col md:flex-row items-end md:items-center gap-4">
+                          {(() => {
+                            const stats = subjectStats[activeGrade] || [];
+                            const standardSize = standardClassSize[activeGrade] || 25;
+                            const groupTotals: Record<string, number> = {};
+                            stats.forEach(stat => {
+                              const baseRemark = getClassRecommendation(stat.applicants, standardSize);
+                              const key = `${activeGrade}_${stat.semester}_${stat.subject}`;
+                              const displayRemark = manualStep5Classes[key] !== undefined ? manualStep5Classes[key] : baseRemark;
+                              if (displayRemark !== "폐강" && !isNaN(Number(displayRemark))) {
+                                const groupKey = `${stat.group}군(${stat.semester})`;
+                                groupTotals[groupKey] = (groupTotals[groupKey] || 0) + Number(displayRemark);
+                              }
+                            });
+                            
+                            const groups = Object.keys(groupTotals).sort();
+                            if (groups.length === 0) return null;
+                            
+                            return (
+                              <div className="flex flex-wrap items-center gap-2 mr-2">
+                                {groups.map(grp => (
+                                  <div key={grp} className="flex items-center gap-1.5 bg-slate-900/80 border border-slate-700/50 px-2.5 py-1 rounded-lg shadow-inner">
+                                    <span className="text-[11px] font-semibold text-slate-400 tracking-wider">{grp}:</span>
+                                    <span className="text-[13px] font-bold text-indigo-400">{groupTotals[grp]}반</span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                          <button
+                            onClick={() => {
+                              if (confirm("수동으로 조정한 개설 반 수를 모두 초기화하시겠습니까?")) {
+                                setManualStep5Classes(prev => {
+                                  const next = { ...prev };
+                                  Object.keys(next).forEach(k => {
+                                    if (k.startsWith(`${activeGrade}_`)) {
+                                      delete next[k];
+                                    }
+                                  });
+                                  return next;
+                                });
+                              }
                             }}
-                            className="w-20 bg-slate-950 border border-slate-700 text-center rounded-lg px-2 py-1.5 text-white font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          />
-                          <span className="text-sm text-slate-400">명</span>
+                            className="px-3 py-1.5 ml-2 mr-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl border border-slate-700 transition-colors flex items-center gap-1.5 shrink-0 shadow-sm hover:shadow-md"
+                            title="수동으로 조정한 개설 반 수를 모두 초기화합니다"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                            초기화
+                          </button>
+                          <div className="flex items-center gap-3 bg-slate-900/50 px-3 py-1.5 rounded-xl border border-slate-800">
+                            <label htmlFor="standardSizeInput" className="text-sm text-slate-300 font-medium whitespace-nowrap">학급 기준 인원:</label>
+                            <input
+                              id="standardSizeInput"
+                              type="number"
+                              min={10}
+                              max={50}
+                              value={standardClassSize[activeGrade]}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 25;
+                                setStandardClassSize(prev => ({ ...prev, [activeGrade]: val }));
+                              }}
+                              className="w-16 bg-slate-950 border border-slate-700 text-center rounded-lg px-2 py-1 text-white font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                            <span className="text-sm text-slate-400 whitespace-nowrap">명</span>
+                          </div>
                         </div>
                       </div>
 
@@ -4105,7 +4155,10 @@ export default function Home() {
                           </thead>
                           <tbody className="">
                             {categorySummaryData.length > 0 ? (
-                              categorySummaryData.map((row, idx) => (
+                              categorySummaryData.map((row, idx) => {
+                                const bg1 = row.sem1 ? (row.sem1.isElective ? "bg-indigo-500/10" : "bg-emerald-500/10") : "";
+                                const bg2 = row.sem2 ? (row.sem2.isElective ? "bg-indigo-500/10" : "bg-emerald-500/10") : "";
+                                return (
                                 <tr key={`${row.category}-${idx}`} className={`hover:bg-slate-800/30 transition-colors border-b border-slate-700/50 ${row.isFirstRow ? 'border-t-2 border-t-slate-600/80' : ''}`}>
                                   {row.isFirstRow && (
                                     <td rowSpan={row.rowSpan} className="px-4 py-3 text-center border-r border-slate-700/50 font-medium align-middle">
@@ -4134,10 +4187,10 @@ export default function Home() {
                                   )}
                                   
                                   {/* 1학기 */}
-                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem1?.gradeLabel || ""}</td>
-                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-200">{row.sem1?.subject || ""}</td>
-                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem1?.credits || ""}</td>
-                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-500">
+                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 ${bg1}`}>{row.sem1?.gradeLabel || ""}</td>
+                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-200 ${bg1}`}>{row.sem1?.subject || ""}</td>
+                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 ${bg1}`}>{row.sem1?.credits || ""}</td>
+                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-500 ${bg1}`}>
                                     {row.sem1 ? (() => {
                                       const gk = row.sem1.gradeLabel === "1" ? "pre1" : row.sem1.gradeLabel === "2" ? "grade1" : "grade2";
                                       const key = `${row.sem1.gradeLabel}_${row.sem1.subject}_1${row.sem1.isSplit ? '_split' : ''}`;
@@ -4165,7 +4218,7 @@ export default function Home() {
                                       }
                                     })() : ""}
                                   </td>
-                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem1?.subjectHours !== undefined ? row.sem1.subjectHours : ""}</td>
+                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 ${bg1}`}>{row.sem1?.subjectHours !== undefined ? row.sem1.subjectHours : ""}</td>
                                   {row.isFirstRow && (
                                     <td rowSpan={row.rowSpan} className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 font-semibold align-middle">
                                       {row.reduction > 0 ? (
@@ -4185,10 +4238,10 @@ export default function Home() {
                                   )}
                                   
                                   {/* 2학기 */}
-                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem2?.gradeLabel || ""}</td>
-                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-200">{row.sem2?.subject || ""}</td>
-                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem2?.credits || ""}</td>
-                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-500">
+                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 ${bg2}`}>{row.sem2?.gradeLabel || ""}</td>
+                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-200 ${bg2}`}>{row.sem2?.subject || ""}</td>
+                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 ${bg2}`}>{row.sem2?.credits || ""}</td>
+                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-500 ${bg2}`}>
                                     {row.sem2 ? (() => {
                                       const gk = row.sem2.gradeLabel === "1" ? "pre1" : row.sem2.gradeLabel === "2" ? "grade1" : "grade2";
                                       const key = `${row.sem2.gradeLabel}_${row.sem2.subject}_2${row.sem2.isSplit ? '_split' : ''}`;
@@ -4216,7 +4269,7 @@ export default function Home() {
                                       }
                                     })() : ""}
                                   </td>
-                                  <td className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300">{row.sem2?.subjectHours !== undefined ? row.sem2.subjectHours : ""}</td>
+                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 ${bg2}`}>{row.sem2?.subjectHours !== undefined ? row.sem2.subjectHours : ""}</td>
                                   {row.isFirstRow && (
                                     <td rowSpan={row.rowSpan} className="px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 font-semibold align-middle">
                                       {row.reduction > 0 ? (
@@ -4247,7 +4300,8 @@ export default function Home() {
                                     </td>
                                   )}
                                 </tr>
-                              ))
+                                );
+                              })
                             ) : (
                               <tr>
                                 <td colSpan={18} className="px-4 py-8 text-center text-slate-500">
