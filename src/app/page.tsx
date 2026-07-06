@@ -6162,11 +6162,11 @@ export default function Home() {
                                         let cellClass = "inline-block px-1.5 py-0.5 rounded text-xs ";
                                         if (isChangedByApplicant) {
                                             if (isHierarchyViolation) {
-                                                cellClass += "bg-amber-400 text-blue-900 font-black ring-1 ring-blue-600 shadow-[0_0_8px_rgba(59,130,246,0.5)]";
+                                                cellClass += "bg-amber-500/20 text-cyan-400 font-black ring-1 ring-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.5)]";
                                             } else if (isDuplicate) {
-                                                cellClass += "bg-amber-400 text-rose-900 font-black ring-1 ring-rose-600 shadow-[0_0_8px_rgba(225,29,72,0.5)]";
+                                                cellClass += "bg-amber-500/20 text-rose-400 font-black ring-1 ring-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]";
                                             } else {
-                                                cellClass += "bg-amber-400 text-amber-950 font-bold ring-1 ring-amber-300";
+                                                cellClass += "bg-amber-500/20 text-amber-300 font-bold ring-1 ring-amber-500/50";
                                             }
                                         } else {
                                             if (isHierarchyViolation) cellClass += "text-cyan-400 font-bold bg-cyan-400/10";
