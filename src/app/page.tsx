@@ -5629,9 +5629,7 @@ export default function Home() {
                         if (rosterAfterSubjectFilter === "전체") {
                           classCols[changeActiveGrade].forEach(col => {
                             const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
-                            if (cellSubject) {
-                              displayCols.push({ slot: changeRosterTimeSlot, col, original: cellSubject });
-                            }
+                            displayCols.push({ slot: changeRosterTimeSlot, col, original: cellSubject || "" });
                           });
                         } else {
                           timeSlots[changeActiveGrade].forEach(slot => {
@@ -5973,9 +5971,7 @@ export default function Home() {
                         if (rosterBeforeSubjectFilter === "전체") {
                           classCols[changeActiveGrade].forEach(col => {
                             const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
-                            if (cellSubject) {
-                              displayCols.push({ slot: changeRosterTimeSlot, col, original: cellSubject });
-                            }
+                            displayCols.push({ slot: changeRosterTimeSlot, col, original: cellSubject || "" });
                           });
                         } else {
                           timeSlots[changeActiveGrade].forEach(slot => {
@@ -6124,7 +6120,8 @@ export default function Home() {
                                           }
                                         });
 
-                                        Object.entries(studentsByBase).forEach(([base, students]) => {
+                                        Object.entries(studentsByBase).forEach(([base, unsortedStudents]) => {
+                                          const students = unsortedStudents.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
                                           const cols = bases[base];
                                           if (!cols || cols.length === 0) return;
 
@@ -6147,7 +6144,7 @@ export default function Home() {
                                       });
 
                                       Object.values(colStudents).forEach(list => {
-                                        list.sort((a, b) => a.name.localeCompare(b.name, 'ko-KR'));
+                                        list.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
                                       });
 
                                       const maxStudents = Math.max(...Object.values(colStudents).map(s => s.length), 0);
@@ -6440,7 +6437,7 @@ export default function Home() {
       {/* Example Modal */}
       {isExampleModalOpen && (
         <div style={{ zIndex: 99999 }} className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col my-auto max-h-[95vh] overflow-hidden">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-[95vw] md:w-[80vw] max-w-[1600px] flex flex-col my-auto max-h-[95vh] overflow-hidden">
             <div className="flex items-center justify-between p-4 md:p-6 border-b border-slate-800/80 shrink-0">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
                 💡 올바른 엑셀 시수 입력 예시
@@ -6459,7 +6456,7 @@ export default function Home() {
                   </h4>
                   <p className="text-sm text-slate-400 mb-4">동일한 선택과목군에서 4과목 선택하는 경우 편제표</p>
                   <div className="bg-slate-900 rounded-lg border border-slate-800 flex justify-center items-center p-4">
-                     <img src="/excel-wrong.png" alt="잘못된 엑셀 입력 예시" className="w-auto h-auto max-w-full max-h-[35vh] object-contain shadow-lg rounded" />
+                     <img src="/excel-wrong.png" alt="잘못된 엑셀 입력 예시" className="w-auto h-auto max-w-full max-h-[60vh] object-contain shadow-lg rounded" />
                   </div>
                 </div>
                 <div className="bg-slate-950 rounded-xl p-4 border-2 border-emerald-500/30 flex-1">
@@ -6468,7 +6465,7 @@ export default function Home() {
                   </h4>
                   <p className="text-sm text-slate-400 mb-4">동일한 선택과목군에 모두 같은 학점을 입력하고 업로드 하세요</p>
                   <div className="bg-slate-900 rounded-lg border border-slate-800 flex justify-center items-center p-4">
-                     <img src="/excel-right.png" alt="올바른 엑셀 입력 예시" className="w-auto h-auto max-w-full max-h-[35vh] object-contain shadow-lg rounded" />
+                     <img src="/excel-right.png" alt="올바른 엑셀 입력 예시" className="w-auto h-auto max-w-full max-h-[60vh] object-contain shadow-lg rounded" />
                   </div>
                 </div>
               </div>

@@ -51,3 +51,9 @@
 - **연쇄적 상태 업데이트:** 한 학생이 여러 과목을 동시에 변경할 수 있으므로, 4단계 교환 로직에서 `studentSchedules`와 같은 '임시 시간표(Working Copy)'를 만들어 변경이 발생할 때마다 실시간으로 시간표 상태를 갱신해야 충돌 에러가 발생하지 않습니다.
 - **원본 데이터 보존:** 교육과정 편제 파싱 시 로마자(Ⅰ, Ⅱ)를 아라비아 숫자로 강제 변환하지 않고 원본 그대로 표기합니다.
 - **UI/UX 기준:** 기능 추가 시 Tailwind CSS를 이용해 **직관적이고 미려한 UI(hover 애니메이션, 트랜지션, 색상 조화)**를 필수로 유지하세요. 단순한 형태의 테이블이나 버튼은 지양합니다.
+
+## 🚀 배포(Deployment) 가이드라인 (NAS / Docker 환경)
+- **메모리 최적화 (OOM 방지):** Synology NAS 등 저사양 기기에서 배포할 때 `npm ci`나 `npm install` 과정에서 "Exit handler never called!" 메모리 초과 에러가 발생할 수 있습니다. 이를 방지하기 위해 `Dockerfile`은 무조건 `node:20-slim` 기반 이미지를 사용하고 패키지 설치는 가벼운 `yarn install`을 사용합니다. (`node-alpine`의 musl libc 충돌 버그 우회)
+- **네트워크 설정 (DNS 해상도 오류 방지):** NAS 도커 환경에서 라이브러리 다운로드 시 `getaddrinfo EAI_AGAIN` 인터넷 연결 오류가 발생하는 경우가 많습니다. 이를 해결하기 위해 `docker-compose.yml`의 `build` 섹션에는 반드시 `network: host`를 포함해야 합니다.
+- **배포 자동화 스크립트:** 프로젝트 최상단에 있는 `deploy.sh` 스크립트를 사용하여 로컬에서 NAS로 파일을 전송(rsync/scp)하고, SSH로 원격 접속하여 `sudo docker compose up -d --build`를 실행하는 구조로 되어있습니다. (사용자 비밀번호 입력 필요)
+- **Next.js Standalone 빌드:** Next.js 최적화 빌드를 위해 `next.config.ts`에 `output: 'standalone'` 설정이 켜져 있습니다.
