@@ -3531,24 +3531,24 @@ export default function Home() {
       <aside 
         onMouseEnter={() => setIsSidebarHovered(true)}
         onMouseLeave={() => setIsSidebarHovered(false)}
-        className={`fixed top-12 left-0 h-[calc(100vh-3rem)] z-[999] transition-all duration-300 ease-in-out bg-slate-900/95 backdrop-blur-xl border-t border-r border-b border-slate-800/80 rounded-tr-2xl flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.5)] overflow-hidden pointer-events-auto ${isSidebarHovered ? 'w-64' : 'w-16'}`}
+        className={`fixed top-12 left-0 h-[calc(100vh-3rem)] z-[999] transition-all duration-300 ease-in-out flex flex-col gap-2 pointer-events-none overflow-hidden ${isSidebarHovered ? 'w-64' : 'w-16'}`}
       >
-        <div className="p-4 pb-6 border-b border-slate-800/50 flex items-center h-[88px] w-64">
+        <div className="p-4 pb-6 flex items-center h-[88px] w-64 bg-slate-900/95 backdrop-blur-xl border-t border-r border-b border-slate-800/80 rounded-tr-2xl shadow-[4px_0_15px_rgba(0,0,0,0.3)] pointer-events-auto transition-colors">
           <div className="w-8 h-8 flex flex-shrink-0 justify-center items-center text-indigo-400 transition-colors relative">
             <Menu className={`w-6 h-6 transition-opacity absolute pointer-events-none ${isSidebarHovered ? 'opacity-0' : 'opacity-100'}`} />
             <Settings className={`w-6 h-6 transition-opacity absolute pointer-events-none ${isSidebarHovered ? 'opacity-100' : 'opacity-0'}`} />
           </div>
           <h2 className={`text-xl font-extrabold bg-gradient-to-r from-indigo-400 to-purple-400 text-transparent bg-clip-text whitespace-nowrap transition-opacity duration-300 ml-2 ${isSidebarHovered ? 'opacity-100' : 'opacity-0'}`}>
-            데이터 처리기
+            교육과정부
           </h2>
         </div>
 
-        <div className="flex flex-col gap-3 p-3 mt-4 w-64">
+        <div className="flex flex-col gap-4 mt-2 w-64 pointer-events-none">
           <button
             onClick={() => setActiveSidebarTab("survey")}
-            className={`flex items-center gap-3 px-2 py-3.5 rounded-xl font-semibold transition-all duration-300 w-full cursor-pointer ${activeSidebarTab === "survey"
-                ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
-                : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 border border-transparent"
+            className={`flex items-center gap-3 px-2 py-4 font-semibold transition-all duration-300 w-full cursor-pointer bg-slate-900/95 backdrop-blur-xl border-t border-r border-b rounded-r-2xl shadow-[4px_0_15px_rgba(0,0,0,0.3)] pointer-events-auto ${activeSidebarTab === "survey"
+                ? "border-indigo-500/50 text-indigo-400 shadow-[4px_0_20px_rgba(99,102,241,0.2)] bg-indigo-500/5"
+                : "border-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
               }`}
           >
             <div className="w-6 h-6 flex flex-shrink-0 justify-center items-center ml-1">
@@ -3558,9 +3558,9 @@ export default function Home() {
           </button>
           <button
             onClick={() => setActiveSidebarTab("change")}
-            className={`flex items-center gap-3 px-2 py-3.5 rounded-xl font-semibold transition-all duration-300 w-full cursor-pointer ${activeSidebarTab === "change"
-                ? "bg-indigo-500/15 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.1)]"
-                : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200 border border-transparent"
+            className={`flex items-center gap-3 px-2 py-4 font-semibold transition-all duration-300 w-full cursor-pointer bg-slate-900/95 backdrop-blur-xl border-t border-r border-b rounded-r-2xl shadow-[4px_0_15px_rgba(0,0,0,0.3)] pointer-events-auto ${activeSidebarTab === "change"
+                ? "border-indigo-500/50 text-indigo-400 shadow-[4px_0_20px_rgba(99,102,241,0.2)] bg-indigo-500/5"
+                : "border-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
               }`}
           >
             <div className="w-6 h-6 flex flex-shrink-0 justify-center items-center ml-1">
@@ -3573,56 +3573,59 @@ export default function Home() {
 
       <main className="relative z-10 flex-1 flex flex-col max-h-screen overflow-hidden ml-16">
         {/* Global Header */}
-        <header className="flex-none px-10 py-5 border-b border-slate-800/30 bg-slate-950/40 backdrop-blur-sm flex items-end justify-between gap-8">
-          <div className="flex flex-col gap-3">
+        <header className="flex-none px-10 py-5 border-b border-slate-800/30 bg-slate-950/40 backdrop-blur-sm flex flex-col gap-4">
+          <div className="flex items-center justify-between w-full">
             <h1 className="text-2xl font-extrabold tracking-tight text-white">
-              {activeSidebarTab === "survey" ? "수강 신청 데이터 처리기" : "선택과목 변경 시스템"}
+              {activeSidebarTab === "survey" ? "명신고등학교 수요조사 데이터 정리" : "명신고등학교 선택과목 변경 시스템"}
             </h1>
+            
+            <div className="flex gap-2 shrink-0">
+              <input
+                type="file"
+                accept=".json"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleLoadBackup}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 text-sm font-medium rounded-xl transition-all border border-slate-700/60 shadow-sm"
+              >
+                <FolderOpen className="w-4 h-4" />
+                불러오기
+              </button>
+              <button
+                onClick={handleSaveBackup}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all border border-indigo-500/50 shadow-md shadow-indigo-500/20"
+              >
+                <Save className="w-4 h-4" />
+                저장하기
+              </button>
+            </div>
+          </div>
+          
+          <div className="w-full">
             {activeSidebarTab === "survey" ? (
-              <div className="flex gap-2 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit overflow-x-auto max-w-[calc(100vw-400px)] scrollbar-hide">
+              <div className="flex gap-2 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit overflow-x-auto max-w-[calc(100vw-120px)] scrollbar-hide">
                   <button onClick={() => setActiveTab('curriculum')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'curriculum' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>교육과정 편성표 입력</span></div></button>
                   <button onClick={() => setActiveTab('hierarchy')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'hierarchy' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span><div className="flex items-center gap-1.5"><GitBranch className="w-4 h-4" /><span>과목 위계 설정</span></div></button>
-                  <button onClick={() => setActiveTab('upload')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'upload' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span><div className="flex items-center gap-1.5"><Upload className="w-4 h-4" /><span>파일 업로드</span></div></button>
+                  <button onClick={() => setActiveTab('upload')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'upload' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span><div className="flex items-center gap-1.5"><Upload className="w-4 h-4" /><span>데이터 업로드</span></div></button>
                   <button onClick={() => setActiveTab('preview')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'preview' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>수요조사 결과</span></div></button>
                   <button onClick={() => setActiveTab('classOpening')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'classOpening' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span><div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /><span>과목 개설 여부</span></div></button>
                   <button onClick={() => setActiveTab('categorySummary')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'categorySummary' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>교과(군)별 시수 정리</span></div></button>
                 </div>
             ) : (
-              <div className="flex gap-2 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit overflow-x-auto max-w-[calc(100vw-400px)] scrollbar-hide">
+              <div className="flex gap-2 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit overflow-x-auto max-w-[calc(100vw-120px)] scrollbar-hide">
                   <button onClick={() => setChangeActiveTab('basic')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'basic' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>기초자료 입력</span></div></button>
                   <button onClick={() => setChangeActiveTab('upload')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'upload' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span><div className="flex items-center gap-1.5"><Upload className="w-4 h-4" /><span>데이터 업로드</span></div></button>
-                  <button onClick={() => setChangeActiveTab('timetable')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'timetable' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>시간표 입력</span></div></button>
-                  <button onClick={() => setChangeActiveTab('roster')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'roster' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span><div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>명단 수정</span></div></button>
-                  <button onClick={() => setChangeActiveTab('application')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'application' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>변경 신청</span></div></button>
-                  <button onClick={() => setChangeActiveTab('roster_after')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'roster_after' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span><div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>변경 후 명단</span></div></button>
+                  <button onClick={() => setChangeActiveTab('timetable')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'timetable' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>타임별 시간표 입력</span></div></button>
+                  <button onClick={() => setChangeActiveTab('roster')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'roster' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span><div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>타임별 학생 명단</span></div></button>
+                  <button onClick={() => setChangeActiveTab('application')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'application' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>선택과목 변경 데이터 입력</span></div></button>
+                  <button onClick={() => setChangeActiveTab('roster_after')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'roster_after' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span><div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>변경 후 타임별 학생 명단</span></div></button>
                   <button onClick={() => setChangeActiveTab('analysis')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'analysis' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">7단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>다년도 분석</span></div></button>
-                  <button onClick={() => setChangeActiveTab('riroschool')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'riroschool' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">8단계</span><div className="flex items-center gap-1.5"><Download className="w-4 h-4" /><span>리로스쿨 파일</span></div></button>
+                  <button onClick={() => setChangeActiveTab('riroschool')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'riroschool' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">8단계</span><div className="flex items-center gap-1.5"><Download className="w-4 h-4" /><span>리로스쿨용 파일</span></div></button>
                 </div>
             )}
-          </div>
-
-          <div className="flex gap-2 shrink-0">
-            <input
-              type="file"
-              accept=".json"
-              className="hidden"
-              ref={fileInputRef}
-              onChange={handleLoadBackup}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 text-sm font-medium rounded-xl transition-all border border-slate-700/60 shadow-sm"
-            >
-              <FolderOpen className="w-4 h-4" />
-              불러오기
-            </button>
-            <button
-              onClick={handleSaveBackup}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all border border-indigo-500/50 shadow-md shadow-indigo-500/20"
-            >
-              <Save className="w-4 h-4" />
-              저장하기
-            </button>
           </div>
         </header>
 
@@ -6500,7 +6503,7 @@ export default function Home() {
       {/* Example Modal */}
       {isExampleModalOpen && (
         <div style={{ zIndex: 99999 }} className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col my-auto max-h-[95vh] overflow-hidden">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-[80vw] flex flex-col my-auto max-h-[95vh] overflow-hidden">
             <div className="flex items-center justify-between p-4 md:p-6 border-b border-slate-800/80 shrink-0">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
                 💡 올바른 엑셀 시수 입력 예시
