@@ -538,21 +538,21 @@ export default function Home() {
     <div className="flex gap-2 mb-6 border-b border-slate-800 pb-4">
       <button
         onClick={() => setActiveGrade("pre1")}
-        className={`px-6 py-2.5 rounded-xl font-medium transition-all ${activeGrade === "pre1" ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-inner" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+        className={`px-6 py-2.5 rounded-xl font-medium transition-all ${activeGrade === "pre1" ? "bg-indigo-600/20 text-white border border-indigo-500/30 shadow-inner" : "text-white hover:text-white hover:bg-slate-800/50"
           }`}
       >
         예비 1학년
       </button>
       <button
         onClick={() => setActiveGrade("grade1")}
-        className={`px-6 py-2.5 rounded-xl font-medium transition-all ${activeGrade === "grade1" ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-inner" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+        className={`px-6 py-2.5 rounded-xl font-medium transition-all ${activeGrade === "grade1" ? "bg-indigo-600/20 text-white border border-indigo-500/30 shadow-inner" : "text-white hover:text-white hover:bg-slate-800/50"
           }`}
       >
         1학년
       </button>
       <button
         onClick={() => setActiveGrade("grade2")}
-        className={`px-6 py-2.5 rounded-xl font-medium transition-all ${activeGrade === "grade2" ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shadow-inner" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+        className={`px-6 py-2.5 rounded-xl font-medium transition-all ${activeGrade === "grade2" ? "bg-indigo-600/20 text-white border border-indigo-500/30 shadow-inner" : "text-white hover:text-white hover:bg-slate-800/50"
           }`}
       >
         2학년
@@ -3520,7 +3520,7 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100 selection:bg-indigo-500/30 font-sans">
+    <div className="flex min-h-screen bg-slate-950 text-white selection:bg-indigo-500/30 font-sans">
       {/* Background Gradients */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-600/20 blur-[120px]" />
@@ -3538,7 +3538,7 @@ export default function Home() {
             <Menu className={`w-6 h-6 transition-opacity absolute pointer-events-none ${isSidebarHovered ? 'opacity-0' : 'opacity-100'}`} />
             <Settings className={`w-6 h-6 transition-opacity absolute pointer-events-none ${isSidebarHovered ? 'opacity-100' : 'opacity-0'}`} />
           </div>
-          <h2 className={`text-xl font-extrabold bg-gradient-to-r from-indigo-400 to-purple-400 text-transparent bg-clip-text whitespace-nowrap transition-opacity duration-300 ml-2 ${isSidebarHovered ? 'opacity-100' : 'opacity-0'}`}>
+          <h2 className={`text-xl font-extrabold text-white whitespace-nowrap transition-opacity duration-300 ml-2 ${isSidebarHovered ? 'opacity-100' : 'opacity-0'}`}>
             교육과정부
           </h2>
         </div>
@@ -3547,8 +3547,8 @@ export default function Home() {
           <button
             onClick={() => setActiveSidebarTab("survey")}
             className={`flex items-center gap-3 px-2 py-4 font-semibold transition-all duration-300 w-full cursor-pointer bg-slate-900/95 backdrop-blur-xl border-t border-r border-b rounded-r-2xl shadow-[4px_0_15px_rgba(0,0,0,0.3)] pointer-events-auto ${activeSidebarTab === "survey"
-                ? "border-indigo-500/50 text-indigo-400 shadow-[4px_0_20px_rgba(99,102,241,0.2)] bg-indigo-500/5"
-                : "border-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                ? "border-indigo-500/50 text-white shadow-[4px_0_20px_rgba(99,102,241,0.2)] bg-indigo-500/5"
+                : "border-slate-800/80 text-white hover:text-white hover:bg-slate-800/40"
               }`}
           >
             <div className="w-6 h-6 flex flex-shrink-0 justify-center items-center ml-1">
@@ -3559,8 +3559,8 @@ export default function Home() {
           <button
             onClick={() => setActiveSidebarTab("change")}
             className={`flex items-center gap-3 px-2 py-4 font-semibold transition-all duration-300 w-full cursor-pointer bg-slate-900/95 backdrop-blur-xl border-t border-r border-b rounded-r-2xl shadow-[4px_0_15px_rgba(0,0,0,0.3)] pointer-events-auto ${activeSidebarTab === "change"
-                ? "border-indigo-500/50 text-indigo-400 shadow-[4px_0_20px_rgba(99,102,241,0.2)] bg-indigo-500/5"
-                : "border-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                ? "border-indigo-500/50 text-white shadow-[4px_0_20px_rgba(99,102,241,0.2)] bg-indigo-500/5"
+                : "border-slate-800/80 text-white hover:text-white hover:bg-slate-800/40"
               }`}
           >
             <div className="w-6 h-6 flex flex-shrink-0 justify-center items-center ml-1">
@@ -3607,23 +3607,23 @@ export default function Home() {
           <div className="w-full">
             {activeSidebarTab === "survey" ? (
               <div className="flex gap-2 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit overflow-x-auto max-w-[calc(100vw-120px)] scrollbar-hide">
-                  <button onClick={() => setActiveTab('curriculum')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'curriculum' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>교육과정 편성표 입력</span></div></button>
-                  <button onClick={() => setActiveTab('hierarchy')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'hierarchy' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span><div className="flex items-center gap-1.5"><GitBranch className="w-4 h-4" /><span>과목 위계 설정</span></div></button>
-                  <button onClick={() => setActiveTab('upload')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'upload' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span><div className="flex items-center gap-1.5"><Upload className="w-4 h-4" /><span>데이터 업로드</span></div></button>
-                  <button onClick={() => setActiveTab('preview')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'preview' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>수요조사 결과</span></div></button>
-                  <button onClick={() => setActiveTab('classOpening')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'classOpening' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span><div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /><span>과목 개설 여부</span></div></button>
-                  <button onClick={() => setActiveTab('categorySummary')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'categorySummary' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>교과(군)별 시수 정리</span></div></button>
+                  <button onClick={() => setActiveTab('curriculum')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'curriculum' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>교육과정 편성표 입력</span></div></button>
+                  <button onClick={() => setActiveTab('hierarchy')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'hierarchy' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span><div className="flex items-center gap-1.5"><GitBranch className="w-4 h-4" /><span>과목 위계 설정</span></div></button>
+                  <button onClick={() => setActiveTab('upload')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'upload' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span><div className="flex items-center gap-1.5"><Upload className="w-4 h-4" /><span>데이터 업로드</span></div></button>
+                  <button onClick={() => setActiveTab('preview')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'preview' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>수요조사 결과</span></div></button>
+                  <button onClick={() => setActiveTab('classOpening')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'classOpening' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span><div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /><span>과목 개설 여부</span></div></button>
+                  <button onClick={() => setActiveTab('categorySummary')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${activeTab === 'categorySummary' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>교과(군)별 시수 정리</span></div></button>
                 </div>
             ) : (
               <div className="flex gap-2 p-1 bg-slate-900/50 backdrop-blur-md rounded-2xl border border-slate-800/50 w-fit overflow-x-auto max-w-[calc(100vw-120px)] scrollbar-hide">
-                  <button onClick={() => setChangeActiveTab('basic')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'basic' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>기초자료 입력</span></div></button>
-                  <button onClick={() => setChangeActiveTab('upload')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'upload' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span><div className="flex items-center gap-1.5"><Upload className="w-4 h-4" /><span>데이터 업로드</span></div></button>
-                  <button onClick={() => setChangeActiveTab('timetable')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'timetable' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>타임별 시간표 입력</span></div></button>
-                  <button onClick={() => setChangeActiveTab('roster')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'roster' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span><div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>타임별 학생 명단</span></div></button>
-                  <button onClick={() => setChangeActiveTab('application')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'application' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>선택과목 변경 데이터 입력</span></div></button>
-                  <button onClick={() => setChangeActiveTab('roster_after')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'roster_after' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span><div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>변경 후 타임별 학생 명단</span></div></button>
-                  <button onClick={() => setChangeActiveTab('analysis')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'analysis' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">7단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>다년도 분석</span></div></button>
-                  <button onClick={() => setChangeActiveTab('riroschool')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'riroschool' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">8단계</span><div className="flex items-center gap-1.5"><Download className="w-4 h-4" /><span>리로스쿨용 파일</span></div></button>
+                  <button onClick={() => setChangeActiveTab('basic')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'basic' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>기초자료 입력</span></div></button>
+                  <button onClick={() => setChangeActiveTab('upload')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'upload' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span><div className="flex items-center gap-1.5"><Upload className="w-4 h-4" /><span>데이터 업로드</span></div></button>
+                  <button onClick={() => setChangeActiveTab('timetable')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'timetable' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>타임별 시간표 입력</span></div></button>
+                  <button onClick={() => setChangeActiveTab('roster')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'roster' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span><div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>타임별 학생 명단</span></div></button>
+                  <button onClick={() => setChangeActiveTab('application')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'application' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>선택과목 변경 데이터 입력</span></div></button>
+                  <button onClick={() => setChangeActiveTab('roster_after')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'roster_after' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span><div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>변경 후 타임별 학생 명단</span></div></button>
+                  <button onClick={() => setChangeActiveTab('analysis')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'analysis' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">7단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>다년도 분석</span></div></button>
+                  <button onClick={() => setChangeActiveTab('riroschool')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 ${changeActiveTab === 'riroschool' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-300 hover:text-white hover:bg-slate-800/50'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">8단계</span><div className="flex items-center gap-1.5"><Download className="w-4 h-4" /><span>리로스쿨용 파일</span></div></button>
                 </div>
             )}
           </div>
@@ -3647,13 +3647,13 @@ export default function Home() {
 
                       {renderGradeTabs()}
 
-                      <p className="text-slate-400">
+                      <p className="text-slate-300">
                         선택하신 학년의 교육과정 편성표 엑셀 파일을 업로드해 주세요. 3개년 데이터가 모두 포함된 원본 엑셀 파일을 그대로 올리시면 됩니다.
                       </p>
 
                                             <button
                         onClick={() => setIsExampleModalOpen(true)}
-                        className="mb-4 flex items-center gap-2 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 text-sm font-semibold rounded-xl border border-indigo-500/30 transition-all shadow-sm"
+                        className="mb-4 flex items-center gap-2 px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-white text-sm font-semibold rounded-xl border border-indigo-500/30 transition-all shadow-sm"
                       >
                         <span className="text-base">💡</span> 올바른 엑셀 입력 예시 보기
                       </button>
@@ -3666,9 +3666,9 @@ export default function Home() {
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                         />
                         <div className="flex flex-col items-center justify-center w-full h-40 bg-slate-900/50 border-2 border-dashed border-slate-700 rounded-xl group-hover:border-indigo-500/50 group-hover:bg-indigo-500/5 transition-all">
-                          <Upload className="w-10 h-10 text-slate-500 group-hover:text-indigo-400 mb-3 transition-colors" />
+                          <Upload className="w-10 h-10 text-slate-300 group-hover:text-indigo-400 mb-3 transition-colors" />
                           <p className="text-slate-300 font-medium">클릭하거나 엑셀 파일을 드래그하여 업로드하세요</p>
-                          <p className="text-slate-500 text-sm mt-1">.xlsx, .xls 파일 지원</p>
+                          <p className="text-slate-300 text-sm mt-1">.xlsx, .xls 파일 지원</p>
                         </div>
                       </div>
 
@@ -3678,13 +3678,13 @@ export default function Home() {
                             <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                             추출된 교육과정 데이터 ({activeGrade === "pre1" ? "1학년 탭" : activeGrade === "grade1" ? "2학년 탭" : "3학년 탭"})
                           </h3>
-                          <p className="text-sm text-slate-400 mb-6">
+                          <p className="text-sm text-slate-300 mb-6">
                             업로드된 엑셀 파일에서 1~3학년 전체 교육과정을 자동으로 분석했습니다. 내부적으로 기초/사회/과학 과목 매핑도 완료되었습니다.
                           </p>
 
                           <div className="overflow-x-auto rounded-lg border border-slate-800">
                             <table className="w-full text-sm text-left">
-                              <thead className="text-xs text-slate-400 uppercase bg-slate-900/80">
+                              <thead className="text-xs text-slate-300 uppercase bg-slate-900/80">
                                 <tr>
                                   <th className="px-4 py-3 font-medium">구분</th>
                                   <th className="px-4 py-3 font-medium">과목명</th>
@@ -3698,13 +3698,13 @@ export default function Home() {
                                 {parsedCurriculumList[activeGrade].map((subj, idx) => (
                                   <tr key={idx} className="bg-slate-950/30 hover:bg-slate-900/50 transition-colors">
                                     <td className="px-4 py-3">
-                                      <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider ${subj.type === "지정" ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                                      <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider ${subj.type === "지정" ? "bg-rose-600/10 text-rose-400 border border-rose-500/20" : "bg-indigo-500/10 text-white border border-indigo-500/20"
                                         }`}>
                                         {subj.type}
                                       </span>
                                     </td>
                                     <td className="px-4 py-3 font-medium text-slate-200">{subj.subject}</td>
-                                    <td className="px-4 py-3 text-slate-400">
+                                    <td className="px-4 py-3 text-slate-300">
                                       {editingDetailedCategory?.grade === activeGrade && editingDetailedCategory?.index === idx ? (
                                         <input
                                           type="text"
@@ -3727,7 +3727,7 @@ export default function Home() {
                                       )}
                                     </td>
                                     <td className="px-4 py-3 text-center text-amber-400/90 font-mono">{subj.credits}</td>
-                                    <td className="px-4 py-3 text-slate-500 text-xs">{subj.semesters}</td>
+                                    <td className="px-4 py-3 text-slate-300 text-xs">{subj.semesters}</td>
                                     <td className="px-4 py-3 text-center">
                                       {["국어", "수학", "영어"].includes(subj.category) && (
                                         <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-medium">
@@ -3766,13 +3766,13 @@ export default function Home() {
 
                       {renderGradeTabs()}
 
-                      <p className="text-slate-400">
+                      <p className="text-slate-300">
                         특정 과목을 수강하기 위해 먼저 들어야 하는 선수 과목 규칙을 설정할 수 있습니다. 1단계에서 분석된 과목들만 선택 가능합니다.
                       </p>
 
                       {!isCurriculumParsed[activeGrade] || Object.keys(subjectMap[activeGrade]).length === 0 ? (
                         <div className="p-8 bg-slate-950/50 border border-slate-800 rounded-2xl text-center">
-                          <p className="text-slate-500">먼저 교육과정 설정 탭에서 과목을 분석해 주세요.</p>
+                          <p className="text-slate-300">먼저 교육과정 설정 탭에서 과목을 분석해 주세요.</p>
                         </div>
                       ) : (
                         <div className="space-y-4">
@@ -3793,7 +3793,7 @@ export default function Home() {
                           </button>
 
                           {(!hierarchyRules[activeGrade] || hierarchyRules[activeGrade].length === 0) && (
-                            <div className="p-6 bg-slate-900/50 border border-dashed border-slate-700 rounded-xl text-center text-slate-500 text-sm">
+                            <div className="p-6 bg-slate-900/50 border border-dashed border-slate-700 rounded-xl text-center text-slate-300 text-sm">
                               설정된 위계 규칙이 없습니다. 필요한 경우 규칙을 추가해 주세요.
                             </div>
                           )}
@@ -3801,10 +3801,10 @@ export default function Home() {
                           <div className="grid gap-3">
                             {(hierarchyRules[activeGrade] || []).map((rule, idx) => (
                               <div key={rule.id} className="flex items-center gap-3 p-4 bg-slate-900 border border-slate-700/50 rounded-xl">
-                                <span className="text-slate-400 font-medium">#{idx + 1}</span>
+                                <span className="text-slate-300 font-medium">#{idx + 1}</span>
                                 <div className="flex-1 flex items-center gap-4">
                                   <div className="flex-1">
-                                    <label className="block text-xs text-slate-500 mb-1">선행 과목 (먼저 듣는 과목)</label>
+                                    <label className="block text-xs text-slate-300 mb-1">선행 과목 (먼저 듣는 과목)</label>
                                     <select
                                       value={rule.prereq}
                                       onChange={(e) => {
@@ -3821,7 +3821,7 @@ export default function Home() {
                                   </div>
                                   <ChevronRight className="w-5 h-5 text-slate-600 mt-5" />
                                   <div className="flex-1">
-                                    <label className="block text-xs text-slate-500 mb-1">후행 과목 (나중에 듣는 과목)</label>
+                                    <label className="block text-xs text-slate-300 mb-1">후행 과목 (나중에 듣는 과목)</label>
                                     <select
                                       value={rule.advanced}
                                       onChange={(e) => {
@@ -3842,7 +3842,7 @@ export default function Home() {
                                     const newRules = hierarchyRules[activeGrade].filter(r => r.id !== rule.id);
                                     setHierarchyRules(prev => ({ ...prev, [activeGrade]: newRules }));
                                   }}
-                                  className="mt-5 p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                  className="mt-5 p-2 text-white hover:text-rose-400 hover:bg-rose-600/10 rounded-lg transition-colors"
                                   title="규칙 삭제"
                                 >
                                   <Trash2 className="w-5 h-5" />
@@ -3872,7 +3872,7 @@ export default function Home() {
                           <Upload className="w-6 h-6 text-rose-400" />
                           3단계: 데이터 파일 업로드
                         </h2>
-                        <p className="text-slate-400 text-sm">
+                        <p className="text-slate-300 text-sm">
                           당해년도 수요조사 설문 파일과 이전 학년의 이수 이력 데이터(선택)를 업로드해 주세요.
                         </p>
                       </div>
@@ -3883,7 +3883,7 @@ export default function Home() {
                         {/* 1. 당해년도 수강신청 파일 업로드 */}
                         <div className="space-y-3">
                           <h3 className="text-lg font-medium text-slate-200 flex items-center gap-2">
-                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 text-xs font-bold">1</span>
+                            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-500/20 text-white text-xs font-bold">1</span>
                             당해년도 수요조사 설문 파일 (필수)
                           </h3>
 
@@ -3902,7 +3902,7 @@ export default function Home() {
                               <h4 className="text-md font-medium text-slate-200 mb-1">
                                 리로스쿨 설문 제출내역 파일을 업로드하세요.
                               </h4>
-                              <p className="text-xs text-slate-500 mb-4">또는 클릭하여 컴퓨터에서 선택 (.xlsx, .xls)</p>
+                              <p className="text-xs text-slate-300 mb-4">또는 클릭하여 컴퓨터에서 선택 (.xlsx, .xls)</p>
                               <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors border border-slate-700">
                                 파일 선택
                               </button>
@@ -3910,14 +3910,14 @@ export default function Home() {
                           ) : (
                             <div className="border border-slate-805 bg-slate-900/30 rounded-2xl p-6 flex flex-col justify-between h-[196px]">
                               <div className="flex items-start gap-4">
-                                <div className="w-12 h-12 bg-indigo-500/20 text-indigo-400 rounded-xl flex items-center justify-center border border-indigo-500/30 flex-shrink-0">
+                                <div className="w-12 h-12 bg-indigo-500/20 text-white rounded-xl flex items-center justify-center border border-indigo-500/30 flex-shrink-0">
                                   <FileIcon className="w-6 h-6" />
                                 </div>
                                 <div className="overflow-hidden">
                                   <h4 className="text-md font-medium text-slate-200 truncate" title={uploadedFiles[activeGrade]?.name}>
                                     {uploadedFiles[activeGrade]?.name}
                                   </h4>
-                                  <p className="text-xs text-slate-500 mt-1">
+                                  <p className="text-xs text-slate-300 mt-1">
                                     {(uploadedFiles[activeGrade]!.size / 1024).toFixed(1)} KB
                                   </p>
                                   <span className="inline-block mt-2 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-xs font-semibold rounded border border-emerald-500/20">
@@ -3934,7 +3934,7 @@ export default function Home() {
                                 </button>
                                 <button
                                   onClick={handleRemoveFile}
-                                  className="px-3 py-2 bg-slate-850 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 rounded-lg transition-colors border border-slate-800"
+                                  className="px-3 py-2 bg-slate-850 hover:bg-rose-600/20 hover:text-rose-400 text-white rounded-lg transition-colors border border-slate-800"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -3965,7 +3965,7 @@ export default function Home() {
                               <h4 className="text-md font-medium text-slate-200 mb-1">
                                 수강신청 통계 파일 업로드
                               </h4>
-                              <p className="text-xs text-slate-400 mb-4 px-4 leading-relaxed">
+                              <p className="text-xs text-slate-300 mb-4 px-4 leading-relaxed">
                                 "리로스쿨-교육과정-수강신청-통계-엑셀저장"에서 다운받은 수강신청 통계 파일을 업로드하세요.
                               </p>
                               <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors border border-slate-700">
@@ -3982,7 +3982,7 @@ export default function Home() {
                                   <h4 className="text-md font-medium text-slate-200 truncate" title={previousHistoryFiles[activeGrade]?.name}>
                                     {previousHistoryFiles[activeGrade]?.name}
                                   </h4>
-                                  <p className="text-xs text-slate-500 mt-1">
+                                  <p className="text-xs text-slate-300 mt-1">
                                     {(previousHistoryFiles[activeGrade]!.size / 1024).toFixed(1)} KB
                                   </p>
                                   <span className="inline-block mt-2 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-xs font-semibold rounded border border-emerald-500/20">
@@ -3991,12 +3991,12 @@ export default function Home() {
                                 </div>
                               </div>
                               <div className="flex gap-2">
-                                <div className="flex-1 py-2 text-center text-slate-400 text-xs bg-slate-800/50 rounded-lg flex items-center justify-center border border-slate-800">
+                                <div className="flex-1 py-2 text-center text-slate-300 text-xs bg-slate-800/50 rounded-lg flex items-center justify-center border border-slate-800">
                                   다년도 위계 검사 자동 적용됨
                                 </div>
                                 <button
                                   onClick={handleRemovePrevHistoryFile}
-                                  className="px-3 py-2 bg-slate-850 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 rounded-lg transition-colors border border-slate-800"
+                                  className="px-3 py-2 bg-slate-850 hover:bg-rose-600/20 hover:text-rose-400 text-white rounded-lg transition-colors border border-slate-800"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
@@ -4029,13 +4029,13 @@ export default function Home() {
 
                       {activeData.length === 0 ? (
                         <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-8 text-center">
-                          <p className="text-slate-500">선택하신 학년의 데이터가 아직 없습니다. 교육과정 설정과 파일 업로드를 진행해 주세요.</p>
+                          <p className="text-slate-300">선택하신 학년의 데이터가 아직 없습니다. 교육과정 설정과 파일 업로드를 진행해 주세요.</p>
                         </div>
                       ) : (
                         <div className="bg-slate-950/50 border border-slate-800 rounded-2xl overflow-hidden">
                           <div className="overflow-auto max-h-[650px] relative">
                             <table className="w-full text-sm text-left text-slate-300 border-collapse">
-                              <thead className="text-xs text-slate-400 uppercase bg-slate-900 border-b border-slate-800">
+                              <thead className="text-xs text-slate-300 uppercase bg-slate-900 border-b border-slate-800">
                                 <tr>
                                   <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-0 z-40 bg-slate-900 min-w-[50px] max-w-[50px] border-r border-slate-800 text-center">순번</th>
                                   <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[50px] z-40 bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800 text-center">학번</th>
@@ -4127,7 +4127,7 @@ export default function Home() {
                       <div className="p-5 bg-slate-950/40 border border-slate-800/80 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
                           <h3 className="font-semibold text-slate-200">학급 분반 및 개설 기준 설정</h3>
-                          <p className="text-xs text-slate-400 mt-1">
+                          <p className="text-xs text-slate-300 mt-1">
                             설정된 학급 기준 인원에 따라 개설(70% 이상), 논의(70% 미만), 분반 추천(120% 초과) 및 폐강(10명 미만) 여부를 자동으로 판단합니다.
                           </p>
                         </div>
@@ -4153,7 +4153,7 @@ export default function Home() {
                               <div className="flex flex-wrap items-center gap-2 mr-2">
                                 {groups.map(grp => (
                                   <div key={grp} className="flex items-center gap-1.5 bg-slate-900/80 border border-slate-700/50 px-2.5 py-1 rounded-lg shadow-inner">
-                                    <span className="text-[11px] font-semibold text-slate-400 tracking-wider">{grp}:</span>
+                                    <span className="text-[11px] font-semibold text-slate-300 tracking-wider">{grp}:</span>
                                     <span className="text-[13px] font-bold text-indigo-400">{groupTotals[grp]}반</span>
                                   </div>
                                 ))}
@@ -4177,7 +4177,7 @@ export default function Home() {
                             className="px-3 py-1.5 ml-2 mr-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl border border-slate-700 transition-colors flex items-center gap-1.5 shrink-0 shadow-sm hover:shadow-md"
                             title="수동으로 조정한 개설 반 수를 모두 초기화합니다"
                           >
-                            <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                            <RotateCcw className="w-3.5 h-3.5 text-slate-300" />
                             초기화
                           </button>
                           <div className="flex items-center gap-3 bg-slate-900/50 px-3 py-1.5 rounded-xl border border-slate-800">
@@ -4194,14 +4194,14 @@ export default function Home() {
                               }}
                               className="w-16 bg-slate-950 border border-slate-700 text-center rounded-lg px-2 py-1 text-white font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             />
-                            <span className="text-sm text-slate-400 whitespace-nowrap">명</span>
+                            <span className="text-sm text-slate-300 whitespace-nowrap">명</span>
                           </div>
                         </div>
                       </div>
 
                       {subjectStats[activeGrade].length === 0 ? (
                         <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-8 text-center">
-                          <p className="text-slate-500">선택하신 학년의 데이터가 아직 없습니다. 교육과정 설정과 파일 업로드를 진행해 주세요.</p>
+                          <p className="text-slate-300">선택하신 학년의 데이터가 아직 없습니다. 교육과정 설정과 파일 업로드를 진행해 주세요.</p>
                         </div>
                       ) : (() => {
                         const stats = subjectStats[activeGrade] || [];
@@ -4237,7 +4237,7 @@ export default function Home() {
                           <div className="bg-slate-950/50 border border-slate-800 rounded-2xl overflow-hidden">
                             <div className="overflow-auto max-h-[650px]">
                               <table className="w-full text-sm text-left text-slate-300 border-collapse">
-                                <thead className="text-xs text-slate-400 uppercase bg-slate-900 border-b border-slate-800">
+                                <thead className="text-xs text-slate-300 uppercase bg-slate-900 border-b border-slate-800">
                                     <tr>
                                       <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[100px]">선택군</th>
                                       <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">학기</th>
@@ -4258,7 +4258,7 @@ export default function Home() {
 
                                     if (displayRemark === "폐강") {
                                       openingStatus = "폐강";
-                                      openingStyle = "text-rose-400 font-bold bg-rose-500/10 px-2.5 py-1 rounded-md inline-block";
+                                      openingStyle = "text-rose-400 font-bold bg-rose-600/10 px-2.5 py-1 rounded-md inline-block";
                                     } else if (!isNaN(Number(displayRemark))) {
                                       openingStatus = "확정";
                                       openingStyle = "text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-md inline-block";
@@ -4401,7 +4401,7 @@ export default function Home() {
                       </div>
                       <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 overflow-hidden shadow-inner overflow-x-auto">
                         <table className="w-full text-sm text-left text-slate-300">
-                          <thead className="text-xs text-slate-400 bg-slate-900/80 sticky top-0 uppercase z-10 border-b border-slate-700/50">
+                          <thead className="text-xs text-slate-300 bg-slate-900/80 sticky top-0 uppercase z-10 border-b border-slate-700/50">
                             <tr>
                               <th rowSpan={2} className="px-4 py-3 text-center border-r border-slate-700/50">교과</th>
                               <th rowSpan={2} className="px-4 py-3 text-center border-r border-slate-700/50">교사 수</th>
@@ -4465,7 +4465,7 @@ export default function Home() {
                                   <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 ${bg1}`}>{row.sem1?.gradeLabel || ""}</td>
                                   <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-200 ${bg1}`}>{row.sem1?.subject || ""}</td>
                                   <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 ${bg1}`}>{row.sem1?.credits || ""}</td>
-                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-500 ${bg1}`}>
+                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 ${bg1}`}>
                                     {row.sem1 ? (() => {
                                       const gk = row.sem1.gradeLabel === "1" ? "pre1" : row.sem1.gradeLabel === "2" ? "grade1" : "grade2";
                                       const key = `${row.sem1.gradeLabel}_${row.sem1.subject}_1${row.sem1.isSplit ? '_split' : ''}`;
@@ -4516,7 +4516,7 @@ export default function Home() {
                                   <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 ${bg2}`}>{row.sem2?.gradeLabel || ""}</td>
                                   <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-200 ${bg2}`}>{row.sem2?.subject || ""}</td>
                                   <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 ${bg2}`}>{row.sem2?.credits || ""}</td>
-                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-500 ${bg2}`}>
+                                  <td className={`px-4 py-3 text-center border-r border-slate-700/50 text-slate-300 ${bg2}`}>
                                     {row.sem2 ? (() => {
                                       const gk = row.sem2.gradeLabel === "1" ? "pre1" : row.sem2.gradeLabel === "2" ? "grade1" : "grade2";
                                       const key = `${row.sem2.gradeLabel}_${row.sem2.subject}_2${row.sem2.isSplit ? '_split' : ''}`;
@@ -4579,7 +4579,7 @@ export default function Home() {
                               })
                             ) : (
                               <tr>
-                                <td colSpan={18} className="px-4 py-8 text-center text-slate-500">
+                                <td colSpan={18} className="px-4 py-8 text-center text-slate-300">
                                   데이터가 없습니다. 1단계 교육과정 편성표를 업로드해주세요.
                                 </td>
                               </tr>
@@ -4628,7 +4628,7 @@ export default function Home() {
                             onClick={() => setChangeActiveGrade("grade2")}
                             className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
                                 ? "bg-indigo-500 text-white shadow-md"
-                                : "text-slate-400 hover:text-slate-200"
+                                : "text-white hover:text-white"
                               }`}
                           >
                             2학년
@@ -4637,7 +4637,7 @@ export default function Home() {
                             onClick={() => setChangeActiveGrade("grade3")}
                             className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
                                 ? "bg-indigo-500 text-white shadow-md"
-                                : "text-slate-400 hover:text-slate-200"
+                                : "text-white hover:text-white"
                               }`}
                           >
                             3학년
@@ -4653,7 +4653,7 @@ export default function Home() {
                               <Upload className="w-5 h-5 text-indigo-400" />
                               교육과정 엑셀 업로드
                             </h3>
-                            <p className="text-sm text-slate-400 mb-6">
+                            <p className="text-sm text-slate-300 mb-6">
                               선택하신 학년이 기준이 됩니다. 수요조사와 독립적으로 검증에 사용될 교육과정 엑셀 파일을 업로드해 주세요.
                             </p>
                             
@@ -4665,7 +4665,7 @@ export default function Home() {
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                               />
                               <div className="flex flex-col items-center justify-center w-full h-32 bg-slate-900/50 border-2 border-dashed border-slate-700 rounded-xl group-hover:border-indigo-500/50 group-hover:bg-indigo-500/5 transition-all">
-                                <Upload className="w-8 h-8 text-slate-500 group-hover:text-indigo-400 mb-2 transition-colors" />
+                                <Upload className="w-8 h-8 text-slate-300 group-hover:text-indigo-400 mb-2 transition-colors" />
                                 <p className="text-slate-300 font-medium text-sm">엑셀 파일 업로드</p>
                               </div>
                             </div>
@@ -4674,7 +4674,7 @@ export default function Home() {
                               <div className="flex-1 overflow-auto pr-2 custom-scrollbar">
                                 <div className="rounded-lg border border-slate-800">
                                   <table className="w-full text-sm text-left">
-                                    <thead className="text-xs text-slate-400 uppercase bg-slate-900/80 sticky top-0 z-10">
+                                    <thead className="text-xs text-slate-300 uppercase bg-slate-900/80 sticky top-0 z-10">
                                       <tr>
                                         <th className="px-4 py-3 font-medium">구분</th>
                                         <th className="px-4 py-3 font-medium">과목명</th>
@@ -4688,15 +4688,15 @@ export default function Home() {
                                       {changeParsedCurriculumList[changeActiveGrade].map((subj, idx) => (
                                         <tr key={idx} className="bg-slate-950/30 hover:bg-slate-900/50 transition-colors">
                                           <td className="px-4 py-3">
-                                            <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider ${subj.type === "지정" ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" : "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                                            <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold tracking-wider ${subj.type === "지정" ? "bg-rose-600/10 text-rose-400 border border-rose-500/20" : "bg-indigo-500/10 text-white border border-indigo-500/20"
                                               }`}>
                                               {subj.type}
                                             </span>
                                           </td>
                                           <td className="px-4 py-3 font-medium text-slate-200">{subj.subject}</td>
-                                          <td className="px-4 py-3 text-slate-400 text-xs">{subj.category}</td>
+                                          <td className="px-4 py-3 text-slate-300 text-xs">{subj.category}</td>
                                           <td className="px-4 py-3 text-center text-amber-400/90 font-mono">{subj.credits}</td>
-                                          <td className="px-4 py-3 text-slate-500 text-[10px]">{subj.semesters}</td>
+                                          <td className="px-4 py-3 text-slate-300 text-[10px]">{subj.semesters}</td>
                                           <td className="px-4 py-3 text-center">
                                             {["국어", "수학", "영어"].includes(subj.category) && (
                                               <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-medium">
@@ -4740,26 +4740,26 @@ export default function Home() {
                                 규칙 추가
                               </button>
                             </div>
-                            <p className="text-sm text-slate-400 mb-6">
+                            <p className="text-sm text-slate-300 mb-6">
                               변경 신청 시 위계 위반을 검증할 규칙을 설정합니다.
                             </p>
 
                             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3">
                               {(!changeHierarchyRules[changeActiveGrade] || changeHierarchyRules[changeActiveGrade].length === 0) ? (
-                                <div className="p-6 border border-dashed border-slate-700/50 rounded-xl text-center text-slate-500 text-sm">
+                                <div className="p-6 border border-dashed border-slate-700/50 rounded-xl text-center text-slate-300 text-sm">
                                   설정된 위계 규칙이 없습니다.
                                 </div>
                               ) : (
                                 changeHierarchyRules[changeActiveGrade].map((rule, idx) => (
                                   <div key={rule.id} className="flex flex-col gap-2 p-3 bg-slate-900/80 border border-slate-700/50 rounded-xl relative group">
                                     <div className="flex items-center justify-between mb-1">
-                                      <span className="text-slate-400 font-medium text-xs">규칙 #{idx + 1}</span>
+                                      <span className="text-slate-300 font-medium text-xs">규칙 #{idx + 1}</span>
                                       <button
                                         onClick={() => {
                                           const newRules = changeHierarchyRules[changeActiveGrade].filter(r => r.id !== rule.id);
                                           setChangeHierarchyRules(prev => ({ ...prev, [changeActiveGrade]: newRules }));
                                         }}
-                                        className="text-slate-500 hover:text-rose-400 transition-colors"
+                                        className="text-slate-300 hover:text-rose-400 transition-colors"
                                       >
                                         <Trash2 className="w-4 h-4" />
                                       </button>
@@ -4826,7 +4826,7 @@ export default function Home() {
                             onClick={() => setChangeActiveGrade("grade2")}
                             className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
                                 ? "bg-indigo-500 text-white shadow-md"
-                                : "text-slate-400 hover:text-slate-200"
+                                : "text-white hover:text-white"
                               }`}
                           >
                             2학년
@@ -4835,7 +4835,7 @@ export default function Home() {
                             onClick={() => setChangeActiveGrade("grade3")}
                             className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
                                 ? "bg-indigo-500 text-white shadow-md"
-                                : "text-slate-400 hover:text-slate-200"
+                                : "text-white hover:text-white"
                               }`}
                           >
                             3학년
@@ -4849,7 +4849,7 @@ export default function Home() {
                             <CheckCircle2 className="w-10 h-10 text-emerald-400" />
                           </div>
                           <h3 className="text-xl font-medium text-slate-200 mb-2">학생 선택 데이터 파일 (sample3) 업로드</h3>
-                          <p className="text-slate-400 mb-4 text-center max-w-md">
+                          <p className="text-slate-300 mb-4 text-center max-w-md">
                             과목명이 열 헤더로 지정되어 있고, 셀 값으로 A, B, C, D 등의 선택 그룹이 명시된 수요조사 결과 파일을 업로드해 주세요.
                           </p>
                           <div className="flex flex-col items-center gap-2 mb-6">
@@ -4859,14 +4859,14 @@ export default function Home() {
                                 {changeUploadNames[changeActiveGrade]?.timetable || '업로드된 파일'}
                               </span>
                             </div>
-                            <span className="text-slate-400 text-sm">
+                            <span className="text-slate-300 text-sm">
                               {changeActiveGrade === "grade2" ? "2학년" : "3학년"} 학생 선택 데이터: {parsedSampleData[changeActiveGrade].length}명 파싱 완료
                             </span>
                           </div>
                           <div className="flex gap-4">
                             <button
                               onClick={handleDeleteSampleUpload}
-                              className="flex items-center gap-2 px-5 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 font-medium rounded-xl transition-all"
+                              className="flex items-center gap-2 px-5 py-2.5 bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/20 font-medium rounded-xl transition-all"
                             >
                               <Trash2 className="w-4 h-4" />
                               삭제
@@ -4896,7 +4896,7 @@ export default function Home() {
                             <FileIcon className="w-10 h-10 text-indigo-400" />
                           </div>
                           <h3 className="text-xl font-medium text-slate-200 mb-2">학생 선택 데이터 파일 (sample3) 업로드</h3>
-                          <p className="text-slate-400 mb-6 text-center max-w-md">
+                          <p className="text-slate-300 mb-6 text-center max-w-md">
                             과목명이 열 헤더로 지정되어 있고, 셀 값으로 A, B, C, D 등의 선택 그룹이 명시된 수요조사 결과 파일을 업로드해 주세요.
                           </p>
 
@@ -4931,7 +4931,7 @@ export default function Home() {
                               <div className="flex gap-2">
                                 <button
                                   onClick={() => handleDeleteExtraUpload('grade2Optional')}
-                                  className="flex items-center gap-2 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 font-medium rounded-xl transition-all text-sm"
+                                  className="flex items-center gap-2 px-3 py-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/20 font-medium rounded-xl transition-all text-sm"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                   삭제
@@ -4975,7 +4975,7 @@ export default function Home() {
                               <div className="flex gap-2">
                                 <button
                                   onClick={() => handleDeleteExtraUpload('grade3Sem1')}
-                                  className="flex items-center gap-2 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 font-medium rounded-xl transition-all text-sm"
+                                  className="flex items-center gap-2 px-3 py-2 bg-rose-600/10 hover:bg-rose-600/20 text-rose-400 border border-rose-500/20 font-medium rounded-xl transition-all text-sm"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                   삭제
@@ -5018,7 +5018,7 @@ export default function Home() {
                             onClick={() => setChangeActiveGrade("grade2")}
                             className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
                                 ? "bg-indigo-500 text-white shadow-md"
-                                : "text-slate-400 hover:text-slate-200"
+                                : "text-white hover:text-white"
                               }`}
                           >
                             2학년
@@ -5027,7 +5027,7 @@ export default function Home() {
                             onClick={() => setChangeActiveGrade("grade3")}
                             className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
                                 ? "bg-indigo-500 text-white shadow-md"
-                                : "text-slate-400 hover:text-slate-200"
+                                : "text-white hover:text-white"
                               }`}
                           >
                             3학년
@@ -5037,7 +5037,7 @@ export default function Home() {
 
                       <div className="bg-slate-900 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl">
                         <div className="p-4 border-b border-slate-800/80 bg-slate-800/30 flex justify-between items-center">
-                          <div className="text-sm text-slate-400">
+                          <div className="text-sm text-slate-300">
                             엑셀에서 복사한 데이터를 칸에 클릭 후 붙여넣기(Ctrl+V) 하시면 한 번에 자동으로 채워집니다.
                           </div>
                           <div className="flex gap-2">
@@ -5049,13 +5049,13 @@ export default function Home() {
                             </button>
                             <button
                               onClick={addTimeSlot}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 rounded-lg font-medium text-sm transition-colors border border-indigo-500/30"
+                              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-500/20 text-white hover:bg-indigo-500/30 rounded-lg font-medium text-sm transition-colors border border-indigo-500/30"
                             >
                               <Plus className="w-4 h-4" /> 타임 추가
                             </button>
                             <button
                               onClick={addClassCol}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 rounded-lg font-medium text-sm transition-colors border border-rose-500/30"
+                              className="flex items-center gap-1 px-3 py-1.5 bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 rounded-lg font-medium text-sm transition-colors border border-rose-500/30"
                             >
                               <Plus className="w-4 h-4" /> 반 추가
                             </button>
@@ -5099,7 +5099,7 @@ export default function Home() {
                                       <div className="flex flex-col h-full min-h-[64px]">
                                         <input
                                           type="text"
-                                          className="w-full flex-1 bg-transparent text-slate-200 px-2 text-center text-sm font-medium focus:outline-none focus:bg-indigo-500/10 focus:ring-1 focus:ring-indigo-500/50 border-b border-slate-800/50"
+                                          className="w-full flex-1 bg-transparent text-white px-2 text-center text-sm font-medium focus:outline-none focus:bg-indigo-500/10 focus:ring-1 focus:ring-indigo-500/50 border-b border-slate-800/50"
                                           value={timetableData[changeActiveGrade]?.[row]?.[col]?.subject || ""}
                                           onChange={(e) => updateTimetableCell(row, col, "subject", e.target.value)}
                                           onPaste={(e) => handleTimetablePaste(e, rIdx, cIdx, "subject")}
@@ -5107,7 +5107,7 @@ export default function Home() {
                                         />
                                         <input
                                           type="text"
-                                          className="w-full flex-1 bg-transparent text-slate-400 px-2 text-center text-xs focus:outline-none focus:bg-indigo-500/10 focus:ring-1 focus:ring-indigo-500/50"
+                                          className="w-full flex-1 bg-transparent text-white px-2 text-center text-xs focus:outline-none focus:bg-indigo-500/10 focus:ring-1 focus:ring-indigo-500/50"
                                           value={timetableData[changeActiveGrade]?.[row]?.[col]?.teacher || ""}
                                           onChange={(e) => updateTimetableCell(row, col, "teacher", e.target.value)}
                                           onPaste={(e) => handleTimetablePaste(e, rIdx, cIdx, "teacher")}
@@ -5137,7 +5137,7 @@ export default function Home() {
                             onClick={() => setChangeActiveGrade("grade2")}
                             className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
                                 ? "bg-indigo-500 text-white shadow-md"
-                                : "text-slate-400 hover:text-slate-200"
+                                : "text-white hover:text-white"
                               }`}
                           >
                             2학년
@@ -5146,7 +5146,7 @@ export default function Home() {
                             onClick={() => setChangeActiveGrade("grade3")}
                             className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
                                 ? "bg-indigo-500 text-white shadow-md"
-                                : "text-slate-400 hover:text-slate-200"
+                                : "text-white hover:text-white"
                               }`}
                           >
                             3학년
@@ -5163,7 +5163,7 @@ export default function Home() {
                           </div>
                           <div className="overflow-auto relative">
                             <table className="w-full text-sm text-left text-slate-300 border-collapse">
-                              <thead className="text-xs text-slate-400 bg-slate-800 border-b border-slate-700 uppercase">
+                              <thead className="text-xs text-slate-300 bg-slate-800 border-b border-slate-700 uppercase">
                                 <tr>
                                   <th className="px-3 py-3 font-semibold text-center w-12 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">순번</th>
                                   <th className="px-4 py-3 font-semibold text-center w-24 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">학번</th>
@@ -5184,7 +5184,7 @@ export default function Home() {
                                           isNew: true
                                         }, ...prev[changeActiveGrade]]
                                       }));
-                                    }} className="p-1 text-slate-400 hover:text-emerald-400 transition-colors">
+                                    }} className="p-1 text-slate-300 hover:text-emerald-400 transition-colors">
                                       <Plus className="w-5 h-5 mx-auto" />
                                     </button>
                                   </th>
@@ -5208,7 +5208,7 @@ export default function Home() {
                                   if (sortedData.length === 0) {
                                     return (
                                       <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-300">
                                           등록된 선택과목 변경 신청 내역이 없습니다.<br />
                                           우측 상단의 <Plus className="w-4 h-4 inline mx-1" /> 버튼을 눌러 추가하세요.
                                         </td>
@@ -5265,7 +5265,7 @@ export default function Home() {
 
                                       return (
                                         <tr key={item.id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
-                                          <td className="px-3 py-2 text-center border-r border-slate-700/50 text-slate-500">{currentIndex + 1}</td>
+                                          <td className="px-3 py-2 text-center border-r border-slate-700/50 text-slate-300">{currentIndex + 1}</td>
                                           {isFirstInGroup && (
                                             <>
                                               <td rowSpan={rowSpan} className="px-2 py-2 border-r border-slate-700/50 align-top">
@@ -5345,7 +5345,7 @@ export default function Home() {
                                                   newData.splice(currentIdx + 1, 0, newItem);
                                                   return { ...prev, [changeActiveGrade]: newData };
                                                 });
-                                              }} className="p-1 text-slate-500 hover:text-emerald-400 transition-colors" title="같은 학생 과목 추가">
+                                              }} className="p-1 text-slate-300 hover:text-emerald-400 transition-colors" title="같은 학생 과목 추가">
                                                 <Plus className="w-3.5 h-3.5" />
                                               </button>
                                               <button onClick={() => {
@@ -5353,7 +5353,7 @@ export default function Home() {
                                                   ...prev,
                                                   [changeActiveGrade]: prev[changeActiveGrade].filter(x => x.id !== item.id)
                                                 }));
-                                              }} className="p-1 text-slate-500 hover:text-red-400 transition-colors" title="삭제">
+                                              }} className="p-1 text-slate-300 hover:text-red-400 transition-colors" title="삭제">
                                                 <Trash2 className="w-3.5 h-3.5" />
                                               </button>
                                             </div>
@@ -5373,7 +5373,7 @@ export default function Home() {
                           </div>
                           <div className="overflow-auto relative">
                             <table className="w-full text-sm text-left text-slate-300 border-collapse">
-                              <thead className="text-xs text-slate-400 bg-slate-800 border-b border-slate-700 uppercase">
+                              <thead className="text-xs text-slate-300 bg-slate-800 border-b border-slate-700 uppercase">
                                 <tr>
                                   <th className="px-3 py-3 font-semibold text-center w-12 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">순번</th>
                                   <th className="px-4 py-3 font-semibold text-center w-24 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800 shadow-sm">학번</th>
@@ -5394,7 +5394,7 @@ export default function Home() {
                                           isNew: true
                                         }, ...prev[changeActiveGrade]]
                                       }));
-                                    }} className="p-1 text-slate-400 hover:text-emerald-400 transition-colors">
+                                    }} className="p-1 text-slate-300 hover:text-emerald-400 transition-colors">
                                       <Plus className="w-5 h-5 mx-auto" />
                                     </button>
                                   </th>
@@ -5418,7 +5418,7 @@ export default function Home() {
                                   if (sortedData.length === 0) {
                                     return (
                                       <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                                        <td colSpan={7} className="px-6 py-12 text-center text-slate-300">
                                           등록된 선택과목 변경 신청 내역이 없습니다.<br />
                                           우측 상단의 <Plus className="w-4 h-4 inline mx-1" /> 버튼을 눌러 추가하세요.
                                         </td>
@@ -5475,7 +5475,7 @@ export default function Home() {
 
                                       return (
                                         <tr key={item.id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
-                                          <td className="px-3 py-2 text-center border-r border-slate-700/50 text-slate-500">{currentIndex + 1}</td>
+                                          <td className="px-3 py-2 text-center border-r border-slate-700/50 text-slate-300">{currentIndex + 1}</td>
                                           {isFirstInGroup && (
                                             <>
                                               <td rowSpan={rowSpan} className="px-2 py-2 border-r border-slate-700/50 align-top">
@@ -5555,7 +5555,7 @@ export default function Home() {
                                                   newData.splice(currentIdx + 1, 0, newItem);
                                                   return { ...prev, [changeActiveGrade]: newData };
                                                 });
-                                              }} className="p-1 text-slate-500 hover:text-emerald-400 transition-colors" title="같은 학생 과목 추가">
+                                              }} className="p-1 text-slate-300 hover:text-emerald-400 transition-colors" title="같은 학생 과목 추가">
                                                 <Plus className="w-3.5 h-3.5" />
                                               </button>
                                               <button onClick={() => {
@@ -5563,7 +5563,7 @@ export default function Home() {
                                                   ...prev,
                                                   [changeActiveGrade]: prev[changeActiveGrade].filter(x => x.id !== item.id)
                                                 }));
-                                              }} className="p-1 text-slate-500 hover:text-red-400 transition-colors" title="삭제">
+                                              }} className="p-1 text-slate-300 hover:text-red-400 transition-colors" title="삭제">
                                                 <Trash2 className="w-3.5 h-3.5" />
                                               </button>
                                             </div>
@@ -5602,7 +5602,7 @@ export default function Home() {
                           </div>
                           <div className="overflow-auto flex-1">
                             <table className="w-full text-sm text-left text-slate-300 border-collapse">
-                              <thead className="text-xs text-slate-400 bg-slate-800/50 border-b border-slate-700 uppercase">
+                              <thead className="text-xs text-slate-300 bg-slate-800/50 border-b border-slate-700 uppercase">
                                 <tr>
                                   <th className="px-4 py-3 font-semibold text-center w-24 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800/90 backdrop-blur shadow-sm">학번</th>
                                   <th className="px-4 py-3 font-semibold text-center w-24 border-r border-slate-700/50 sticky top-0 z-10 bg-slate-800/90 backdrop-blur shadow-sm">이름</th>
@@ -5617,7 +5617,7 @@ export default function Home() {
                                   if (data.length === 0 && dataLower.length === 0) {
                                     return (
                                       <tr>
-                                        <td colSpan={3} className="px-6 py-12 text-center text-slate-500">
+                                        <td colSpan={3} className="px-6 py-12 text-center text-slate-300">
                                           신청 내역을 입력하면 자동 변경 결과가 이곳에 표시됩니다.
                                         </td>
                                       </tr>
@@ -5630,7 +5630,7 @@ export default function Home() {
                                   if (studentsUpper.length === 0 && studentsLower.length === 0) {
                                     return (
                                       <tr>
-                                        <td colSpan={3} className="px-6 py-12 text-center text-slate-500">
+                                        <td colSpan={3} className="px-6 py-12 text-center text-slate-300">
                                           유효한 학번이 입력되지 않았습니다.
                                         </td>
                                       </tr>
@@ -5659,7 +5659,7 @@ export default function Home() {
                                                     key={i}
                                                     className={`inline-block px-2 py-1 rounded border text-xs mr-2 mb-1 ${log.status === 'success'
                                                         ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
-                                                        : 'text-rose-300 bg-rose-500/10 border-rose-500/20 cursor-help'
+                                                        : 'text-rose-300 bg-rose-600/10 border-rose-500/20 cursor-help'
                                                       }`}
                                                     title={log.reason}
                                                   >
@@ -5669,7 +5669,7 @@ export default function Home() {
                                                 ))}
                                               </div>
                                             ) : (
-                                              <span className="text-slate-500 italic text-xs">일치하는 수강 명단 없음</span>
+                                              <span className="text-slate-300 italic text-xs">일치하는 수강 명단 없음</span>
                                             )}
                                           </td>
                                         </tr>
@@ -5738,7 +5738,7 @@ export default function Home() {
                               onClick={() => setChangeActiveGrade("grade2")}
                               className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
                                   ? "bg-indigo-500 text-white shadow-md"
-                                  : "text-slate-400 hover:text-slate-200"
+                                  : "text-white hover:text-white"
                                 }`}
                             >
                               2학년
@@ -5747,7 +5747,7 @@ export default function Home() {
                               onClick={() => setChangeActiveGrade("grade3")}
                               className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
                                   ? "bg-indigo-500 text-white shadow-md"
-                                  : "text-slate-400 hover:text-slate-200"
+                                  : "text-white hover:text-white"
                                 }`}
                             >
                               3학년
@@ -5809,7 +5809,7 @@ export default function Home() {
                                   }}
                                   className={`px-5 py-2 rounded-lg font-medium transition-all ${changeRosterTimeSlot === slot && rosterAfterSubjectFilter === "전체"
                                       ? "bg-indigo-600 text-white shadow-md"
-                                      : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                                      : "bg-slate-800/50 text-white hover:bg-slate-700 hover:text-white"
                                     }`}
                                 >
                                   {slot}타임
@@ -5823,7 +5823,7 @@ export default function Home() {
                                   onClick={() => setRosterAfterSubjectFilter("전체")}
                                   className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${rosterAfterSubjectFilter === "전체"
                                       ? "bg-amber-500 text-white shadow-md"
-                                      : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                                      : "bg-slate-800/50 text-white hover:bg-slate-700 hover:text-white"
                                     }`}
                                 >
                                   전체 과목 (타임별)
@@ -5834,7 +5834,7 @@ export default function Home() {
                                     onClick={() => setRosterAfterSubjectFilter(sub)}
                                     className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${rosterAfterSubjectFilter === sub
                                         ? "bg-amber-500 text-white shadow-md"
-                                        : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                                        : "bg-slate-800/50 text-white hover:bg-slate-700 hover:text-white"
                                       }`}
                                   >
                                     {sub}
@@ -5871,7 +5871,7 @@ export default function Home() {
                                       <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">교사</th>
                                       {displayCols.map(c => (
                                         <Fragment key={`teacher-${c.slot}-${c.col}`}>
-                                          <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center text-slate-400">
+                                          <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center text-slate-300">
                                             {timetableData[changeActiveGrade]?.[c.slot]?.[c.col]?.teacher || "-"}
                                           </th>
                                         </Fragment>
@@ -6008,7 +6008,7 @@ export default function Home() {
                                       for (let r = 0; r < maxStudents; r++) {
                                         rows.push(
                                           <tr key={`row-${r}`} className={`${r % 2 === 0 ? "bg-slate-900/20" : "bg-slate-800/20"} hover:bg-indigo-900/20 transition-colors`}>
-                                            <td className="px-3 py-1.5 border-r border-slate-700/50 text-center text-slate-500 bg-slate-900/50">
+                                            <td className="px-3 py-1.5 border-r border-slate-700/50 text-center text-slate-300 bg-slate-900/50">
                                               {r + 1}
                                             </td>
                                             {displayCols.map(c => {
@@ -6018,11 +6018,11 @@ export default function Home() {
                                               const tooltipText = studentChangeLogs.map(l => `${l.beforeStr} → ${l.afterStr}`).join('\n');
                                               return (
                                                 <Fragment key={`${c.slot}-${c.col}-${r}`}>
-                                                  <td className={`px-2 py-1.5 border-r border-slate-700/50 text-center border-r-slate-800/30 text-xs ${isModified ? (student.modifiedSource === 'applicant' ? 'bg-amber-500/10 text-amber-300 font-bold' : 'bg-emerald-500/10 text-emerald-300 font-bold') : 'text-slate-400'}`}>
+                                                  <td className={`px-2 py-1.5 border-r border-slate-700/50 text-center border-r-slate-800/30 text-xs ${isModified ? (student.modifiedSource === 'applicant' ? 'bg-amber-500/10 text-amber-300 font-bold' : 'bg-emerald-500/10 text-emerald-300 font-bold') : 'text-white'}`}>
                                                     {student ? student.id : ""}
                                                   </td>
                                                   <td 
-                                                    className={`px-2 py-1.5 border-r border-slate-700/50 text-center text-xs ${isModified ? (student.modifiedSource === 'applicant' ? 'bg-amber-500/10 text-amber-400 font-bold cursor-help' : 'bg-emerald-500/10 text-emerald-400 font-bold cursor-help') : 'text-slate-300 font-medium'}`}
+                                                    className={`px-2 py-1.5 border-r border-slate-700/50 text-center text-xs ${isModified ? (student.modifiedSource === 'applicant' ? 'bg-amber-500/10 text-amber-400 font-bold cursor-help' : 'bg-emerald-500/10 text-emerald-400 font-bold cursor-help') : 'text-white font-medium'}`}
                                                     title={isModified && tooltipText ? tooltipText : undefined}
                                                   >
                                                     {student ? student.name : ""}
@@ -6082,7 +6082,7 @@ export default function Home() {
                               onClick={() => setChangeActiveGrade("grade2")}
                               className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
                                   ? "bg-indigo-500 text-white shadow-md"
-                                  : "text-slate-400 hover:text-slate-200"
+                                  : "text-white hover:text-white"
                                 }`}
                             >
                               2학년
@@ -6091,7 +6091,7 @@ export default function Home() {
                               onClick={() => setChangeActiveGrade("grade3")}
                               className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
                                   ? "bg-indigo-500 text-white shadow-md"
-                                  : "text-slate-400 hover:text-slate-200"
+                                  : "text-white hover:text-white"
                                 }`}
                             >
                               3학년
@@ -6107,7 +6107,7 @@ export default function Home() {
                             onClick={() => setChangeRosterTimeSlot(slot)}
                             className={`px-5 py-2 rounded-lg font-medium transition-all ${changeRosterTimeSlot === slot
                                 ? "bg-indigo-600 text-white shadow-md"
-                                : "bg-slate-800/50 text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                                : "bg-slate-800/50 text-white hover:bg-slate-700 hover:text-white"
                               }`}
                           >
                             {slot}타임
@@ -6141,7 +6141,7 @@ export default function Home() {
                                 <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">교사</th>
                                 {classCols[changeActiveGrade].map(col => (
                                   <Fragment key={`teacher-${col}`}>
-                                    <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center text-slate-400">
+                                    <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center text-slate-300">
                                       {timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.teacher || "-"}
                                     </th>
                                   </Fragment>
@@ -6222,12 +6222,12 @@ export default function Home() {
                                 for (let r = 0; r < maxStudents; r++) {
                                   rows.push(
                                     <tr key={r} className="border-b border-slate-800/30 hover:bg-slate-800/20">
-                                      <td className="px-3 py-1.5 border-r border-slate-700/50 text-center text-slate-500 bg-slate-900/50">{r + 1}</td>
+                                      <td className="px-3 py-1.5 border-r border-slate-700/50 text-center text-slate-300 bg-slate-900/50">{r + 1}</td>
                                       {classCols[changeActiveGrade].map(col => {
                                         const student = colStudents[col][r];
                                         return (
                                           <Fragment key={`data-${col}-${r}`}>
-                                            <td className="px-2 py-1.5 border-r border-slate-700/50 text-center text-slate-400 border-r-slate-800/30 text-xs">
+                                            <td className="px-2 py-1.5 border-r border-slate-700/50 text-center text-slate-300 border-r-slate-800/30 text-xs">
                                               {student ? student.id : ""}
                                             </td>
                                             <td className="px-2 py-1.5 border-r border-slate-700/50 text-center text-slate-300 font-medium text-xs">
@@ -6275,7 +6275,7 @@ export default function Home() {
                               <span className="text-amber-200">학생 직접 변경자 (5단계 수동 신청 반영)</span>
                             </div>
                           </div>
-                          <p className="text-slate-400 text-sm mt-1 mb-4 ml-8">
+                          <p className="text-slate-300 text-sm mt-1 mb-4 ml-8">
                             * 위계성 검사는 '수요조사' 탭의 2단계에서 설정한 위계 규칙을 공유하여 그대로 적용합니다.
                           </p>
                         </div>
@@ -6294,7 +6294,7 @@ export default function Home() {
                             className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors flex items-center gap-2 ${
                               showOnlyApplicants
                                 ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
-                                : "bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-slate-300"
+                                : "bg-slate-800/50 border-slate-700/50 text-white hover:text-white"
                             }`}
                           >
                             직접 변경자만 보기
@@ -6304,7 +6304,7 @@ export default function Home() {
                               onClick={() => setChangeActiveGrade("grade2")}
                               className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
                                   ? "bg-slate-700 text-white shadow"
-                                  : "text-slate-400 hover:text-slate-200"
+                                  : "text-slate-300 hover:text-slate-200"
                                 }`}
                             >
                               2학년
@@ -6313,7 +6313,7 @@ export default function Home() {
                               onClick={() => setChangeActiveGrade("grade3")}
                               className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
                                   ? "bg-slate-700 text-white shadow"
-                                  : "text-slate-400 hover:text-slate-200"
+                                  : "text-slate-300 hover:text-slate-200"
                                 }`}
                             >
                               3학년
@@ -6324,13 +6324,13 @@ export default function Home() {
 
                       {step6Data.length === 0 ? (
                         <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-8 text-center">
-                          <p className="text-slate-500">선택하신 학년의 데이터가 아직 없습니다.</p>
+                          <p className="text-slate-300">선택하신 학년의 데이터가 아직 없습니다.</p>
                         </div>
                       ) : (
                         <div className="bg-slate-950/50 border border-slate-800 rounded-2xl overflow-hidden">
                           <div className="overflow-auto max-h-[650px] relative">
                             <table className="w-full text-sm text-left text-slate-300 border-collapse">
-                              <thead className="text-xs text-slate-400 uppercase bg-slate-900 border-b border-slate-800">
+                              <thead className="text-xs text-slate-300 uppercase bg-slate-900 border-b border-slate-800">
                                 <tr>
                                   <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-0 z-40 bg-slate-900 min-w-[50px] max-w-[50px] border-r border-slate-800 text-center">순번</th>
                                   <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[50px] z-40 bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800 text-center">학번</th>
@@ -6347,7 +6347,7 @@ export default function Home() {
                                 {(showOnlyApplicants ? step6Data.filter(row => adjustmentLog[row.id]?.some(l => l.status === 'success' && l.source === 'applicant')) : step6Data).map((row, idx) => {
                                   const hasChanges = adjustmentLog[row.id] && adjustmentLog[row.id].some(l => l.status === 'success' && l.source === 'applicant');
                                   const highlightClass = hasChanges ? "bg-amber-500/10 text-amber-300" : "bg-slate-950 text-white";
-                                  const nameHighlightClass = hasChanges ? "bg-amber-500/10 text-amber-300" : "bg-slate-950 text-slate-300";
+                                  const nameHighlightClass = hasChanges ? "bg-amber-500/10 text-amber-300" : "bg-slate-950 text-white";
                                   const hoverClass = hasChanges ? "group-hover:bg-amber-500/20" : "group-hover:bg-slate-900";
                                   return (
                                   <tr key={idx} className="group border-b border-slate-800/50 hover:bg-slate-900/50">
@@ -6450,7 +6450,7 @@ export default function Home() {
                           <h3 className="text-xl font-bold text-white">
                             최종 선택과목 데이터 엑셀 다운로드
                           </h3>
-                          <p className="text-slate-400 text-sm md:text-base leading-relaxed">
+                          <p className="text-slate-300 text-sm md:text-base leading-relaxed">
                             2단계에서 업로드했던 원본 엑셀 파일(sample3)의 형태와 서식을 그대로 유지한 채,<br />
                             학생들의 변경 신청 결과에 맞춰 선택과목 알파벳 마킹(A, B, C, D)만 정확히 최신화하여 다운로드합니다.
                           </p>
@@ -6462,7 +6462,7 @@ export default function Home() {
                               className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg ${
                                 sampleRawData['grade2'] 
                                   ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20 hover:scale-105' 
-                                  : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                                  : 'bg-slate-800 text-white cursor-not-allowed border border-slate-700'
                               }`}
                             >
                               <Download className="w-5 h-5" />
@@ -6474,7 +6474,7 @@ export default function Home() {
                               className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all shadow-lg ${
                                 sampleRawData['grade3'] 
                                   ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20 hover:scale-105' 
-                                  : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                                  : 'bg-slate-800 text-white cursor-not-allowed border border-slate-700'
                               }`}
                             >
                               <Download className="w-5 h-5" />
@@ -6508,7 +6508,7 @@ export default function Home() {
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
                 💡 올바른 엑셀 시수 입력 예시
               </h3>
-              <button onClick={() => setIsExampleModalOpen(false)} className="text-slate-400 hover:text-white transition-colors p-2 rounded-full hover:bg-slate-800">
+              <button onClick={() => setIsExampleModalOpen(false)} className="text-slate-300 hover:text-white transition-colors p-2 rounded-full hover:bg-slate-800">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -6520,7 +6520,7 @@ export default function Home() {
                   <h4 className="text-rose-400 font-bold mb-3 flex items-center gap-2 text-base">
                     <span>❌ 잘못된 예 (수정 전)</span>
                   </h4>
-                  <p className="text-sm text-slate-400 mb-4">동일한 선택과목군에서 4과목 선택하는 경우 편제표</p>
+                  <p className="text-sm text-slate-300 mb-4">동일한 선택과목군에서 4과목 선택하는 경우 편제표</p>
                   <div className="bg-slate-900 rounded-lg border border-slate-800 flex justify-center items-center p-4">
                      <img src="/excel-wrong.png" alt="잘못된 엑셀 입력 예시" className="w-auto h-auto max-w-full max-h-[35vh] object-contain shadow-lg rounded" />
                   </div>
@@ -6529,7 +6529,7 @@ export default function Home() {
                   <h4 className="text-emerald-400 font-bold mb-3 flex items-center gap-2 text-base">
                     <span>⭕ 올바른 예 (수정 후)</span>
                   </h4>
-                  <p className="text-sm text-slate-400 mb-4">동일한 선택과목군에 모두 같은 학점을 입력하고 업로드 하세요</p>
+                  <p className="text-sm text-slate-300 mb-4">동일한 선택과목군에 모두 같은 학점을 입력하고 업로드 하세요</p>
                   <div className="bg-slate-900 rounded-lg border border-slate-800 flex justify-center items-center p-4">
                      <img src="/excel-right.png" alt="올바른 엑셀 입력 예시" className="w-auto h-auto max-w-full max-h-[35vh] object-contain shadow-lg rounded" />
                   </div>
