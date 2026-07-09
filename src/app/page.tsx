@@ -87,6 +87,7 @@ export default function Home() {
   const [showOnlyApplicants, setShowOnlyApplicants] = useState(false);
   const [changeRosterTimeSlot, setChangeRosterTimeSlot] = useState("A");
   const [rosterAfterSubjectFilter, setRosterAfterSubjectFilter] = useState<string>("전체");
+  const [rosterSubjectFilter, setRosterSubjectFilter] = useState<string>("전체");
 
   const [changeTimeSlots, setChangeTimeSlots] = useState<{ grade2: string[], grade3: string[] }>({ grade2: [], grade3: [] });
   const [changeClassCols, setChangeClassCols] = useState<{ grade2: string[], grade3: string[] }>({ grade2: [], grade3: [] });
@@ -6100,167 +6101,257 @@ export default function Home() {
                         </div>
                       </div>
 
-                      <div className="flex gap-2 flex-wrap mb-4">
-                        {timeSlots[changeActiveGrade].map(slot => (
-                          <button
-                            key={slot}
-                            onClick={() => setChangeRosterTimeSlot(slot)}
-                            className={`px-5 py-2 rounded-lg font-medium transition-all ${changeRosterTimeSlot === slot
-                                ? "bg-indigo-600 text-white shadow-md"
-                                : "bg-slate-800/50 text-white hover:bg-slate-700 hover:text-white"
-                              }`}
-                          >
-                            {slot}타임
-                          </button>
-                        ))}
-                      </div>
+                      {(() => {
+                        const currentSubjects = Array.from(new Set(
+                          timeSlots[changeActiveGrade].flatMap(slot => 
+                            classCols[changeActiveGrade]
+                              .map(col => {
+                                const cellSubject = timetableData[changeActiveGrade]?.[slot]?.[col]?.subject?.trim();
+                                if (!cellSubject) return null;
+                                const match = cellSubject.match(/^(.*?)([\\d\\s]*)$/);
+                                return match ? match[1].trim() : cellSubject;
+                              })
+                              .filter(Boolean)
+                          )
+                        )).sort() as string[];
 
-                      <div className="bg-slate-900 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm text-left border-collapse">
-                            <thead>
-                              <tr className="bg-amber-400/20 text-amber-200 border-b-2 border-slate-700">
-                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-bold min-w-[80px]">과목명</th>
-                                {classCols[changeActiveGrade].map(col => (
-                                  <th key={col} colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-bold min-w-[120px]">
-                                    {timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject || "-"}
-                                  </th>
+                        const displayCols: { slot: string, col: string, original: string }[] = [];
+                        if (rosterSubjectFilter === "전체") {
+                          classCols[changeActiveGrade].forEach(col => {
+                            const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
+                            if (cellSubject) {
+                              displayCols.push({ slot: changeRosterTimeSlot, col, original: cellSubject });
+                            }
+                          });
+                        } else {
+                          timeSlots[changeActiveGrade].forEach(slot => {
+                            classCols[changeActiveGrade].forEach(col => {
+                              const cellSubject = timetableData[changeActiveGrade]?.[slot]?.[col]?.subject?.trim();
+                              if (!cellSubject) return;
+                              const match = cellSubject.match(/^(.*?)([\\d\\s]*)$/);
+                              const base = match ? match[1].trim() : cellSubject;
+                              if (base === rosterSubjectFilter) {
+                                displayCols.push({ slot, col, original: cellSubject });
+                              }
+                            });
+                          });
+                        }
+
+                        const maxCols = classCols[changeActiveGrade].length;
+                        const firstColWidth = 8;
+                        const dataColWidth = (100 - firstColWidth) / maxCols;
+                        const emptyColCount = maxCols - displayCols.length;
+
+                        return (
+                          <>
+                            <div className="flex gap-2 flex-wrap mb-4">
+                              {timeSlots[changeActiveGrade].map(slot => (
+                                <button
+                                  key={slot}
+                                  onClick={() => {
+                                    setChangeRosterTimeSlot(slot);
+                                    setRosterSubjectFilter("전체");
+                                  }}
+                                  className={`px-5 py-2 rounded-lg font-medium transition-all ${changeRosterTimeSlot === slot && rosterSubjectFilter === "전체"
+                                      ? "bg-indigo-600 text-white shadow-md"
+                                      : "bg-slate-800/50 text-white hover:bg-slate-700 hover:text-white"
+                                    }`}
+                                >
+                                  {slot}타임
+                                </button>
+                              ))}
+                            </div>
+                            
+                            {currentSubjects.length > 0 && (
+                              <div className="flex gap-2 flex-wrap mb-4">
+                                <button
+                                  onClick={() => setRosterSubjectFilter("전체")}
+                                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${rosterSubjectFilter === "전체"
+                                      ? "bg-amber-500 text-white shadow-md"
+                                      : "bg-slate-800/50 text-white hover:bg-slate-700 hover:text-white"
+                                    }`}
+                                >
+                                  전체 과목 (타임별)
+                                </button>
+                                {currentSubjects.map(sub => (
+                                  <button
+                                    key={sub}
+                                    onClick={() => setRosterSubjectFilter(sub)}
+                                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${rosterSubjectFilter === sub
+                                        ? "bg-amber-500 text-white shadow-md"
+                                        : "bg-slate-800/50 text-white hover:bg-slate-700 hover:text-white"
+                                      }`}
+                                  >
+                                    {sub}
+                                  </button>
                                 ))}
-                              </tr>
-                              <tr className="bg-slate-800 border-b border-slate-700">
-                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">강의실</th>
-                                {classCols[changeActiveGrade].map(col => (
-                                  <Fragment key={`room-${col}`}>
-                                    <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300 bg-slate-800/80">
-                                      {col}
-                                    </th>
-                                  </Fragment>
-                                ))}
-                              </tr>
-                              <tr className="bg-slate-800/50 border-b border-slate-700">
-                                <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">교사</th>
-                                {classCols[changeActiveGrade].map(col => (
-                                  <Fragment key={`teacher-${col}`}>
-                                    <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center text-slate-300">
-                                      {timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.teacher || "-"}
-                                    </th>
-                                  </Fragment>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(() => {
-                                const colStudents: Record<string, StudentTimeData[]> = {};
-                                classCols[changeActiveGrade].forEach(col => {
-                                  colStudents[col] = [];
-                                });
+                              </div>
+                            )}
 
-                                const allStudents = parsedSampleData[changeActiveGrade] || [];
-                                // 1. Group columns by base subject
-                                const subjectGroups: Record<string, { col: string, num: number, original: string }[]> = {};
-                                classCols[changeActiveGrade].forEach(col => {
-                                  const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
-                                  if (!cellSubject) return;
-
-                                  const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
-                                  const base = match ? match[1].trim() : cellSubject;
-                                  const numMatch = cellSubject.match(/\d+/);
-                                  const num = numMatch ? parseInt(numMatch[0], 10) : 1;
-
-                                  if (!subjectGroups[base]) subjectGroups[base] = [];
-                                  subjectGroups[base].push({ col, num, original: cellSubject });
-                                });
-
-                                // Sort each group by num (so class 1 gets the remainder if odd)
-                                Object.values(subjectGroups).forEach(group => {
-                                  group.sort((a, b) => a.num - b.num);
-                                });
-
-                                // 2. Map students to their base subjects
-                                const studentsByBase: Record<string, StudentTimeData[]> = {};
-                                allStudents.forEach(student => {
-                                  const chosenSubject = student.timeSlotMap[changeRosterTimeSlot];
-                                  if (!chosenSubject) return;
-
-                                  let matchedBase = Object.keys(subjectGroups).find(base => {
-                                    const cleanChosen = chosenSubject.replace(/\s+/g, '');
-                                    const cleanBase = base.replace(/\s+/g, '');
-                                    if (!cleanBase) return false;
-                                    return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
-                                  });
-
-                                  if (matchedBase) {
-                                    if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
-                                    studentsByBase[matchedBase].push(student);
-                                  }
-                                });
-
-                                // 3. Distribute students into columns
-                                Object.keys(studentsByBase).forEach(base => {
-                                  const students = studentsByBase[base].sort((a, b) => {
-                                    return a.id.localeCompare(b.id, undefined, { numeric: true });
-                                  });
-                                  const cols = subjectGroups[base];
-
-                                  const baseCount = Math.floor(students.length / cols.length);
-                                  const remainder = students.length % cols.length;
-
-                                  let sIdx = 0;
-                                  cols.forEach((colObj, idx) => {
-                                    const count = baseCount + (idx < remainder ? 1 : 0);
-                                    const assigned = students.slice(sIdx, sIdx + count);
-                                    colStudents[colObj.col].push(...assigned);
-                                    sIdx += count;
-                                  });
-                                });
-                                let maxStudents = 0;
-                                classCols[changeActiveGrade].forEach(col => {
-                                  if (colStudents[col].length > maxStudents) maxStudents = colStudents[col].length;
-                                });
-
-                                const rows = [];
-                                for (let r = 0; r < maxStudents; r++) {
-                                  rows.push(
-                                    <tr key={r} className="border-b border-slate-800/30 hover:bg-slate-800/20">
-                                      <td className="px-3 py-1.5 border-r border-slate-700/50 text-center text-slate-300 bg-slate-900/50">{r + 1}</td>
-                                      {classCols[changeActiveGrade].map(col => {
-                                        const student = colStudents[col][r];
-                                        return (
-                                          <Fragment key={`data-${col}-${r}`}>
-                                            <td className="px-2 py-1.5 border-r border-slate-700/50 text-center text-slate-300 border-r-slate-800/30 text-xs">
-                                              {student ? student.id : ""}
-                                            </td>
-                                            <td className="px-2 py-1.5 border-r border-slate-700/50 text-center text-slate-300 font-medium text-xs">
-                                              {student ? student.name : ""}
-                                            </td>
-                                          </Fragment>
-                                        );
-                                      })}
-                                    </tr>
-                                  );
-                                }
-
-                                return (
-                                  <>
-                                    {rows}
-                                    <tr className="bg-indigo-900/20 border-t-2 border-indigo-500/30">
-                                      <td className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">총 인원</td>
-                                      {classCols[changeActiveGrade].map(col => (
-                                        <td key={`total-${col}`} colSpan={2} className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">
-                                          {colStudents[col].length}명
-                                        </td>
+                            <div className="bg-slate-900 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl">
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left border-collapse table-fixed">
+                                  <thead>
+                                    <tr className="bg-amber-400/20 text-amber-200 border-b-2 border-slate-700">
+                                      <th style={{ width: `${firstColWidth}%` }} className="px-3 py-2 border-r border-slate-700/50 text-center font-bold">과목명</th>
+                                      {displayCols.map(c => (
+                                        <th key={`${c.slot}-${c.col}`} colSpan={2} style={{ width: `${dataColWidth}%` }} className="px-3 py-2 border-r border-slate-700/50 text-center font-bold">
+                                          {rosterSubjectFilter === "전체" ? c.original : `${c.slot}타임 ${c.original}`}
+                                        </th>
                                       ))}
+                                      {emptyColCount > 0 && <th style={{ width: `${emptyColCount * dataColWidth}%` }}></th>}
                                     </tr>
-                                  </>
-                                );
-                              })()}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
+                                    <tr className="bg-slate-800 border-b border-slate-700">
+                                      <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">강의실</th>
+                                      {displayCols.map(c => (
+                                        <Fragment key={`room-${c.slot}-${c.col}`}>
+                                          <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300 bg-slate-800/80">
+                                            {c.col}
+                                          </th>
+                                        </Fragment>
+                                      ))}
+                                      {emptyColCount > 0 && <th></th>}
+                                    </tr>
+                                    <tr className="bg-slate-800/50 border-b border-slate-700">
+                                      <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">교사</th>
+                                      {displayCols.map(c => (
+                                        <Fragment key={`teacher-${c.slot}-${c.col}`}>
+                                          <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center text-slate-300">
+                                            {timetableData[changeActiveGrade]?.[c.slot]?.[c.col]?.teacher || "-"}
+                                          </th>
+                                        </Fragment>
+                                      ))}
+                                      {emptyColCount > 0 && <th></th>}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(() => {
+                                      const colStudents: Record<string, any[]> = {};
+                                      displayCols.forEach(c => {
+                                        colStudents[`${c.slot}-${c.col}`] = [];
+                                      });
+
+                                      const allStudents = parsedSampleData[changeActiveGrade] || [];
+                                      
+                                      const slotGroups: Record<string, Record<string, { col: string, num: number, original: string }[]>> = {};
+                                      displayCols.forEach(c => {
+                                        if (!slotGroups[c.slot]) slotGroups[c.slot] = {};
+                                        const match = c.original.match(/^(.*?)([\\d\\s]*)$/);
+                                        const base = match ? match[1].trim() : c.original;
+                                        const numMatch = c.original.match(/\\d+/);
+                                        const num = numMatch ? parseInt(numMatch[0], 10) : 1;
+                                        if (!slotGroups[c.slot][base]) slotGroups[c.slot][base] = [];
+                                        slotGroups[c.slot][base].push({ col: c.col, num, original: c.original });
+                                      });
+
+                                      Object.values(slotGroups).forEach(bases => {
+                                        Object.values(bases).forEach(group => group.sort((a, b) => a.num - b.num));
+                                      });
+
+                                      Object.keys(slotGroups).forEach(slot => {
+                                        const bases = slotGroups[slot];
+                                        const studentsByBase: Record<string, any[]> = {};
+
+                                        allStudents.forEach(student => {
+                                          const chosenSubject = student.timeSlotMap[slot];
+                                          if (!chosenSubject) return;
+
+                                          let effectiveSubject = chosenSubject;
+
+                                          let matchedBase = Object.keys(bases).find(base => {
+                                            const cleanChosen = effectiveSubject.replace(/\\s+/g, '');
+                                            const cleanBase = base.replace(/\\s+/g, '');
+                                            if (!cleanBase) return false;
+                                            return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
+                                          });
+
+                                          if (matchedBase) {
+                                            if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
+                                            studentsByBase[matchedBase].push(student);
+                                          }
+                                        });
+
+                                        Object.keys(studentsByBase).forEach(base => {
+                                          const students = studentsByBase[base].sort((a, b) => {
+                                            return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+                                          });
+                                          const cols = bases[base];
+
+                                          const baseCount = Math.floor(students.length / cols.length);
+                                          const remainder = students.length % cols.length;
+
+                                          let sIdx = 0;
+                                          cols.forEach((colObj, idx) => {
+                                            const count = baseCount + (idx < remainder ? 1 : 0);
+                                            const assigned = students.slice(sIdx, sIdx + count);
+                                            colStudents[`${slot}-${colObj.col}`].push(...assigned);
+                                            sIdx += count;
+                                          });
+                                        });
+                                      });
+
+                                      let maxStudents = 0;
+                                      displayCols.forEach(c => {
+                                        if (colStudents[`${c.slot}-${c.col}`].length > maxStudents) {
+                                          maxStudents = colStudents[`${c.slot}-${c.col}`].length;
+                                        }
+                                      });
+
+                                      const rows = [];
+                                      for (let r = 0; r < maxStudents; r++) {
+                                        rows.push(
+                                          <tr key={r} className="border-b border-slate-800/30 hover:bg-slate-800/20">
+                                            <td className="px-3 py-1.5 border-r border-slate-700/50 text-center text-slate-300 bg-slate-900/50">{r + 1}</td>
+                                            {displayCols.map(c => {
+                                              const student = colStudents[`${c.slot}-${c.col}`][r];
+                                              return (
+                                                <Fragment key={`data-${c.slot}-${c.col}-${r}`}>
+                                                  <td className="px-2 py-1.5 border-r border-slate-700/50 text-center text-slate-300 border-r-slate-800/30 text-xs">
+                                                    {student ? student.id : ""}
+                                                  </td>
+                                                  <td className="px-2 py-1.5 border-r border-slate-700/50 text-center text-slate-300 font-medium text-xs">
+                                                    {student ? student.name : ""}
+                                                  </td>
+                                                </Fragment>
+                                              );
+                                            })}
+                                            {emptyColCount > 0 && <td colSpan={emptyColCount * 2}></td>}
+                                          </tr>
+                                        );
+                                      }
+
+                                      return (
+                                        <>
+                                          {rows.length > 0 ? rows : (
+                                            <tr>
+                                              <td colSpan={displayCols.length * 2 + 1} className="px-6 py-12 text-center text-slate-400">
+                                                표시할 학생 데이터가 없습니다.
+                                              </td>
+                                            </tr>
+                                          )}
+                                          {rows.length > 0 && (
+                                            <tr className="bg-indigo-900/20 border-t-2 border-indigo-500/30">
+                                              <td className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">총 인원</td>
+                                              {displayCols.map(c => (
+                                                <td key={`total-${c.slot}-${c.col}`} colSpan={2} className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">
+                                                  {colStudents[`${c.slot}-${c.col}`].length}명
+                                                </td>
+                                              ))}
+                                              {emptyColCount > 0 && <td colSpan={emptyColCount * 2}></td>}
+                                            </tr>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
-
                   {changeActiveTab === "analysis" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                       <div className="flex justify-between items-center mb-2">
