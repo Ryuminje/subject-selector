@@ -222,21 +222,58 @@ export default function Home() {
 
     const currentCols = classCols[changeActiveGrade];
     const currentRows = timeSlots[changeActiveGrade];
+    const remainingSlots = currentRows.length - startRowIndex;
 
-    rows.forEach((row, rIdx) => {
-      const cells = row.split('\t');
-      const targetRow = currentRows[startRowIndex + rIdx];
-      if (targetRow) {
+    // Auto-detect interleaved format: if pasting on "subject" field
+    // and the number of rows is roughly 2x the remaining time slots,
+    // treat odd rows as subjects and even rows as teachers.
+    if (field === "subject" && rows.length > remainingSlots && rows.length >= remainingSlots * 2) {
+      for (let pairIdx = 0; pairIdx < remainingSlots; pairIdx++) {
+        const subjectRow = rows[pairIdx * 2];
+        const teacherRow = rows[pairIdx * 2 + 1];
+        const targetRow = currentRows[startRowIndex + pairIdx];
+        if (!targetRow) continue;
         if (!newData[targetRow]) newData[targetRow] = {};
-        cells.forEach((cell, cIdx) => {
-          const targetCol = currentCols[startColIndex + cIdx];
-          if (targetCol) {
-            const existingCell = newData[targetRow][targetCol] || { subject: "", teacher: "" };
-            newData[targetRow][targetCol] = { ...existingCell, [field]: cell.trim() };
-          }
-        });
+
+        if (subjectRow) {
+          const subjectCells = subjectRow.split('\t');
+          subjectCells.forEach((cell, cIdx) => {
+            const targetCol = currentCols[startColIndex + cIdx];
+            if (targetCol) {
+              const existingCell = newData[targetRow][targetCol] || { subject: "", teacher: "" };
+              newData[targetRow][targetCol] = { ...existingCell, subject: cell.trim() };
+            }
+          });
+        }
+
+        if (teacherRow) {
+          const teacherCells = teacherRow.split('\t');
+          teacherCells.forEach((cell, cIdx) => {
+            const targetCol = currentCols[startColIndex + cIdx];
+            if (targetCol) {
+              const existingCell = newData[targetRow][targetCol] || { subject: "", teacher: "" };
+              newData[targetRow][targetCol] = { ...existingCell, teacher: cell.trim() };
+            }
+          });
+        }
       }
-    });
+    } else {
+      // Original single-field paste logic
+      rows.forEach((row, rIdx) => {
+        const cells = row.split('\t');
+        const targetRow = currentRows[startRowIndex + rIdx];
+        if (targetRow) {
+          if (!newData[targetRow]) newData[targetRow] = {};
+          cells.forEach((cell, cIdx) => {
+            const targetCol = currentCols[startColIndex + cIdx];
+            if (targetCol) {
+              const existingCell = newData[targetRow][targetCol] || { subject: "", teacher: "" };
+              newData[targetRow][targetCol] = { ...existingCell, [field]: cell.trim() };
+            }
+          });
+        }
+      });
+    }
 
     setTimetableData(prev => ({
       ...prev,
@@ -6108,7 +6145,7 @@ export default function Home() {
                               .map(col => {
                                 const cellSubject = timetableData[changeActiveGrade]?.[slot]?.[col]?.subject?.trim();
                                 if (!cellSubject) return null;
-                                const match = cellSubject.match(/^(.*?)([\\d\\s]*)$/);
+                                const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
                                 return match ? match[1].trim() : cellSubject;
                               })
                               .filter(Boolean)
@@ -6128,7 +6165,7 @@ export default function Home() {
                             classCols[changeActiveGrade].forEach(col => {
                               const cellSubject = timetableData[changeActiveGrade]?.[slot]?.[col]?.subject?.trim();
                               if (!cellSubject) return;
-                              const match = cellSubject.match(/^(.*?)([\\d\\s]*)$/);
+                              const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
                               const base = match ? match[1].trim() : cellSubject;
                               if (base === rosterSubjectFilter) {
                                 displayCols.push({ slot, col, original: cellSubject });
@@ -6236,9 +6273,9 @@ export default function Home() {
                                       const slotGroups: Record<string, Record<string, { col: string, num: number, original: string }[]>> = {};
                                       displayCols.forEach(c => {
                                         if (!slotGroups[c.slot]) slotGroups[c.slot] = {};
-                                        const match = c.original.match(/^(.*?)([\\d\\s]*)$/);
+                                        const match = c.original.match(/^(.*?)([\d\s]*)$/);
                                         const base = match ? match[1].trim() : c.original;
-                                        const numMatch = c.original.match(/\\d+/);
+                                        const numMatch = c.original.match(/\d+/);
                                         const num = numMatch ? parseInt(numMatch[0], 10) : 1;
                                         if (!slotGroups[c.slot][base]) slotGroups[c.slot][base] = [];
                                         slotGroups[c.slot][base].push({ col: c.col, num, original: c.original });
@@ -6259,8 +6296,8 @@ export default function Home() {
                                           let effectiveSubject = chosenSubject;
 
                                           let matchedBase = Object.keys(bases).find(base => {
-                                            const cleanChosen = effectiveSubject.replace(/\\s+/g, '');
-                                            const cleanBase = base.replace(/\\s+/g, '');
+                                            const cleanChosen = effectiveSubject.replace(/\s+/g, '');
+                                            const cleanBase = base.replace(/\s+/g, '');
                                             if (!cleanBase) return false;
                                             return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
                                           });
