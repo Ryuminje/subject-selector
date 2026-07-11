@@ -2440,9 +2440,10 @@ export default function Home() {
 
             dfs(0, { ...student.timeSlotMap }, [], 0, 0);
 
-            if (bestSequence) {
-               newSched = bestSequence.sched;
-               studentLog.push(...bestSequence.logs);
+            const finalSeq: any = bestSequence;
+            if (finalSeq) {
+               newSched = finalSeq.sched;
+               studentLog.push(...finalSeq.logs);
             }
 
             // 3. 새로 계산된 이 학생의 시간표를 전체 인원수에 다시 더함
