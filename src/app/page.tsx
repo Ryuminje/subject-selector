@@ -2686,6 +2686,217 @@ export default function Home() {
     XLSX.writeFile(wb, `${prefix}_${suffix}.xlsx`);
   };
 
+  const handleExportAttendanceRoster = () => {
+    const wb = XLSX.utils.book_new();
+    const grade = changeActiveGrade;
+    const allStudents = parsedSampleData[grade] || [];
+    const tSlots = timeSlots[grade] || [];
+    const cols = classCols[grade] || [];
+    const gTimetable = timetableData[grade] || {};
+
+    if (tSlots.length === 0) {
+      alert("다운로드할 데이터가 없습니다.");
+      return;
+    }
+
+    const wsData: any[][] = [];
+
+    const headerRow: any[] = ["학년", "반"];
+    tSlots.forEach(t => headerRow.push(`${t}타임`));
+    headerRow.push("교사", "타임", "과목");
+    for (let i = 1; i <= 34; i++) headerRow.push(`${i}`);
+    for (let i = 1; i <= 34; i++) headerRow.push(`학번${i}`);
+    wsData.push(headerRow);
+
+    const tempRows: { gradeNum: number, classNum: number, timeSlot: string, row: any[] }[] = [];
+
+    tSlots.forEach(timeSlot => {
+      const colStudents: Record<string, any[]> = {};
+      cols.forEach(col => { colStudents[col] = []; });
+
+      const subjectGroups: Record<string, { col: string, num: number, original: string }[]> = {};
+      cols.forEach(col => {
+        const cellSubject = gTimetable[timeSlot]?.[col]?.subject?.trim();
+        if (!cellSubject) return;
+
+        const match = cellSubject.match(/^(.*?)([\d\s]*)$/);
+        const base = match ? match[1].trim() : cellSubject;
+        const numMatch = cellSubject.match(/\d+/);
+        const num = numMatch ? parseInt(numMatch[0], 10) : 1;
+
+        if (!subjectGroups[base]) subjectGroups[base] = [];
+        subjectGroups[base].push({ col, num, original: cellSubject });
+      });
+
+      Object.values(subjectGroups).forEach(group => {
+        group.sort((a, b) => a.num - b.num);
+      });
+
+      const studentsByBase: Record<string, any[]> = {};
+      allStudents.forEach(student => {
+        const chosenSubject = student.timeSlotMap[timeSlot];
+        if (!chosenSubject) return;
+
+        let effectiveSubject = chosenSubject;
+        const studentLogs = adjustmentLog[student.id];
+        if (studentLogs) {
+          let movedInto = null;
+          let movedOut = false;
+          for (const entry of studentLogs) {
+            if (entry.status !== 'success') continue;
+            const beforeMatch = entry.beforeStr.match(/^(.+)\(([^)]+)\)$/);
+            const afterMatch = entry.afterStr.match(/^(.+)\(([^)]+)\)$/);
+            if (beforeMatch && afterMatch) {
+              const logBeforeSubject = beforeMatch[1];
+              const logBeforeSlot = beforeMatch[2];
+              const logAfterSubject = afterMatch[1];
+              const logAfterSlot = afterMatch[2];
+
+              if (logBeforeSlot === timeSlot && logBeforeSubject === chosenSubject) {
+                movedOut = true;
+              }
+              if (logAfterSlot === timeSlot) {
+                movedInto = logAfterSubject;
+              }
+            }
+          }
+          if (movedInto) {
+            effectiveSubject = movedInto;
+          } else if (movedOut) {
+            effectiveSubject = '__REMOVED__';
+          }
+        }
+        if (effectiveSubject === '__REMOVED__') return;
+
+        const cleanChosen = effectiveSubject.replace(/[\sⅠⅡⅢⅣ1234]/g, '').toLowerCase();
+        let matchedBase = null;
+        let matchedPriority = 999;
+
+        for (const base of Object.keys(subjectGroups)) {
+          const cleanBase = base.replace(/[\sⅠⅡⅢⅣ1234]/g, '').toLowerCase();
+          if (cleanBase === cleanChosen) {
+            matchedBase = base;
+            matchedPriority = 1;
+            break;
+          }
+          if (cleanChosen.includes(cleanBase)) {
+            matchedBase = base;
+            matchedPriority = 2;
+          } else if (cleanBase.includes(cleanChosen) && matchedPriority > 2) {
+            matchedBase = base;
+            matchedPriority = 3;
+          }
+        }
+
+        if (matchedBase) {
+          if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
+          studentsByBase[matchedBase].push(student);
+        }
+      });
+
+      Object.keys(subjectGroups).forEach(base => {
+        const students = studentsByBase[base] || [];
+        students.sort((a, b) => {
+          const numA = parseInt(a.id) || 0;
+          const numB = parseInt(b.id) || 0;
+          return numA - numB;
+        });
+
+        const group = subjectGroups[base];
+        const numClasses = group.length;
+        if (numClasses === 0) return;
+
+        const baseSize = Math.floor(students.length / numClasses);
+        let remainder = students.length % numClasses;
+
+        let studentIndex = 0;
+        group.forEach(classInfo => {
+          let classSize = baseSize;
+          if (remainder > 0) {
+            classSize += 1;
+            remainder -= 1;
+          }
+          const assigned = students.slice(studentIndex, studentIndex + classSize);
+          colStudents[classInfo.col] = assigned;
+          studentIndex += classSize;
+        });
+      });
+
+      cols.forEach(col => {
+        const teacher = gTimetable[timeSlot]?.[col]?.teacher || "-";
+        const subjectRaw = gTimetable[timeSlot]?.[col]?.subject;
+        if (!subjectRaw) return;
+        
+        const match = subjectRaw.match(/^(.*?)([\d\s]*)$/);
+        const baseSubject = match ? match[1].trim() : subjectRaw;
+
+        const students = colStudents[col] || [];
+        
+        let gradeStr = "";
+        let classStr = "";
+        const colMatch = col.match(/^(\d+)-(\d+)$/);
+        if (colMatch) {
+          gradeStr = colMatch[1];
+          classStr = colMatch[2];
+        } else {
+          gradeStr = col;
+        }
+        
+        const row: any[] = [gradeStr, classStr];
+        tSlots.forEach(t => {
+          if (t === timeSlot) {
+            row.push(baseSubject);
+          } else {
+            row.push("");
+          }
+        });
+        row.push(teacher, timeSlot, baseSubject);
+        
+        for (let i = 0; i < 34; i++) {
+          row.push(students[i] ? students[i].name : "");
+        }
+        for (let i = 0; i < 34; i++) {
+          row.push(students[i] ? students[i].id : "");
+        }
+        
+        tempRows.push({
+          gradeNum: parseInt(gradeStr) || 0,
+          classNum: parseInt(classStr) || 0,
+          timeSlot: timeSlot,
+          row: row
+        });
+      });
+    });
+
+    tempRows.sort((a, b) => {
+      if (a.gradeNum !== b.gradeNum) return a.gradeNum - b.gradeNum;
+      if (a.classNum !== b.classNum) return a.classNum - b.classNum;
+      return a.timeSlot.localeCompare(b.timeSlot);
+    });
+
+    tempRows.forEach(item => wsData.push(item.row));
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    for (const cell in ws) {
+      if (cell[0] === '!') continue;
+      if (!ws[cell].s) ws[cell].s = {};
+      ws[cell].s = {
+        alignment: { horizontal: "center", vertical: "center" },
+        border: {
+          top: { style: "thin", color: { rgb: "000000" } },
+          bottom: { style: "thin", color: { rgb: "000000" } },
+          left: { style: "thin", color: { rgb: "000000" } },
+          right: { style: "thin", color: { rgb: "000000" } }
+        }
+      };
+    }
+
+    const prefix = grade === 'grade2' ? '2학년' : '3학년';
+    XLSX.utils.book_append_sheet(wb, ws, `출석부 명단`);
+    XLSX.writeFile(wb, `출석부 표지 명단(${prefix}).xlsx`);
+  };
+
   const handleExportChanges = () => {
     const grade = changeActiveGrade;
     const gradeNum = grade === 'grade2' ? '2' : '3';
@@ -5778,6 +5989,13 @@ export default function Home() {
                         </div>
 
                         <div className="flex items-center gap-4">
+                          <button
+                            onClick={handleExportAttendanceRoster}
+                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg shadow-md transition-all"
+                          >
+                            <Download className="w-4 h-4" />
+                            출석부용 엑셀 다운로드
+                          </button>
                           <button
                             onClick={() => handleExportRoster(true)}
                             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg shadow-md transition-all"
