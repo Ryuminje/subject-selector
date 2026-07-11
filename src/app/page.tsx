@@ -2347,114 +2347,103 @@ export default function Home() {
             });
 
             // 2. 이 학생의 원래 시간표에서부터 변경 신청을 순차적으로 적용하여 최적의 경로 찾기
-            const newSched = { ...student.timeSlotMap };
+            let newSched = { ...student.timeSlotMap };
             const studentLog: any[] = [];
             const studentChanges = changes.filter(c => c.studentId === studentId);
 
-            studentChanges.forEach(c => {
-               let beforeSlot: string | null = null;
-               const cleanBefore = normalizeSubject(c.beforeSubject);
-               for (const [slot, subject] of Object.entries(newSched)) {
-                 const cleanSubject = normalizeSubject(subject as string);
-                 if (cleanSubject === cleanBefore || cleanSubject.includes(cleanBefore) || cleanBefore.includes(cleanSubject)) {
-                   beforeSlot = slot;
-                   break;
-                 }
-               }
-               
-               if (!beforeSlot) {
-                  studentLog.push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `현재 수강중인 과목이 아님`, source: c.source });
-                  return;
-               }
+            let bestSequence: { sched: Record<string, string>, logs: any[], maxCost: number, successCount: number } | null = null;
 
-               let afterSlots = findSlotsWithSubject(c.afterSubject);
-          if (c._targetSlot) {
-            afterSlots = afterSlots.filter(s => s === c._targetSlot);
-          }
-               if (afterSlots.length === 0) {
-                  studentLog.push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목`, source: c.source });
-                  return;
-               }
+            const dfs = (changeIndex: number, currentSched: Record<string, string>, currentLogs: any[], currentMaxCost: number, successCount: number) => {
+              if (changeIndex >= studentChanges.length) {
+                if (!bestSequence || 
+                    successCount > bestSequence.successCount || 
+                    (successCount === bestSequence.successCount && currentMaxCost < bestSequence.maxCost)) {
+                  bestSequence = { sched: currentSched, logs: currentLogs, maxCost: currentMaxCost, successCount };
+                }
+                return;
+              }
 
-               // 현재 인원 분포를 바탕으로 최적의 교체 경로(타임) 탐색
-               let bestSlot: string | null = null;
-               let bestCost = Infinity; // 비용: 교체 시 도달하게 되는 반의 인원수 (작을수록 좋음)
-               let lastFailedReason = "";
+              const c = studentChanges[changeIndex];
+              let beforeSlot: string | null = null;
+              const cleanBefore = normalizeSubject(c.beforeSubject);
+              for (const [slot, subject] of Object.entries(currentSched)) {
+                const cleanSubject = normalizeSubject(subject as string);
+                if (cleanSubject === cleanBefore || cleanSubject.includes(cleanBefore) || cleanBefore.includes(cleanSubject)) {
+                  beforeSlot = slot;
+                  break;
+                }
+              }
 
-               for (const afterSlot of afterSlots) {
-                 // 1-step (같은 타임)
-                 if (afterSlot === beforeSlot) {
+              if (!beforeSlot) {
+                dfs(changeIndex + 1, currentSched, [...currentLogs, { beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `현재 수강중인 과목이 아님`, source: c.source }], currentMaxCost, successCount);
+                return;
+              }
+
+              let afterSlots = findSlotsWithSubject(c.afterSubject);
+              if (c._targetSlot) {
+                afterSlots = afterSlots.filter(s => s === c._targetSlot);
+              }
+
+              if (afterSlots.length === 0) {
+                dfs(changeIndex + 1, currentSched, [...currentLogs, { beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목`, source: c.source }], currentMaxCost, successCount);
+                return;
+              }
+
+              let validChoiceFound = false;
+              let lastFailedReason = "";
+
+              for (const afterSlot of afterSlots) {
+                if (afterSlot === beforeSlot) {
                    const costKey = `${beforeSlot}::${normalizeSubject(c.afterSubject)}`;
                    const cost = classSizes[costKey] || 0;
-                   if (cost < bestCost) {
-                     bestCost = cost;
-                     bestSlot = afterSlot;
+                   const nextSched = { ...currentSched };
+                   nextSched[beforeSlot] = c.afterSubject;
+                   const nextLogs = [...currentLogs];
+                   if (c.beforeSubject !== c.afterSubject) {
+                     nextLogs.push({ beforeStr: `${c.beforeSubject}(${beforeSlot})`, afterStr: `${c.afterSubject}(${beforeSlot})`, status: 'success', source: c.source });
                    }
+                   validChoiceFound = true;
+                   dfs(changeIndex + 1, nextSched, nextLogs, Math.max(currentMaxCost, cost), successCount + 1);
                    continue;
-                 }
+                }
 
-                 // 2-step (다른 타임)
-                 const studentSubjectInAfterSlot = newSched[afterSlot] as string;
-                 if (!studentSubjectInAfterSlot) {
-                   lastFailedReason = `${afterSlot}타임 수강 과목 없음`;
-                   continue;
-                 }
+                const studentSubjectInAfterSlot = currentSched[afterSlot] as string;
+                if (!studentSubjectInAfterSlot) {
+                  lastFailedReason = `${afterSlot}타임 수강 과목 없음`;
+                  continue;
+                }
 
-                 if (subjectExistsInSlot(studentSubjectInAfterSlot, beforeSlot)) {
-                    // Cost = MAX( afterSlot에 들어가는 과목 인원, beforeSlot으로 이동하는 과목 인원 )
-                    const cost1Key = `${afterSlot}::${normalizeSubject(c.afterSubject)}`;
-                    const cost2Key = `${beforeSlot}::${normalizeSubject(studentSubjectInAfterSlot)}`;
-                    
-                    const size1 = classSizes[cost1Key] || 0;
-                    const size2 = classSizes[cost2Key] || 0;
-                    
-                    const cost = Math.max(size1, size2);
+                if (subjectExistsInSlot(studentSubjectInAfterSlot, beforeSlot)) {
+                   const cost1Key = `${afterSlot}::${normalizeSubject(c.afterSubject)}`;
+                   const cost2Key = `${beforeSlot}::${normalizeSubject(studentSubjectInAfterSlot)}`;
+                   const cost = Math.max(classSizes[cost1Key] || 0, classSizes[cost2Key] || 0);
+                   
+                   const nextSched = { ...currentSched };
+                   nextSched[beforeSlot] = studentSubjectInAfterSlot;
+                   nextSched[afterSlot] = c.afterSubject;
+                   
+                   const nextLogs = [...currentLogs];
+                   nextLogs.push({ beforeStr: `${studentSubjectInAfterSlot}(${afterSlot})`, afterStr: `${studentSubjectInAfterSlot}(${beforeSlot})`, status: 'success', source: c.source });
+                   nextLogs.push({ beforeStr: `${c.beforeSubject}(${beforeSlot})`, afterStr: `${c.afterSubject}(${afterSlot})`, status: 'success', source: c.source });
+                   
+                   validChoiceFound = true;
+                   dfs(changeIndex + 1, nextSched, nextLogs, Math.max(currentMaxCost, cost), successCount + 1);
+                } else {
+                   lastFailedReason = `2단계 변경 불가: '${studentSubjectInAfterSlot}' 과목이 ${beforeSlot}타임에 개설되지 않음`;
+                }
+              }
 
-                    // 최소 인원 편차를 가진 타임을 선택
-                    if (cost < bestCost) {
-                       bestCost = cost;
-                       bestSlot = afterSlot;
-                    }
-                 } else {
-                    lastFailedReason = `2단계 변경 불가: '${studentSubjectInAfterSlot}' 과목이 ${beforeSlot}타임에 개설되지 않음`;
-                 }
-               }
+              if (!validChoiceFound) {
+                 dfs(changeIndex + 1, currentSched, [...currentLogs, { beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 교환 실패` : lastFailedReason, source: c.source }], currentMaxCost, successCount);
+              }
+            };
 
-               if (bestSlot) {
-                 if (bestSlot === beforeSlot) {
-                    if (c.beforeSubject !== c.afterSubject) {
-                        studentLog.push({
-                          beforeStr: `${c.beforeSubject}(${beforeSlot})`,
-                          afterStr: `${c.afterSubject}(${beforeSlot})`,
-                          status: 'success', source: c.source
-                        });
-                    }
-                    newSched[beforeSlot] = c.afterSubject;
-                  } else {
-                   const studentSubjectInAfterSlot = newSched[bestSlot] as string;
-                   studentLog.push({
-                     beforeStr: `${studentSubjectInAfterSlot}(${bestSlot})`,
-                     afterStr: `${studentSubjectInAfterSlot}(${beforeSlot})`,
-                     status: 'success', source: c.source
-                   });
-                   studentLog.push({
-                     beforeStr: `${c.beforeSubject}(${beforeSlot})`,
-                     afterStr: `${c.afterSubject}(${bestSlot})`,
-                     status: 'success', source: c.source
-                   });
-                   newSched[beforeSlot] = studentSubjectInAfterSlot;
-                   newSched[bestSlot] = c.afterSubject;
-                 }
-               } else {
-                 studentLog.push({
-                   beforeStr: c.beforeSubject,
-                   afterStr: c.afterSubject,
-                   status: 'failed',
-                   reason: afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 교환 실패` : lastFailedReason,
-                   source: c.source
-                 });
-               }
-            });
+            dfs(0, { ...student.timeSlotMap }, [], 0, 0);
+
+            if (bestSequence) {
+               newSched = bestSequence.sched;
+               studentLog.push(...bestSequence.logs);
+            }
 
             // 3. 새로 계산된 이 학생의 시간표를 전체 인원수에 다시 더함
             Object.entries(newSched).forEach(([slot, subject]) => {
@@ -2825,6 +2814,7 @@ export default function Home() {
       }
 
       const currentSubjects: string[] = [];
+      const currentSubjectsMap: Record<string, string> = {};
       const timeSlotsForGrade = timeSlots[changeActiveGrade];
 
       timeSlotsForGrade.forEach(slot => {
@@ -2877,8 +2867,11 @@ export default function Home() {
           else if (movedOut) effectiveSubject = '__REMOVED__';
         }
 
-        if (effectiveSubject !== '__REMOVED__') {
+        if (effectiveSubject && effectiveSubject !== '__REMOVED__') {
           currentSubjects.push(effectiveSubject);
+          currentSubjectsMap[slot] = effectiveSubject;
+        } else {
+          currentSubjectsMap[slot] = '';
         }
       });
 
@@ -2928,6 +2921,7 @@ export default function Home() {
         name: student.name,
         completedBefore,
         currentSubjects,
+        currentSubjectsMap,
         basicCount,
         socialCount,
         scienceCount,
@@ -3048,8 +3042,13 @@ export default function Home() {
     const gradeNum = changeActiveGrade === "grade2" ? 2 : 3;
 
     aoa.push([`${gradeNum}학년 다년도 분석 결과`]);
+    const timeSlotsForGrade = timeSlots[changeActiveGrade] || [];
+    
     aoa.push([
-      "순번", "학번", "이름", "과거 이수 과목", "2학기 최종 과목", "기초과목", "사회", "과학", "비고(중복/위계)"
+      "순번", "학번", "이름", "과거 이수 과목", "2학기 과목", ...timeSlotsForGrade.slice(1).map(() => ""), "기초과목", "사회", "과학", "비고(중복/위계)"
+    ]);
+    aoa.push([
+      "", "", "", "", ...timeSlotsForGrade, "", "", "", ""
     ]);
 
     step6Data.forEach((student, idx) => {
@@ -3063,7 +3062,7 @@ export default function Home() {
         student.id,
         student.name,
         student.completedBefore.join(", "),
-        student.currentSubjects.join(", "),
+        ...timeSlotsForGrade.map(slot => student.currentSubjectsMap?.[slot] || ""),
         student.basicCount || 0,
         student.socialCount || 0,
         student.scienceCount || 0,
@@ -3073,8 +3072,22 @@ export default function Home() {
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
 
+    const tc = 4 + timeSlotsForGrade.length;
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: tc + 3 } },
+      { s: { r: 1, c: 0 }, e: { r: 2, c: 0 } },
+      { s: { r: 1, c: 1 }, e: { r: 2, c: 1 } },
+      { s: { r: 1, c: 2 }, e: { r: 2, c: 2 } },
+      { s: { r: 1, c: 3 }, e: { r: 2, c: 3 } },
+      { s: { r: 1, c: 4 }, e: { r: 1, c: tc - 1 } },
+      { s: { r: 1, c: tc }, e: { r: 2, c: tc } },
+      { s: { r: 1, c: tc + 1 }, e: { r: 2, c: tc + 1 } },
+      { s: { r: 1, c: tc + 2 }, e: { r: 2, c: tc + 2 } },
+      { s: { r: 1, c: tc + 3 }, e: { r: 2, c: tc + 3 } }
+    ];
+
     ws["!cols"] = [
-      { wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 40 }, { wch: 30 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 40 }
+      { wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 40 }, ...timeSlotsForGrade.map(() => ({ wch: 12 })), { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 40 }
     ];
 
     const wb = XLSX.utils.book_new();
@@ -5812,9 +5825,7 @@ export default function Home() {
                         if (rosterAfterSubjectFilter === "전체") {
                           classCols[changeActiveGrade].forEach(col => {
                             const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
-                            if (cellSubject) {
-                              displayCols.push({ slot: changeRosterTimeSlot, col, original: cellSubject });
-                            }
+                            displayCols.push({ slot: changeRosterTimeSlot, col, original: cellSubject || "" });
                           });
                         } else {
                           timeSlots[changeActiveGrade].forEach(slot => {
@@ -6156,9 +6167,7 @@ export default function Home() {
                         if (rosterSubjectFilter === "전체") {
                           classCols[changeActiveGrade].forEach(col => {
                             const cellSubject = timetableData[changeActiveGrade]?.[changeRosterTimeSlot]?.[col]?.subject?.trim();
-                            if (cellSubject) {
-                              displayCols.push({ slot: changeRosterTimeSlot, col, original: cellSubject });
-                            }
+                            displayCols.push({ slot: changeRosterTimeSlot, col, original: cellSubject || "" });
                           });
                         } else {
                           timeSlots[changeActiveGrade].forEach(slot => {
@@ -6460,15 +6469,20 @@ export default function Home() {
                             <table className="w-full text-sm text-left text-slate-300 border-collapse">
                               <thead className="text-xs text-slate-300 uppercase bg-slate-900 border-b border-slate-800">
                                 <tr>
-                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-0 z-40 bg-slate-900 min-w-[50px] max-w-[50px] border-r border-slate-800 text-center">순번</th>
-                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[50px] z-40 bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800 text-center">학번</th>
-                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[130px] z-40 bg-slate-900 min-w-[80px] max-w-[80px] border-r border-slate-800/50 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)]">이름</th>
-                                  <th className="px-2 py-2.5 text-center whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-r border-slate-800">과거 이수 과목</th>
-                                  <th className="px-2 py-2.5 text-center whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-r border-slate-800">2학기 최종 과목</th>
-                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 text-center">기초과목</th>
-                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 text-center">사회</th>
-                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 text-center">과학</th>
-                                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900">비고(중복/위계)</th>
+                                  <th rowSpan={2} className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-0 z-40 bg-slate-900 min-w-[50px] max-w-[50px] border-r border-b border-slate-800 text-center align-middle">순번</th>
+                                  <th rowSpan={2} className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[50px] z-40 bg-slate-900 min-w-[80px] max-w-[80px] border-r border-b border-slate-800 text-center align-middle">학번</th>
+                                  <th rowSpan={2} className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[130px] z-40 bg-slate-900 min-w-[80px] max-w-[80px] border-r border-b border-slate-800/50 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)] align-middle">이름</th>
+                                  <th rowSpan={2} className="px-2 py-2.5 text-center whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-r border-b border-slate-800 align-middle">과거 이수 과목</th>
+                                  <th colSpan={timeSlots[changeActiveGrade]?.length || 1} className="px-2 py-1 text-center whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-r border-b border-slate-800 text-[11px] text-slate-400">2학기 과목</th>
+                                  <th rowSpan={2} className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-l border-b border-slate-800 text-center align-middle">기초과목</th>
+                                  <th rowSpan={2} className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-b border-slate-800 text-center align-middle">사회</th>
+                                  <th rowSpan={2} className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-b border-slate-800 text-center align-middle">과학</th>
+                                  <th rowSpan={2} className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-slate-900 border-b border-slate-800 align-middle">비고(중복/위계)</th>
+                                </tr>
+                                <tr>
+                                  {timeSlots[changeActiveGrade]?.map(slot => (
+                                    <th key={slot} className="px-2 py-1.5 text-center whitespace-nowrap sticky top-[25px] z-10 bg-slate-900 border-r border-b border-slate-800 text-indigo-400">{slot}</th>
+                                  ))}
                                 </tr>
                               </thead>
                               <tbody>
@@ -6485,60 +6499,63 @@ export default function Home() {
                                     <td className="px-2 py-2.5 border-r border-slate-800 max-w-[250px] text-xs leading-relaxed break-words" title={row.completedBefore.join(", ")}>
                                       {row.completedBefore.length > 0 ? row.completedBefore.join(", ") : <span className="text-slate-600">-</span>}
                                     </td>
-                                    <td className="px-2 py-2.5 border-r border-slate-800 max-w-[250px]" title={row.currentSubjects.join(", ")}>
-                                      <div className="flex flex-wrap gap-1.5">
-                                      {row.currentSubjects.map((subject, i) => {
-                                        const normS = (s: string) => s ? s.replace(/\s+/g, '').replace(/Ⅰ/g, 'I').replace(/Ⅱ/g, 'II').replace(/Ⅲ/g, 'III') : '';
-                                        const isDuplicate = subject && row.duplicateSubjects?.some((d: string) => normS(d) === normS(subject));
-                                        const isHierarchyViolation = subject && row.hierarchyViolations?.some((v: any) => normS(v.subject) === normS(subject) || normS(v.prereq) === normS(subject));
-                                        
-                                        let isChangedByApplicant = false;
-                                        let debugInfo = "";
-                                        if (adjustmentLog[row.id]) {
-                                            isChangedByApplicant = adjustmentLog[row.id].some(l => {
-                                                if (l.status !== 'success' || l.source !== 'applicant') return false;
-                                                const timeSlotsForGrade = timeSlots[changeActiveGrade] || [];
-                                                let afterSubj = l.afterStr;
-                                                let found = false;
-                                                for (const slot of timeSlotsForGrade) {
-                                                    if (l.afterStr.endsWith(`(${slot})`)) {
-                                                        afterSubj = l.afterStr.slice(0, -(slot.length + 2));
-                                                        found = true;
-                                                        break;
-                                                    }
-                                                }
-                                                if (!found) {
-                                                    const match = l.afterStr.match(/^(.+)\(([^)]+)\)$/);
-                                                    if (match) afterSubj = match[1];
-                                                }
-                                                const norm = (s: string) => s.replace(/\s+/g, '').replace(/Ⅰ/g, 'I').replace(/Ⅱ/g, 'II').replace(/Ⅲ/g, 'III');
-                                                return norm(afterSubj) === norm(subject);
-                                            });
-                                        }
+                                    {timeSlots[changeActiveGrade]?.map(slot => {
+                                      const subject = row.currentSubjectsMap?.[slot] || "";
+                                      const normS = (s: string) => s ? s.replace(/\s+/g, '').replace(/Ⅰ/g, 'I').replace(/Ⅱ/g, 'II').replace(/Ⅲ/g, 'III') : '';
+                                      const isDuplicate = subject && row.duplicateSubjects?.some((d: string) => normS(d) === normS(subject));
+                                      const isHierarchyViolation = subject && row.hierarchyViolations?.some((v: any) => normS(v.subject) === normS(subject) || normS(v.prereq) === normS(subject));
+                                      
+                                      let isChangedByApplicant = false;
+                                      let debugInfo = "";
+                                      if (adjustmentLog[row.id] && subject) {
+                                          isChangedByApplicant = adjustmentLog[row.id].some(l => {
+                                              if (l.status !== 'success' || l.source !== 'applicant') return false;
+                                              const timeSlotsForGrade = timeSlots[changeActiveGrade] || [];
+                                              let afterSubj = l.afterStr;
+                                              let found = false;
+                                              for (const ts of timeSlotsForGrade) {
+                                                  if (l.afterStr.endsWith(`(${ts})`)) {
+                                                      afterSubj = l.afterStr.slice(0, -(ts.length + 2));
+                                                      found = true;
+                                                      break;
+                                                  }
+                                              }
+                                              if (!found) {
+                                                  const match = l.afterStr.match(/^(.+)\(([^)]+)\)$/);
+                                                  if (match) afterSubj = match[1];
+                                              }
+                                              const norm = (s: string) => s.replace(/\s+/g, '').replace(/Ⅰ/g, 'I').replace(/Ⅱ/g, 'II').replace(/Ⅲ/g, 'III');
+                                              return norm(afterSubj) === norm(subject);
+                                          });
+                                      }
 
-                                        let cellClass = "inline-block px-1.5 py-0.5 rounded text-xs ";
-                                        if (isChangedByApplicant) {
-                                            if (isHierarchyViolation) {
-                                                cellClass += "bg-amber-500/20 text-cyan-400 font-black ring-1 ring-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.5)]";
-                                            } else if (isDuplicate) {
-                                                cellClass += "bg-amber-500/20 text-rose-400 font-black ring-1 ring-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]";
-                                            } else {
-                                                cellClass += "bg-amber-500/20 text-amber-300 font-bold ring-1 ring-amber-500/50";
-                                            }
-                                        } else {
-                                            if (isHierarchyViolation) cellClass += "text-cyan-400 font-bold bg-cyan-400/10";
-                                            else if (isDuplicate) cellClass += "text-yellow-400 font-bold bg-yellow-400/10";
-                                            else cellClass += "bg-slate-800 text-slate-300";
-                                        }
+                                      let cellClass = "inline-block px-1.5 py-0.5 rounded text-xs ";
+                                      if (isChangedByApplicant) {
+                                          if (isHierarchyViolation) {
+                                              cellClass += "bg-amber-500/20 text-cyan-400 font-black ring-1 ring-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.5)]";
+                                          } else if (isDuplicate) {
+                                              cellClass += "bg-amber-500/20 text-rose-400 font-black ring-1 ring-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]";
+                                          } else {
+                                              cellClass += "bg-amber-500/20 text-amber-300 font-bold ring-1 ring-amber-500/50";
+                                          }
+                                      } else {
+                                          if (isHierarchyViolation) cellClass += "text-cyan-400 font-bold bg-cyan-400/10";
+                                          else if (isDuplicate) cellClass += "text-yellow-400 font-bold bg-yellow-400/10";
+                                          else cellClass += "bg-slate-800 text-slate-300";
+                                      }
 
-                                        return (
-                                          <span key={`cur-${i}`} className={cellClass}>
-                                            {subject}
-                                          </span>
-                                        );
-                                      })}
-                                      </div>
-                                    </td>
+                                      return (
+                                        <td key={slot} className="px-2 py-2.5 border-r border-slate-800 text-center">
+                                          {subject ? (
+                                              <span className={cellClass} title={debugInfo}>
+                                                  {subject}
+                                              </span>
+                                          ) : (
+                                              <span className="text-slate-600">-</span>
+                                          )}
+                                        </td>
+                                      );
+                                    })}
                                     <td className="px-2 py-2.5 text-center text-indigo-400 font-medium whitespace-nowrap">{row.basicCount}</td>
                                     <td className="px-2 py-2.5 text-center text-rose-400 font-medium whitespace-nowrap">{row.socialCount}</td>
                                     <td className="px-2 py-2.5 text-center text-emerald-400 font-medium whitespace-nowrap">{row.scienceCount}</td>
