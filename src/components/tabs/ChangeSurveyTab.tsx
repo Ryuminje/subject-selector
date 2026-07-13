@@ -2103,10 +2103,10 @@ export function ChangeSurveyTab() {
 
     const MAX_ITER = 2000;
     let iterations = 0;
-    let stagnationCounter = 0;
     
     let currentSizes = computeSizes(vSchedules);
     const idealSizes = getSubjectStats(currentSizes);
+    const generated: any[] = [];
 
     while (iterations < MAX_ITER) {
        // Calculate deviations for all class slots
@@ -2188,6 +2188,15 @@ export function ChangeSurveyTab() {
               currentSizes[bestSwap.slotB + "::" + bestSwap.normA] = (currentSizes[bestSwap.slotB + "::" + bestSwap.normA] || 0) + 1;
               currentSizes[bestSwap.slotA + "::" + bestSwap.normB] = (currentSizes[bestSwap.slotA + "::" + bestSwap.normB] || 0) + 1;
               
+              generated.push({
+                 id: Date.now() + Math.random().toString(),
+                 studentId: bestSwap.studentId,
+                 studentName: students.find(s => s.id === bestSwap.studentId)?.name || "",
+                 beforeSubject: bestSwap.subjA,
+                 afterSubject: bestSwap.subjA,
+                 _targetSlot: bestSwap.slotB
+              });
+
               swapMade = true;
               break; 
            }
@@ -2197,35 +2206,6 @@ export function ChangeSurveyTab() {
            break; // Local minimum or fully balanced
        }
        iterations++;
-    }
-
-    // Compute net generated changes by comparing to original
-    const generated: any[] = [];
-    for (const s of students) {
-        if (lockedStudents.has(String(s.id))) continue;
-        const original = s.timeSlotMap;
-        const optimized = vSchedules[s.id];
-        
-        for (const slot of Object.keys(original)) {
-            if (original[slot] !== optimized[slot]) {
-                let targetSlot = null;
-                for (const ts of Object.keys(optimized)) {
-                    if (optimized[ts] === original[slot]) {
-                        targetSlot = ts;
-                        break;
-                    }
-                }
-                
-                generated.push({
-                    id: Date.now() + Math.random().toString(),
-                    studentId: s.id,
-                    studentName: s.name || "",
-                    beforeSubject: original[slot],
-                    afterSubject: original[slot],
-                    _targetSlot: targetSlot
-                });
-            }
-        }
     }
 
     const sortedGenerated = generated.sort((a, b) => {
