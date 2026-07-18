@@ -2,10 +2,7 @@
 
 import React from "react";
 import { Settings, Download, Plus, Trash2 } from "lucide-react";
-import type { ChangeGradeKey } from "../types";
-
-type TimetableCell = { subject: string; teacher: string };
-type TimetableGradeData = Record<string, Record<string, TimetableCell>>;
+import type { ChangeGradeKey, TimetableData, GradeStringArrays } from "../types";
 
 interface TimetableStepProps {
   changeActiveGrade: ChangeGradeKey;
@@ -15,9 +12,9 @@ interface TimetableStepProps {
   addClassCol: () => void;
   removeClassCol: (idx: number) => void;
   removeTimeSlot: (idx: number) => void;
-  classCols: { grade2: string[]; grade3: string[] };
-  timeSlots: { grade2: string[]; grade3: string[] };
-  timetableData: { grade2: TimetableGradeData; grade3: TimetableGradeData };
+  classCols: GradeStringArrays;
+  timeSlots: GradeStringArrays;
+  timetableData: TimetableData;
   updateTimetableCell: (row: string, col: string, field: "subject" | "teacher", value: string) => void;
   handleTimetablePaste: (e: React.ClipboardEvent, startRowIndex: number, startColIndex: number, field: "subject" | "teacher") => void;
 }
