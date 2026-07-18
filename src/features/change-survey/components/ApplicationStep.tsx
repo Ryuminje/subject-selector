@@ -2,17 +2,17 @@
 
 import React from "react";
 import { FileText, Plus, Trash2, Download } from "lucide-react";
-import type { ChangeGradeKey } from "../types";
+import type { ChangeGradeKey, ElectiveChange } from "../types";
 
 type AdjustmentLog = Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary' }[]>;
 
 interface ApplicationStepProps {
   changeActiveGrade: ChangeGradeKey;
   setChangeActiveGrade: (grade: ChangeGradeKey) => void;
-  electiveChanges: Record<string, any[]>;
-  setElectiveChanges: React.Dispatch<React.SetStateAction<Record<string, any[]>>>;
-  electiveChangesArbitrary: Record<string, any[]>;
-  setElectiveChangesArbitrary: React.Dispatch<React.SetStateAction<Record<string, any[]>>>;
+  electiveChanges: Record<string, ElectiveChange[]>;
+  setElectiveChanges: React.Dispatch<React.SetStateAction<Record<string, ElectiveChange[]>>>;
+  electiveChangesArbitrary: Record<string, ElectiveChange[]>;
+  setElectiveChangesArbitrary: React.Dispatch<React.SetStateAction<Record<string, ElectiveChange[]>>>;
   enableOptimization: boolean;
   setEnableOptimization: (v: boolean) => void;
   handleExportChanges: () => void;

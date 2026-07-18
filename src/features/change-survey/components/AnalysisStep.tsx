@@ -2,7 +2,7 @@
 
 import React from "react";
 import { FileText, Download } from "lucide-react";
-import type { ChangeGradeKey, GradeStringArrays } from "../types";
+import type { ChangeGradeKey, GradeStringArrays, Step6Row } from "../types";
 
 type AdjustmentLog = Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary' }[]>;
 
@@ -10,7 +10,7 @@ interface AnalysisStepProps {
   changeActiveGrade: ChangeGradeKey;
   setChangeActiveGrade: (grade: ChangeGradeKey) => void;
   handleExportStep6: () => void;
-  step6Data: any[];
+  step6Data: Step6Row[];
   showOnlyApplicants: boolean;
   setShowOnlyApplicants: (v: boolean) => void;
   timeSlots: GradeStringArrays;
