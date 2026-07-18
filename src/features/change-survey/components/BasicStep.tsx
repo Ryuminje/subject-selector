@@ -4,9 +4,7 @@ import React from "react";
 import { Settings, Upload, GitBranch, Plus, Trash2, ChevronRight } from "lucide-react";
 import { SearchableSelect } from "../../../components/ui/SearchableSelect";
 import type { ParsedCurriculumSubject, SubjectMap, HierarchyRule } from "../../../types";
-
-type ChangeGradeKey = "grade2" | "grade3";
-type ChangeActiveTab = "basic" | "upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis" | "riroschool";
+import type { ChangeGradeKey, ChangeActiveTab } from "../types";
 
 interface BasicStepProps {
   changeActiveGrade: ChangeGradeKey;
