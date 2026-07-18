@@ -19,6 +19,7 @@ export interface ProcessedStudent {
   classNum: string;
   num: string;
   semester1: string[];
+  semester1_2?: string[];
   semester2: string[];
   basicCount: number;
   socialCount: number;
