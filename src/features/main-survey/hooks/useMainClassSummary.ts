@@ -3,6 +3,23 @@ import * as XLSX from "xlsx-js-style";
 import { normalizeSubjectName } from "./useMainUploads";
 import type { DesignatedSubject, GradeKey, ParsedCurriculumSubject, ProcessedStudent, SubjectMap, SubjectStat } from "../../../types";
 
+export interface CategorySummaryRow {
+  category: string;
+  isFirstRow: boolean;
+  rowSpan: number;
+  reduction: number;
+  sem1TotalOriginal: number;
+  sem2TotalOriginal: number;
+  sem1Total: number;
+  sem2Total: number;
+  yearTotal: number;
+  sem1Avg: string;
+  sem2Avg: string;
+  yearAvg: string;
+  sem1: { gradeLabel: string; subject: string; credits: number; isSplit?: boolean; subjectHours: number; isElective?: boolean; classCount: number } | null;
+  sem2: { gradeLabel: string; subject: string; credits: number; isSplit?: boolean; subjectHours: number; isElective?: boolean; classCount: number } | null;
+}
+
 export function getClassRecommendation(applicants: number, standardSize: number) {
   if (applicants < 10) return "폐강";
   if (applicants < 0.7 * standardSize) return "논의";
@@ -440,22 +457,7 @@ export function useMainClassSummary(
       return a.localeCompare(b);
     });
 
-    const rows: Array<{
-      category: string;
-      isFirstRow: boolean;
-      rowSpan: number;
-      reduction: number;
-      sem1TotalOriginal: number;
-      sem2TotalOriginal: number;
-      sem1Total: number;
-      sem2Total: number;
-      yearTotal: number;
-      sem1Avg: string;
-      sem2Avg: string;
-      yearAvg: string;
-      sem1: { gradeLabel: string; subject: string; credits: number; isSplit?: boolean; subjectHours: number; isElective?: boolean; classCount: number } | null;
-      sem2: { gradeLabel: string; subject: string; credits: number; isSplit?: boolean; subjectHours: number; isElective?: boolean; classCount: number } | null;
-    }> = [];
+    const rows: CategorySummaryRow[] = [];
 
     categories.forEach(cat => {
       const catItems = items.filter(i => i.detailedCategory === cat);
