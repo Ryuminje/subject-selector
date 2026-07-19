@@ -4,54 +4,17 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Upload, FileText, Settings, Download, CheckCircle2, ChevronRight, Trash2, File as FileIcon, Save, FolderOpen, GitBranch, Plus, RotateCcw, X } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { SearchableSelect } from "../ui/SearchableSelect";
-import type { SubjectCategory, GradeKey, SubjectMap, HierarchyRule, ProcessedStudent, StudentTimeData, SubjectStat, DesignatedSubject, SelectedSubjectHours, ParsedCurriculumSubject } from "../../types";
+import type { SubjectCategory, GradeKey, SubjectMap, HierarchyRule, ProcessedStudent, SubjectStat, DesignatedSubject, SelectedSubjectHours, ParsedCurriculumSubject } from "../../types";
 
 export function DemandSurveyTab() {
   const [activeTab, setActiveTab] = useState("curriculum");
   const [activeGrade, setActiveGrade] = useState<GradeKey>("grade1");
   const [isExampleModalOpen, setIsExampleModalOpen] = useState(false);
 
-  const [sampleRawData, setSampleRawData] = useState<{ grade2: string | null, grade3: string | null }>({ grade2: null, grade3: null });
-
-
-  const initialTimeSlots = ["A", "B", "C", "D", "E", "F", "G"];
-  const initialColsG2 = Array.from({ length: 9 }, (_, i) => `2-${i + 1}`);
-  const initialColsG3 = Array.from({ length: 9 }, (_, i) => `3-${i + 1}`);
-
-  const [timeSlots, setTimeSlots] = useState<{ grade2: string[], grade3: string[] }>({
-    grade2: [...initialTimeSlots], grade3: [...initialTimeSlots]
-  });
-  const [classCols, setClassCols] = useState<{ grade2: string[], grade3: string[] }>({
-    grade2: [...initialColsG2], grade3: [...initialColsG3]
-  });
-  const [timetableData, setTimetableData] = useState<{
-    grade2: Record<string, Record<string, { subject: string, teacher: string }>>,
-    grade3: Record<string, Record<string, { subject: string, teacher: string }>>
-  }>({ grade2: {}, grade3: {} });
-
-  const [parsedSampleData, setParsedSampleData] = useState<{
-    grade2: StudentTimeData[],
-    grade3: StudentTimeData[]
-  }>({ grade2: [], grade3: [] });
-
-  const [grade2HistoryData, setGrade2HistoryData] = useState<Record<string, Record<string, string[]>>>({ grade2: {}, grade3: {} });
-  const [grade3Sem1HistoryData, setGrade3Sem1HistoryData] = useState<Record<string, Record<string, string[]>>>({ grade2: {}, grade3: {} });
-  const [extraUploads, setExtraUploads] = useState<Record<string, { grade2Optional: boolean; grade3Sem1: boolean }>>({ grade2: { grade2Optional: false, grade3Sem1: false }, grade3: { grade2Optional: false, grade3Sem1: false } });
-  const [changeUploadNames, setChangeUploadNames] = useState<Record<string, { timetable: string | null; grade2Optional: string | null; grade3Sem1: string | null }>>({
-    grade2: { timetable: null, grade2Optional: null, grade3Sem1: null },
-    grade3: { timetable: null, grade2Optional: null, grade3Sem1: null }
-  });
-
-  const [electiveChanges, setElectiveChanges] = useState<Record<string, any[]>>({ grade2: [], grade3: [] });
   const [parsedCurriculumList, setParsedCurriculumList] = useState<{ [key in GradeKey]: ParsedCurriculumSubject[] }>({ pre1: [], grade1: [], grade2: [] });
   const [subjectMap, setSubjectMap] = useState<{ [key in GradeKey]: SubjectMap }>({ pre1: {}, grade1: {}, grade2: {} });
   const [isCurriculumParsed, setIsCurriculumParsed] = useState<{ [key in GradeKey]: boolean }>({ pre1: false, grade1: false, grade2: false });
   const [hierarchyRules, setHierarchyRules] = useState<{ [key in GradeKey]: HierarchyRule[] }>({ pre1: [], grade1: [], grade2: [] });
-
-  const [changeParsedCurriculumList, setChangeParsedCurriculumList] = useState<Record<string, ParsedCurriculumSubject[]>>({});
-  const [changeSubjectMap, setChangeSubjectMap] = useState<Record<string, SubjectMap>>({});
-  const [changeIsCurriculumParsed, setChangeIsCurriculumParsed] = useState<Record<string, boolean>>({});
-  const [changeHierarchyRules, setChangeHierarchyRules] = useState<Record<string, HierarchyRule[]>>({});
 
   const [uploadedFiles, setUploadedFiles] = useState<{ [key in GradeKey]: { name: string, size: number, data: string } | null }>({ pre1: null, grade1: null, grade2: null });
   const [processedData, setProcessedData] = useState<{ [key in GradeKey]: ProcessedStudent[] }>({ pre1: [], grade1: [], grade2: [] });
@@ -82,10 +45,6 @@ export function DemandSurveyTab() {
       subjectMap,
       isCurriculumParsed,
       hierarchyRules,
-      changeParsedCurriculumList,
-      changeSubjectMap,
-      changeIsCurriculumParsed,
-      changeHierarchyRules,
       uploadedFiles,
       processedData,
       rawSheetData,
@@ -99,17 +58,7 @@ export function DemandSurveyTab() {
       teacherCounts,
       designatedSubjects,
       selectedSubjectHours,
-      parsedSampleData,
-      timetableData,
-      electiveChanges,
-      timeSlots,
-      classCols,
-      grade2HistoryData,
-      grade3Sem1HistoryData,
-      extraUploads,
-      changeUploadNames,
-      headTeacherReductions,
-      sampleRawData
+      headTeacherReductions
     });
 
     (window as any).loadDemandBackup = (parsed: any) => {
@@ -118,10 +67,6 @@ export function DemandSurveyTab() {
       if (parsed.subjectMap) setSubjectMap({ pre1: {}, grade1: {}, grade2: [], ...parsed.subjectMap });
       if (parsed.isCurriculumParsed) setIsCurriculumParsed({ pre1: false, grade1: false, grade2: false, ...parsed.isCurriculumParsed });
       if (parsed.hierarchyRules) setHierarchyRules({ pre1: [], grade1: [], grade2: [], ...parsed.hierarchyRules });
-      if (parsed.changeParsedCurriculumList) setChangeParsedCurriculumList(parsed.changeParsedCurriculumList);
-      if (parsed.changeSubjectMap) setChangeSubjectMap(parsed.changeSubjectMap);
-      if (parsed.changeIsCurriculumParsed) setChangeIsCurriculumParsed(parsed.changeIsCurriculumParsed);
-      if (parsed.changeHierarchyRules) setChangeHierarchyRules(parsed.changeHierarchyRules);
       if (parsed.uploadedFiles) setUploadedFiles({ pre1: null, grade1: null, grade2: null, ...parsed.uploadedFiles });
       if (parsed.processedData) setProcessedData({ pre1: [], grade1: [], grade2: [], ...parsed.processedData });
       if (parsed.rawSheetData) setRawSheetData({ pre1: [], grade1: [], grade2: [], ...parsed.rawSheetData });
@@ -136,34 +81,6 @@ export function DemandSurveyTab() {
       if (parsed.headTeacherReductions) setHeadTeacherReductions(parsed.headTeacherReductions);
       if (parsed.designatedSubjects) setDesignatedSubjects({ pre1: [], ...parsed.designatedSubjects });
       if (parsed.selectedSubjectHours) setSelectedSubjectHours({ pre1: [], ...parsed.selectedSubjectHours });
-      if (parsed.parsedSampleData) setParsedSampleData(parsed.parsedSampleData);
-      if (parsed.sampleRawData) setSampleRawData(parsed.sampleRawData);
-      if (parsed.timetableData) setTimetableData(parsed.timetableData);
-      if (parsed.electiveChanges) setElectiveChanges(parsed.electiveChanges);
-      if (parsed.timeSlots) setTimeSlots(parsed.timeSlots);
-      if (parsed.classCols) setClassCols(parsed.classCols);
-      if (parsed.grade2HistoryData) {
-        if (parsed.grade2HistoryData.grade2 || parsed.grade2HistoryData.grade3) {
-          const trimmed: Record<string, Record<string, string[]>> = { grade2: {}, grade3: {} };
-          for (const g of ["grade2", "grade3"]) {
-            if (parsed.grade2HistoryData[g]) {
-              for (const k in parsed.grade2HistoryData[g]) trimmed[g][k.trim()] = parsed.grade2HistoryData[g][k];
-            }
-          }
-          setGrade2HistoryData(trimmed);
-        } else {
-          setGrade2HistoryData(parsed.grade2HistoryData);
-        }
-      }
-      if (parsed.grade3Sem1HistoryData) setGrade3Sem1HistoryData(parsed.grade3Sem1HistoryData);
-      if (parsed.extraUploads) {
-        if (parsed.extraUploads.grade2 || parsed.extraUploads.grade3) {
-          setExtraUploads(parsed.extraUploads);
-        } else {
-          setExtraUploads({ grade2: parsed.extraUploads, grade3: parsed.extraUploads });
-        }
-      }
-      if (parsed.changeUploadNames) setChangeUploadNames(parsed.changeUploadNames);
     };
   }
 
