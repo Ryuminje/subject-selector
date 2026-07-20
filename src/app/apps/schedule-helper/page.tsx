@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useSchedule } from "@/features/schedule-helper/lib/ScheduleContext";
-import { ArrowLeft, ArrowLeftRight, Users, Ban, Loader2 } from "lucide-react";
+import { SHEET_EDIT_URL } from "@/features/schedule-helper/lib/sheetData";
+import { ArrowLeft, ArrowLeftRight, Users, Ban, Loader2, ExternalLink } from "lucide-react";
 import SwapTab from "@/features/schedule-helper/components/SwapTab";
 import MeetingTab from "@/features/schedule-helper/components/MeetingTab";
 import BlockTab from "@/features/schedule-helper/components/BlockTab";
@@ -42,13 +43,24 @@ export default function ScheduleHelperPage() {
       </Link>
 
       {/* Header */}
-      <div className="bg-gradient-to-br from-emerald-600 to-teal-500 p-6 md:p-8 rounded-3xl shadow-lg text-white mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-2 flex items-center gap-2">
-          <span>🗓️</span> 명신고등학교 수업교체 도우미
-        </h1>
-        <p className="text-emerald-50 font-medium text-sm md:text-base">
-          설정 시트의 고정 데이터와 앱 내 임시 설정이 함께 적용됩니다
-        </p>
+      <div className="bg-gradient-to-br from-emerald-600 to-teal-500 p-6 md:p-8 rounded-3xl shadow-lg text-white mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold mb-2 flex items-center gap-2">
+            <span>🗓️</span> 명신고등학교 수업교체 도우미
+          </h1>
+          <p className="text-emerald-50 font-medium text-sm md:text-base">
+            설정 시트의 고정 데이터와 앱 내 임시 설정이 함께 적용됩니다
+          </p>
+        </div>
+        <a
+          href={SHEET_EDIT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold rounded-xl border border-white/30 transition-colors"
+        >
+          <ExternalLink className="w-4 h-4" />
+          <span className="hidden sm:inline">원본 구글 시트 열기</span>
+        </a>
       </div>
 
       {/* Tabs Nav */}

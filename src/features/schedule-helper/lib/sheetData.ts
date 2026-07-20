@@ -1,7 +1,11 @@
 import * as XLSX from "xlsx";
 
+// 구글 시트 ID (백엔드 데이터 원본)
+const SHEET_ID = "12Rz3N-cTyRhNqxSwFVXX__UD9a19E4E-sb5t2ffCX9Q";
 // 구글 시트 XLSX 내보내기 URL
-const SHEET_EXPORT_URL = "https://docs.google.com/spreadsheets/d/12Rz3N-cTyRhNqxSwFVXX__UD9a19E4E-sb5t2ffCX9Q/export?format=xlsx";
+const SHEET_EXPORT_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=xlsx`;
+// 구글 시트 편집 화면 URL (사용자가 직접 열어볼 때 사용)
+export const SHEET_EDIT_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/edit`;
 
 export interface ScheduleRow {
   teacher: string;
