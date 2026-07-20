@@ -1,0 +1,121 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// 학교 하나 = 테넌트 하나
+
+model School {
+  id       String @id @default(cuid())
+  name     String
+  joinCode String @unique
+
+  // 업로드된 시간표 원본 (teachers/days/periods/tableData 형태의 JSON — ScheduleData 참고)
+  scheduleData       String?
+  scheduleUploadedAt DateTime?
+
+  // 전체 교사 공통 협의회 불가 요일/교시 (JSON: Record<day, number[]>)
+  globalMeetingBlocks String @default("{}")
+
+  createdAt DateTime @default(now())
+
+  teachers Teacher[]
+}
+
+// 시간표에 등장하는 교사 한 명 (로그인 계정 유무와 무관하게 존재 — 업로드 시 이름으로 자동 upsert)
+
+model Teacher {
+  id       String @id @default(cuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  name String
+
+  // 교과군 (기존 "설정" 시트 I~J열 대체)
+  department String?
+
+  // 고정 교체 불가 요일/교시 (기존 "설정" 시트 A~C열 대체, JSON: Record<day, number[]>)
+  fixedBlockDays String @default("{}")
+
+  // 오늘 결근/출장 등 임시 설정 (기존 브라우저 localStorage 대체, 학교 전체 공유, JSON: Record<day, number[]>)
+  tempBlockDays String @default("{}")
+
+  @@unique([schoolId, name])
+}
+
+// 로그인 계정(user/session/account/verification)은 better-auth CLI(`npx auth generate`)가
+// 이 파일에 직접 추가합니다 — 이 아래에 생성된 모델은 손으로 수정하지 말고,
+// schoolId/role/teacherId 같은 앱 전용 필드는 src/lib/auth.ts의 user.additionalFields로 정의하세요.
+
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  role          String
+  schoolId      String
+  teacherId     String?
+  sessions      Session[]
+  accounts      Account[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}

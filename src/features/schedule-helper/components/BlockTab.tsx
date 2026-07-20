@@ -6,7 +6,7 @@ import { UserX, Search, CalendarOff, PlusCircle, X, CheckCircle2, Info } from "l
 import { cn } from "@/features/schedule-helper/lib/utils";
 
 export default function BlockTab() {
-  const { data, localBlockSettings, addLocalBlock, removeLocalBlock } = useSchedule();
+  const { data, sharedBlockSettings, addSharedBlock, removeSharedBlock } = useSchedule();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTeacher, setSelectedTeacher] = useState<string | null>(null);
   const [tempDays, setTempDays] = useState<Record<string, Set<number>>>({});
@@ -56,7 +56,7 @@ export default function BlockTab() {
     setTempDays(newDays);
   };
 
-  const handleAddBlock = () => {
+  const handleAddBlock = async () => {
     if (!selectedTeacher) return;
     const toAdd: Record<string, number[]> = {};
     Object.entries(tempDays).forEach(([day, periodSet]) => {
@@ -66,15 +66,15 @@ export default function BlockTab() {
     });
 
     if (Object.keys(toAdd).length > 0) {
-      addLocalBlock(selectedTeacher, toAdd);
+      await addSharedBlock(selectedTeacher, toAdd);
       setTempDays({});
     }
   };
 
   const hasAnySelection = Object.values(tempDays).some(set => set.size > 0);
-  const localBlockEntries = Object.entries(localBlockSettings);
+  const sharedBlockEntries = Object.entries(sharedBlockSettings);
   const defaultBlockEntries = Object.entries(data.defaultBlockSettings || {});
-  const totalBlockedTeachers = new Set([...localBlockEntries.map(e => e[0]), ...defaultBlockEntries.map(e => e[0])]).size;
+  const totalBlockedTeachers = new Set([...sharedBlockEntries.map(e => e[0]), ...defaultBlockEntries.map(e => e[0])]).size;
 
   return (
     <div className="flex flex-col lg:flex-row gap-6 items-stretch">
@@ -126,8 +126,8 @@ export default function BlockTab() {
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl mb-6 flex gap-3 text-amber-800 text-sm leading-relaxed">
           <Info className="w-5 h-5 shrink-0 text-amber-600" />
           <div>
-            <strong>안내:</strong> &apos;설정&apos; 시트의 내용이 기본 적용되어 있습니다.<br/>
-            <strong>오늘 갑자기 결근·출장</strong>이 생긴 교사가 있다면 여기서 추가하세요. 이 설정은 현재 브라우저에 저장됩니다.
+            <strong>안내:</strong> 관리자가 교사 목록에서 설정한 고정 교체불가 설정이 기본 적용되어 있습니다.<br/>
+            <strong>오늘 갑자기 결근·출장</strong>이 생긴 교사가 있다면 여기서 추가하세요. 이 설정은 우리 학교 선생님 모두에게 공유됩니다.
           </div>
         </div>
 
@@ -238,10 +238,10 @@ export default function BlockTab() {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* 구글 시트 기본 설정 목록 */}
+            {/* 관리자 고정 설정 목록 */}
             {defaultBlockEntries.length > 0 && (
               <div>
-                <h3 className="text-sm font-bold text-slate-500 mb-2 px-1">구글 시트 고정 설정 (삭제 불가)</h3>
+                <h3 className="text-sm font-bold text-slate-500 mb-2 px-1">관리자 고정 설정 (여기서 삭제 불가 — 교사 목록에서 수정)</h3>
                 <div className="space-y-2">
                   {defaultBlockEntries.map(([teacher, dayMap]) => {
                     const tags = Object.entries(dayMap).map(([day, periods]) => {
@@ -269,11 +269,11 @@ export default function BlockTab() {
             )}
 
             {/* 임시 설정 목록 */}
-            {localBlockEntries.length > 0 && (
+            {sharedBlockEntries.length > 0 && (
               <div>
-                <h3 className="text-sm font-bold text-rose-500 mb-2 px-1 mt-4">브라우저 임시 설정</h3>
+                <h3 className="text-sm font-bold text-rose-500 mb-2 px-1 mt-4">학교 공유 임시 설정</h3>
                 <div className="space-y-2">
-                  {localBlockEntries.map(([teacher, dayMap]) => {
+                  {sharedBlockEntries.map(([teacher, dayMap]) => {
                     const tags = Object.entries(dayMap).map(([day, periods]) => {
                       const label = periods.length === data.periods.length ? `${day} 전일` : `${day}요일 ${periods.join('·')}교시`;
                       return (
@@ -292,7 +292,7 @@ export default function BlockTab() {
                           <div>{tags}</div>
                         </div>
                         <button
-                          onClick={() => removeLocalBlock(teacher)}
+                          onClick={() => removeSharedBlock(teacher)}
                           className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors shrink-0"
                           title="삭제"
                         >
