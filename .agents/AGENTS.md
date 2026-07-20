@@ -53,12 +53,61 @@
 
 - **파일 매핑:** 원본의 `src/lib/*` → `src/features/schedule-helper/lib/*`, 원본의 `src/components/*Tab.tsx` → `src/features/schedule-helper/components/*Tab.tsx`, 원본의 `src/app/page.tsx` → `src/app/apps/schedule-helper/page.tsx`, 원본의 `src/app/layout.tsx` → `src/app/apps/schedule-helper/layout.tsx`(단, 원본의 `<html>/<body>`는 제거하고 루트 레이아웃 안에 중첩되는 일반 래퍼 `<div>` + `<ScheduleProvider>`로 변경 — App Router에서 `<html>/<body>`는 루트 레이아웃에만 있어야 합니다), 원본의 `src/app/api/schedule/route.ts`는 **경로 그대로** `src/app/api/schedule/route.ts`로 이식(허브 프로젝트에 기존 `/api/*` 라우트가 없어서 충돌이 없었고, 클라이언트 코드의 `fetch('/api/schedule')` 호출을 고칠 필요가 없었습니다).
 - **의존성:** 원본 `package.json`을 그대로 베끼지 말고 **실제로 import되는 것만** 이식하세요. `clsx`/`tailwind-merge`(→ `cn` 헬퍼)는 실제로 쓰여서 추가했지만, 원본 `package.json`에 있던 `papaparse`는 소스 어디에도 import가 없는 죽은 의존성이라 설치하지 않았습니다.
-- **데이터 소스:** 이 앱은 자체 백엔드/DB가 없고, `src/features/schedule-helper/lib/sheetData.ts`의 `fetchScheduleData()`가 공개 구글 시트 export URL(`SHEET_EXPORT_URL`, xlsx 형식)을 직접 fetch해서 파싱합니다. 시트 구조가 바뀌면(교사 행 시작 위치, "설정" 시트의 열 배치 등) 이 파일의 파싱 로직을 손봐야 합니다. 환경변수나 시크릿은 전혀 쓰지 않습니다. 같은 파일에서 `SHEET_ID`/`SHEET_EDIT_URL`도 export하므로, 원본 시트로 바로 이동하는 링크가 필요하면 이 상수를 재사용하세요(구글 시트 ID를 다른 곳에 하드코딩하지 마세요) — `src/app/apps/schedule-helper/page.tsx` 헤더 우측의 "원본 구글 시트 열기" 버튼이 이미 이 상수를 씁니다.
+- **데이터 소스 (2026-07-21 이후):** ~~구글 시트 export URL을 fetch~~하던 방식은 폐기했습니다. 지금은 관리자가 앱 안에서 직접 엑셀을 업로드하고, 그 결과가 DB(`School.scheduleData`)에 저장됩니다. 자세한 내용은 바로 아래 "🏫 schedule-helper 멀티테넌트(학교별 계정) 아키텍처" 섹션을 보세요 — `sheetData.ts`는 이제 `parseScheduleWorkbook(buffer)`라는 순수 파싱 함수만 남았고, fetch/URL 관련 코드는 전혀 없습니다.
 - **원본에 있던 실제 버그 2개를 포팅 중에 고쳤습니다** (원본 저장소에는 아직 남아있을 수 있음):
   1. `MeetingTab.tsx`가 `if (!data) return null;` 조건부 return **뒤에** `useMemo`를 호출하고 있어 React 훅 규칙 위반이었습니다 — `useMemo` 호출을 조건부 return보다 앞으로 옮기고 콜백 내부에서 `!data` 체크를 하도록 수정했습니다.
   2. `ScheduleContext.tsx`가 `sheetData.ts`의 `fetchScheduleData`를 import만 하고 실제로는 안 쓰고 있었습니다(대신 `/api/schedule`을 직접 fetch) — 죽은 import라 제거했습니다.
   - 이 프로젝트의 eslint 설정(`react-hooks` 최신 규칙 포함)이 원본보다 엄격해서 이 두 개 외에 `react/no-unescaped-entities`(따옴표 이스케이프)와 `react-hooks/set-state-in-effect`(localStorage를 마운트 이펙트에서 읽어와 setState하는, SSR 안전을 위해 의도된 패턴 — `eslint-disable-next-line` 처리)도 걸렸습니다. 새 외부 코드를 포팅할 때는 항상 `npx tsc --noEmit`과 `npx eslint <새 경로>`를 새로 추가한 파일에 한정해서 돌려보고 이 프로젝트 기준으로 깨끗하게 맞추세요.
 - **UI 톤:** 원본의 emerald/teal 포인트 컬러를 그대로 유지했습니다(이미 라이트 테마라 허브의 크림/앰버 톤과 크게 부딪히지 않음). 상단에 "허브로 돌아가기" 링크(`next/link` → `/`)만 추가했습니다.
+
+---
+
+## 🏫 schedule-helper 멀티테넌트(학교별 계정) 아키텍처 — 2026-07-21 추가
+
+`schedule-helper`("쌤스 헬퍼")는 원래 명신고 전용으로 구글 시트 하나를 fetch하는 단일 학교 도구였는데, **여러 학교가 각자 가입해서 자기 데이터로 쓸 수 있는 서비스**로 확장했습니다. 이 프로젝트에서 로그인/DB가 있는 유일한 부분이 여기입니다 — 허브, `enrollment-helper`는 지금도 인증 없이 완전히 열려 있습니다.
+
+### 스택 선택
+
+- **DB: Prisma + SQLite** (`@prisma/adapter-better-sqlite3` 드라이버 어댑터 사용). Postgres 같은 별도 컨테이너 없이 파일 하나(`dev.db`, 프로덕션은 `DATABASE_URL`이 가리키는 경로)로 끝나서 기존 NAS/Docker 배포 방식과 잘 맞습니다.
+  - **Prisma 7 문법 주의:** 이 버전은 `generator client { provider = "prisma-client" }` (구버전 `prisma-client-js` 아님)를 쓰고, 생성된 클라이언트를 `src/generated/prisma`에 출력합니다(스키마 파일의 `output` 참고, `.gitignore`에 이미 등록됨). **드라이버 어댑터가 필수**라 `new PrismaClient()`를 인자 없이 호출하면 타입 에러가 납니다 — 반드시 `new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL }) })` 형태로 써야 합니다(`src/lib/prisma.ts` 참고).
+  - 스키마/마이그레이션 CLI는 `.env`가 아니라 `prisma.config.ts`(및 그 안에서 로드하는 `.env`)를 봅니다. `npx prisma migrate dev`, `npx prisma generate`로 스키마를 바꿀 때마다 클라이언트를 재생성해야 합니다.
+- **인증: better-auth** (NextAuth/Auth.js 아님). 처음엔 NextAuth v5를 쓰려 했지만, 이 시점 기준 NextAuth v5가 여전히 beta(5.0.0-beta.31)에 머물러 있고 better-auth는 안정 버전(1.6.x)까지 나와 있어 전환했습니다. `npx auth ...` CLI 명령은 better-auth의 CLI입니다(패키지명이 `auth`라 헷갈리기 쉬움 — NextAuth의 것이 아닙니다).
+  - `src/lib/auth.ts` — `betterAuth()` 설정. `prismaAdapter(prisma, { provider: "sqlite" })`, `emailAndPassword: { enabled: true }`, 그리고 `user.additionalFields`로 `role`("ADMIN"|"TEACHER" 문자열 — better-auth의 additionalFields는 Prisma enum을 지원하지 않아 일반 string으로 관리)/`schoolId`/`teacherId`를 계정에 붙였습니다. `plugins: [nextCookies()]`가 **반드시 마지막 플러그인**이어야 하며, 이게 있어야 `auth.api.*` 호출 시 Next.js Route Handler/Proxy 안에서 세션 쿠키가 자동으로 설정됩니다.
+  - `src/lib/auth-client.ts` — 브라우저에서 쓰는 `better-auth/react` 클라이언트. `signIn`/`signOut`/`useSession`만 export — 회원가입은 클라이언트에서 직접 `authClient.signUp.email()`을 호출하지 않고, 아래 커스텀 API 라우트가 서버에서 `auth.api.signUpEmail(...)`을 호출하는 방식입니다(가입 시점에 `role`/`schoolId`를 서버가 결정해야 하기 때문 — "학교 만들기"면 ADMIN+새 School, "코드로 가입"이면 TEACHER+기존 School).
+  - `src/app/api/auth/[...all]/route.ts` — better-auth의 모든 내장 엔드포인트(`/api/auth/sign-in/email`, `/get-session`, `/sign-out` 등)를 처리하는 catch-all. `toNextJsHandler(auth)`로 한 줄이면 충분합니다.
+
+### 데이터 모델 (`prisma/schema.prisma`)
+
+- **`School`** — 테넌트 하나. `joinCode`(교사 셀프 가입용, 8자리), `scheduleData`(JSON 문자열 — 업로드된 시간표의 `{teachers, days, periods, tableData}`), `scheduleUploadedAt`, `globalMeetingBlocks`(JSON, 전체 교사 공통 협의회 불가 시간).
+- **`Teacher`** — 학교 안의 교사 한 명. **로그인 계정 유무와 무관하게 존재**하며 시간표 업로드 시 이름으로 자동 upsert됩니다(`@@unique([schoolId, name])`). `department`(교과군), `fixedBlockDays`(관리자가 지정하는 고정 교체불가, JSON), `tempBlockDays`(오늘 결근 등 임시 교체불가, 학교 전체 공유, JSON) — 이 셋은 예전엔 엑셀의 "설정" 시트 + 브라우저 localStorage에서 왔지만, 지금은 전부 "교사 목록 관리" 화면(`/apps/schedule-helper/teachers`, 관리자 전용)에서 직접 편집합니다.
+- **better-auth가 자동 생성/관리하는 `User`/`Session`/`Account`/`Verification`** — `npx auth generate`가 스키마 파일에 직접 써넣은 모델입니다. **이 네 모델은 손으로 편집하지 말고 항상 `npx auth generate`로 재생성하세요** — CLI가 이 블록을 통째로 다시 쓰기 때문에, 수동으로 추가한 `@relation` 같은 필드는 다음 `generate` 때 사라질 수 있습니다. 그래서 의도적으로 `User.schoolId`/`User.teacherId`는 Prisma `@relation` 없이 평범한 문자열 필드로만 두었고, 관련 School/Teacher를 찾을 땐 그냥 `prisma.school.findUnique({ where: { id: user.schoolId } })`처럼 수동 조회합니다.
+
+### 라우팅 & 인증 게이트
+
+- `src/app/apps/schedule-helper/(app)/` — **route group**. `layout.tsx`(폰트 + `<ScheduleProvider>`)와 기존 `page.tsx`, `teachers/page.tsx`가 여기 있습니다. `(app)`는 URL에 나타나지 않으므로 여전히 `/apps/schedule-helper`, `/apps/schedule-helper/teachers`로 접근합니다.
+- `src/app/apps/schedule-helper/login/page.tsx`, `signup/page.tsx` — **`(app)` 밖에** 있습니다. 로그인 전 페이지에서 `ScheduleProvider`가 불필요한 `/api/schedule` 요청을 쏘지 않게 하려는 의도적인 분리입니다.
+- **`src/proxy.ts`** (Next.js 16부터 `middleware.ts`가 `proxy.ts`로 이름이 바뀌었고 **기본적으로 Node.js 런타임에서 실행**됩니다 — 이 프로젝트처럼 better-sqlite3 같은 네이티브 모듈을 인증 체크에서 써야 하는 경우 핵심적인 변화입니다. Edge 런타임이었다면 애초에 동작하지 않았을 것). `/apps/schedule-helper/:path*`를 매칭해서 `login`/`signup` 경로를 제외한 나머지에 세션이 없으면 로그인 페이지로 리다이렉트합니다. 허브·`enrollment-helper`는 이 matcher에 안 걸리므로 영향 없습니다.
+- 가입 흐름: "학교 만들기"(`POST /api/schedule-helper/schools` — School 생성 + joinCode 발급 + admin 계정 생성, 이메일 중복 등으로 계정 생성이 실패하면 방금 만든 School을 롤백 삭제) / "코드로 가입"(`POST /api/schedule-helper/join` — joinCode로 School을 찾아 TEACHER 계정 생성). 둘 다 `src/app/apps/schedule-helper/signup/page.tsx`의 탭 토글 UI에서 호출합니다.
+
+### 데이터 흐름 요약
+
+1. 관리자가 `/apps/schedule-helper`에서 "시간표 업로드"로 엑셀을 올리면 → `POST /api/schedule-helper/upload`가 `parseScheduleWorkbook()`으로 파싱 → `School.scheduleData`에 저장 + 파싱된 교사 이름들을 `Teacher`로 upsert.
+2. `GET /api/schedule`가 로그인 세션의 `schoolId`로 `School` + `Teacher[]`를 조회해서, 예전 `ScheduleData` 모양(`teachers/days/periods/tableData/defaultBlockSettings/tempBlockSettings/globalMeetingBlocks/teacherDepts`)으로 조립해 반환합니다. `defaultBlockSettings`/`teacherDepts`는 `Teacher.fixedBlockDays`/`.department`에서, `tempBlockSettings`는 `Teacher.tempBlockDays`에서 옵니다.
+3. 관리자가 "교사 목록 관리"(`/apps/schedule-helper/teachers`)에서 교사별 `department`/`fixedBlockDays`를 저장하면 `PATCH /api/schedule-helper/teachers/[id]`가 해당 `Teacher` 행만 갱신합니다(관리자 본인 학교 소속인지 반드시 확인 — `teacher.schoolId !== session.user.schoolId`면 404).
+4. 교체 불가 탭에서 "오늘 결근" 같은 임시 설정을 추가/삭제하면 `POST`/`DELETE /api/schedule/blocks`가 `Teacher.tempBlockDays`를 직접 수정합니다 — **더 이상 브라우저 localStorage가 아니라 학교 전체가 공유하는 서버 데이터**입니다(예전엔 `schedule_local_blocks`라는 키로 각자 브라우저에만 저장됐었음).
+
+### 새 학교가 이 서비스를 쓰려면 (온보딩)
+
+1. 관리자가 `/apps/schedule-helper/signup`에서 "학교 만들기"로 가입 → joinCode 발급받음(관리자에게만 한 번 보여줌, 잊어버리면 현재는 재발급 기능이 없으니 필요해지면 추가하세요).
+2. 관리자가 학기별 전체 교사 시간표 엑셀(순번/교사성명 열 + 월~금 요일·교시 헤더 + "학년 과목명(반)" 형태 셀 — `sheetData.ts`의 `parseScheduleWorkbook` 참고)을 업로드.
+3. joinCode를 다른 선생님들께 공유 → 각자 "코드로 가입"으로 셀프 가입.
+4. (선택) 관리자가 "교사 목록 관리"에서 교과군/고정 교체불가 시간을 채워넣음.
+
+### 배포 시 주의
+
+- `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` 세 환경변수가 반드시 필요합니다(`.env.example` 참고). `BETTER_AUTH_SECRET`은 `npx auth secret`으로 생성.
+- SQLite 파일(`DATABASE_URL`이 가리키는 경로)이 Docker 볼륨에 영속되도록 마운트해야 합니다 — 컨테이너 재시작마다 계정/학교 데이터가 날아가면 안 됩니다.
+- 배포 파이프라인에 `npx prisma migrate deploy`(dev 전용인 `migrate dev` 아님)를 빌드/배포 스텝에 추가해야 마이그레이션이 실제 서버에도 적용됩니다. 아직 CI/배포 스크립트에 반영 안 되어 있으니, 실제 배포 전에 반드시 추가하세요.
 
 ---
 
@@ -136,6 +185,8 @@
 - **네트워크 설정 (DNS 해상도 오류 방지):** NAS 도커 환경에서 라이브러리 다운로드 시 `getaddrinfo EAI_AGAIN` 인터넷 연결 오류가 발생하는 경우가 많습니다. 이를 해결하기 위해 `docker-compose.yml`의 `build` 섹션에는 반드시 `network: host`를 포함해야 합니다.
 - **배포 자동화 스크립트:** 프로젝트 최상단에 있는 `deploy.sh` 스크립트를 사용하여 로컬에서 NAS로 파일을 전송(rsync/scp)하고, SSH로 원격 접속하여 `sudo docker compose up -d --build`를 실행하는 구조로 되어있습니다. (사용자 비밀번호 입력 필요)
 - **Next.js Standalone 빌드:** Next.js 최적화 빌드를 위해 `next.config.ts`에 `output: 'standalone'` 설정이 켜져 있습니다.
+- **schedule-helper용 환경변수 (2026-07-21 추가):** `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`이 배포 환경에도 설정되어 있어야 합니다. SQLite 파일 경로를 Docker 볼륨에 마운트해서 컨테이너 재시작 시에도 학교/계정 데이터가 유지되게 하세요. 배포 스텝에 `npx prisma migrate deploy`를 추가해야 합니다(아직 `deploy.sh`에 반영 안 됨).
+- **네이티브 모듈 빌드 주의:** `better-sqlite3`(Prisma의 SQLite 드라이버 어댑터가 사용)는 설치 시 네이티브 바인딩을 컴파일/다운로드합니다. 위 "메모리 최적화" 항목의 저사양 NAS OOM 이슈와 겹칠 수 있으니, 배포 환경에서 설치가 실패하면 이 패키지의 prebuild 바이너리 다운로드/컴파일부터 의심하세요.
 
 ---
 
@@ -149,6 +200,17 @@
 ---
 
 ## 📅 개발 히스토리 로그 (최신순)
+
+### 2026-07-21
+**schedule-helper를 멀티테넌트(학교별 계정) 서비스로 전환:**
+- 사용자가 "다른 학교에서도 쓸 수 있게" 확장하고 싶다고 요청 → "한 서비스에 여러 학교가 가입해서 공유" 방식(계정/DB 필요)으로 명확히 확인한 뒤 진행했습니다. 교사 초대는 학교 코드 셀프 가입, 시간표는 학교당 1개만 유지, 도메인 분리 없이 단일 URL — 이렇게 범위를 정했습니다.
+- Prisma + SQLite(better-sqlite3 드라이버 어댑터) 도입, better-auth로 이메일/비밀번호 인증 추가(NextAuth v5가 계속 beta에 머물러 있어 안정 버전이 나온 better-auth로 최종 선택). `School`/`Teacher` 두 모델과 better-auth가 관리하는 `User`/`Session`/`Account`/`Verification`으로 스키마 구성.
+- 구글 시트 자동 fetch를 완전히 제거하고, 관리자가 앱 안에서 직접 엑셀을 업로드하는 방식으로 전환(`parseScheduleWorkbook`). 업로드 시 교사 이름으로 `Teacher` 레코드를 자동 upsert.
+- "설정" 엑셀 시트가 담당하던 교과군/고정 교체불가/협의회 불가 설정을 대체하는 **교사 목록 관리 화면**(`/apps/schedule-helper/teachers`, 관리자 전용)을 새로 만들었습니다.
+- 브라우저 localStorage 전용이던 "오늘 결근" 임시 설정을 학교 전체가 공유하는 서버 데이터(`Teacher.tempBlockDays`)로 승격했습니다.
+- `/apps/schedule-helper` 전체를 `src/proxy.ts`(Next.js 16의 새 `middleware.ts` 대체 파일명, 기본 Node.js 런타임이라 better-sqlite3 같은 네이티브 모듈을 인증 체크에 쓸 수 있음)로 로그인 게이트를 걸었습니다. 로그인/가입 페이지는 `ScheduleProvider`가 불필요한 fetch를 하지 않도록 `(app)` 라우트 그룹 밖으로 분리했습니다.
+- 자세한 아키텍처는 위 "🏫 schedule-helper 멀티테넌트(학교별 계정) 아키텍처" 섹션 참고.
+- 실제 사용자가 제공한 명신고 시간표 엑셀(교사 53명)로 학교 생성 → 업로드 → 교체/협의회/임시설정 탭 → 교사 목록 관리 → 로그아웃/로그인까지 브라우저에서 전부 검증했습니다. 검증에 쓴 테스트 계정/학교 데이터는 모두 정리해서 DB를 깨끗한 상태로 남겨뒀습니다 — 실제 관리자 비밀번호는 제가 대신 만들지 않고, 사용자가 직접 가입 화면에서 설정하도록 남겨둔 것입니다.
 
 ### 2026-07-20 (3)
 **schedule-helper 헤더에 원본 구글 시트 바로가기 버튼 추가:**
