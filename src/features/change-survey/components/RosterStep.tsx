@@ -160,7 +160,7 @@ export function RosterStep({
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left border-collapse table-fixed">
                   <thead>
-                    <tr className="bg-amber-400/20 text-amber-200 border-b-2 border-stone-300">
+                    <tr className="bg-amber-400/20 text-amber-700 border-b-2 border-stone-300">
                       <th style={{ width: `${firstColWidth}%` }} className="px-3 py-2 border-r border-stone-300 text-center font-bold">과목명</th>
                       {displayCols.map(c => (
                         <th key={`${c.slot}-${c.col}`} colSpan={2} style={{ width: `${dataColWidth}%` }} className="px-3 py-2 border-r border-stone-300 text-center font-bold">
