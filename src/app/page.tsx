@@ -1,94 +1,157 @@
 "use client";
-import React, { useState } from "react";
-import { Settings, FileText, GitBranch } from "lucide-react";
-import { DemandSurveyTab } from "../components/tabs/DemandSurveyTab";
-import { ChangeSurveyTab } from "../components/tabs/ChangeSurveyTab";
-import { MainSurveyTab } from "../components/tabs/MainSurveyTab";
+
+import { useState } from "react";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { schoolName, introText, departments } from "@/config/hub";
+
+const palette = [
+  {
+    base: "bg-amber-100 border border-amber-200 hover:bg-amber-200",
+    active: "bg-amber-600 border border-amber-600 shadow-lg shadow-amber-500/20",
+    icon: "bg-white/70 text-amber-700",
+    iconActive: "bg-white/20 text-white",
+    title: "text-amber-900",
+    titleActive: "text-white",
+    subtitle: "text-amber-800/70",
+    subtitleActive: "text-amber-50/90",
+    count: "text-amber-700/70",
+    countActive: "text-amber-50/80",
+  },
+  {
+    base: "bg-rose-100 border border-rose-200 hover:bg-rose-200",
+    active: "bg-rose-600 border border-rose-600 shadow-lg shadow-rose-500/20",
+    icon: "bg-white/70 text-rose-700",
+    iconActive: "bg-white/20 text-white",
+    title: "text-rose-900",
+    titleActive: "text-white",
+    subtitle: "text-rose-800/70",
+    subtitleActive: "text-rose-50/90",
+    count: "text-rose-700/70",
+    countActive: "text-rose-50/80",
+  },
+  {
+    base: "bg-emerald-100 border border-emerald-200 hover:bg-emerald-200",
+    active: "bg-emerald-600 border border-emerald-600 shadow-lg shadow-emerald-500/20",
+    icon: "bg-white/70 text-emerald-700",
+    iconActive: "bg-white/20 text-white",
+    title: "text-emerald-900",
+    titleActive: "text-white",
+    subtitle: "text-emerald-800/70",
+    subtitleActive: "text-emerald-50/90",
+    count: "text-emerald-700/70",
+    countActive: "text-emerald-50/80",
+  },
+  {
+    base: "bg-stone-800 border border-stone-800 hover:bg-stone-700",
+    active: "bg-stone-900 border border-stone-900 shadow-lg shadow-stone-900/20",
+    icon: "bg-white/10 text-stone-100",
+    iconActive: "bg-white/15 text-white",
+    title: "text-white",
+    titleActive: "text-white",
+    subtitle: "text-stone-300",
+    subtitleActive: "text-stone-200",
+    count: "text-stone-400",
+    countActive: "text-stone-300",
+  },
+];
 
 export default function Home() {
-  const [activeSidebarTab, setActiveSidebarTab] = useState<"survey" | "main" | "change">("survey");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const activeDept = departments[activeIndex];
+  const activeStyle = palette[activeIndex % palette.length];
+  const ActiveIcon = activeDept?.icon;
 
   return (
-    <div className="flex min-h-screen bg-orange-50 text-stone-900 selection:bg-amber-300/40 font-sans">
+    <div className="min-h-screen bg-orange-50 text-stone-900 selection:bg-amber-300/40 font-sans relative">
       {/* Background Gradients */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-amber-300/25 blur-[120px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-rose-300/20 blur-[120px]" />
       </div>
 
-      {/* Sidebar Container */}
-      <aside className="fixed top-12 left-0 h-[calc(100vh-3rem)] z-[999] flex flex-col gap-6 pointer-events-none w-16">
+      <main className="relative z-10 max-w-5xl mx-auto px-6 py-16 sm:py-20">
+        <header className="mb-10 text-center">
+          <h1 className="text-3xl sm:text-4xl font-bold text-stone-900 tracking-tight">{schoolName}</h1>
+          <p className="mt-3 text-stone-600">{introText}</p>
+        </header>
 
-        {/* Logo/Brand */}
-        <div className="flex items-center h-[72px] w-16 hover:w-64 p-4 bg-white/95 backdrop-blur-xl border-y border-r border-stone-200 rounded-r-2xl shadow-[4px_0_15px_rgba(0,0,0,0.08)] pointer-events-auto transition-all duration-300 overflow-hidden group">
-          <div className="w-8 h-8 flex flex-shrink-0 justify-center items-center text-amber-500">
-            <Settings className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
+        <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-6 items-start">
+          {/* Left: department pill list */}
+          <div className="space-y-3">
+            {departments.map((dept, i) => {
+              const Icon = dept.icon;
+              const style = palette[i % palette.length];
+              const isActive = i === activeIndex;
+              return (
+                <button
+                  key={dept.name}
+                  onClick={() => setActiveIndex(i)}
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-all duration-200 ${isActive ? style.active : style.base}`}
+                >
+                  <div className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl transition-colors duration-200 ${isActive ? style.iconActive : style.icon}`}>
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-semibold truncate transition-colors duration-200 ${isActive ? style.titleActive : style.title}`}>
+                      {dept.name}
+                    </p>
+                    <p className={`text-xs truncate transition-colors duration-200 ${isActive ? style.subtitleActive : style.subtitle}`}>
+                      {dept.description}
+                    </p>
+                  </div>
+                  <span className={`text-[11px] font-mono shrink-0 transition-colors duration-200 ${isActive ? style.countActive : style.count}`}>
+                    {`${String(i + 1).padStart(2, "0")} // ${dept.apps.length}`}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <span className="ml-4 font-bold text-lg whitespace-nowrap tracking-wide bg-gradient-to-r from-amber-500 to-amber-700 bg-clip-text text-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            Subject Selector
-          </span>
-        </div>
 
-        {/* Navigation Tabs */}
-        <nav className="flex flex-col gap-4 pointer-events-auto">
+          {/* Right: apps of the selected department */}
+          <div className="bg-white/95 backdrop-blur-xl border border-stone-200 rounded-3xl p-6 sm:p-7 shadow-xl min-h-[240px]">
+            {activeDept && (
+              <>
+                <div className="flex items-center gap-3 mb-1">
+                  <div className={`w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-full ${activeStyle.icon}`}>
+                    {ActiveIcon && <ActiveIcon className="w-5 h-5" />}
+                  </div>
+                  <h2 className="flex-1 min-w-0 text-lg font-bold text-stone-900 truncate">{activeDept.name}</h2>
+                  <span className="text-xs font-mono text-stone-400 shrink-0">
+                    {String(activeIndex + 1).padStart(2, "0")}
+                  </span>
+                </div>
+                <p className="text-sm text-stone-600 mb-5 ml-14 -mt-0.5">{activeDept.description}</p>
 
-          <button
-            onClick={() => setActiveSidebarTab("survey")}
-            className={`relative flex items-center px-4 h-[60px] transition-all duration-300 group overflow-hidden bg-white/95 backdrop-blur-xl border-y border-r border-stone-200 rounded-r-2xl shadow-[4px_0_15px_rgba(0,0,0,0.08)] w-16 hover:w-64 ${activeSidebarTab === "survey" ? 'border-r-amber-500/60 bg-amber-50' : 'hover:bg-stone-50'}`}
-          >
-            <div className={`w-8 h-8 flex flex-shrink-0 justify-center items-center rounded-xl transition-all duration-300 ${activeSidebarTab === "survey" ? 'bg-amber-500/15 text-amber-600 shadow-[0_0_15px_rgba(217,119,6,0.15)]' : 'text-stone-400 group-hover:text-amber-600'}`}>
-              <FileText className="w-5 h-5" />
-            </div>
-            <span className={`ml-4 font-medium whitespace-nowrap transition-all duration-300 ${activeSidebarTab === "survey" ? 'text-amber-700 opacity-100' : 'text-stone-500 opacity-0 group-hover:opacity-100'}`}>
-              수요조사 탭
-            </span>
-            {activeSidebarTab === "survey" && (
-              <div className="absolute left-0 w-1 h-8 bg-amber-500 rounded-r-full shadow-[0_0_10px_rgba(217,119,6,0.4)]" />
+                <div className="space-y-3">
+                  {activeDept.apps.map((app) => {
+                    const AppIcon = app.icon;
+                    return (
+                      <Link
+                        key={app.href}
+                        href={app.href}
+                        className="group flex items-center gap-4 p-4 bg-stone-50 hover:bg-white border border-stone-200 hover:border-amber-300 rounded-2xl transition-all duration-200"
+                      >
+                        <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl bg-amber-500/15 text-amber-600">
+                          <AppIcon className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-stone-900 group-hover:text-amber-700 transition-colors">
+                            {app.title}
+                          </h3>
+                          <p className="mt-0.5 text-sm text-stone-600 leading-relaxed">{app.description}</p>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-stone-300 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                      </Link>
+                    );
+                  })}
+                  {activeDept.apps.length === 0 && (
+                    <div className="text-center py-10 text-sm text-stone-400">아직 등록된 프로그램이 없습니다.</div>
+                  )}
+                </div>
+              </>
             )}
-          </button>
-
-          <button
-            onClick={() => setActiveSidebarTab("change")}
-            className={`relative flex items-center px-4 h-[60px] transition-all duration-300 group overflow-hidden bg-white/95 backdrop-blur-xl border-y border-r border-stone-200 rounded-r-2xl shadow-[4px_0_15px_rgba(0,0,0,0.08)] w-16 hover:w-64 ${activeSidebarTab === "change" ? 'border-r-rose-500/60 bg-rose-50' : 'hover:bg-stone-50'}`}
-          >
-            <div className={`w-8 h-8 flex flex-shrink-0 justify-center items-center rounded-xl transition-all duration-300 ${activeSidebarTab === "change" ? 'bg-rose-500/15 text-rose-600 shadow-[0_0_15px_rgba(225,29,72,0.15)]' : 'text-stone-400 group-hover:text-rose-500'}`}>
-              <GitBranch className="w-5 h-5" />
-            </div>
-            <span className={`ml-4 font-medium whitespace-nowrap transition-all duration-300 ${activeSidebarTab === "change" ? 'text-rose-700 opacity-100' : 'text-stone-500 opacity-0 group-hover:opacity-100'}`}>
-              선택과목 변경 탭
-            </span>
-            {activeSidebarTab === "change" && (
-              <div className="absolute left-0 w-1 h-8 bg-rose-500 rounded-r-full shadow-[0_0_10px_rgba(225,29,72,0.4)]" />
-            )}
-          </button>
-
-          <button
-            onClick={() => setActiveSidebarTab("main")}
-            className={`relative flex items-center px-4 h-[60px] transition-all duration-300 group overflow-hidden bg-white/95 backdrop-blur-xl border-y border-r border-stone-200 rounded-r-2xl shadow-[4px_0_15px_rgba(0,0,0,0.08)] w-16 hover:w-64 ${activeSidebarTab === "main" ? 'border-r-emerald-500/60 bg-emerald-50' : 'hover:bg-stone-50'}`}
-          >
-            <div className={`w-8 h-8 flex flex-shrink-0 justify-center items-center rounded-xl transition-all duration-300 ${activeSidebarTab === "main" ? 'bg-emerald-500/15 text-emerald-600 shadow-[0_0_15px_rgba(16,185,129,0.15)]' : 'text-stone-400 group-hover:text-emerald-600'}`}>
-              <FileText className="w-5 h-5" />
-            </div>
-            <span className={`ml-4 font-medium whitespace-nowrap transition-all duration-300 ${activeSidebarTab === "main" ? 'text-emerald-700 opacity-100' : 'text-stone-500 opacity-0 group-hover:opacity-100'}`}>
-              수강신청(본조사) 탭
-            </span>
-            {activeSidebarTab === "main" && (
-              <div className="absolute left-0 w-1 h-8 bg-emerald-500 rounded-r-full shadow-[0_0_10px_rgba(16,185,129,0.4)]" />
-            )}
-          </button>
-        </nav>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 relative z-10 overflow-x-hidden overflow-y-auto ml-16 transition-none">
-        <div className={activeSidebarTab === "survey" ? "block" : "hidden"}>
-          <DemandSurveyTab />
-        </div>
-        <div className={activeSidebarTab === "main" ? "block" : "hidden"}>
-          <MainSurveyTab />
-        </div>
-        <div className={activeSidebarTab === "change" ? "block" : "hidden"}>
-          <ChangeSurveyTab />
+          </div>
         </div>
       </main>
     </div>
