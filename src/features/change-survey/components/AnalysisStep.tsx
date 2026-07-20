@@ -38,7 +38,7 @@ export function AnalysisStep({
             </h2>
             <div className="flex items-center gap-2 bg-stone-100 px-3 py-1.5 rounded-lg border border-stone-300 text-xs font-medium mt-1">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500/50 border border-amber-500"></span>
-              <span className="text-amber-200">학생 직접 변경자 (5단계 수동 신청 반영)</span>
+              <span className="text-amber-700">학생 직접 변경자 (5단계 수동 신청 반영)</span>
             </div>
           </div>
           <p className="text-stone-600 text-sm mt-1 mb-4 ml-8">
@@ -59,7 +59,7 @@ export function AnalysisStep({
             onClick={() => setShowOnlyApplicants(!showOnlyApplicants)}
             className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors flex items-center gap-2 ${
               showOnlyApplicants
-                ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
+                ? "bg-amber-500/20 border-amber-500/50 text-amber-700"
                 : "bg-stone-100 border-stone-300 text-stone-900 hover:text-stone-900"
             }`}
           >
@@ -117,8 +117,8 @@ export function AnalysisStep({
               <tbody>
                 {(showOnlyApplicants ? step6Data.filter(row => adjustmentLog[row.id]?.some(l => l.status === 'success' && l.source === 'applicant')) : step6Data).map((row, idx) => {
                   const hasChanges = adjustmentLog[row.id] && adjustmentLog[row.id].some(l => l.status === 'success' && l.source === 'applicant');
-                  const highlightClass = hasChanges ? "bg-amber-500/10 text-amber-300" : "bg-white text-stone-900";
-                  const nameHighlightClass = hasChanges ? "bg-amber-500/10 text-amber-300" : "bg-white text-stone-900";
+                  const highlightClass = hasChanges ? "bg-amber-500/10 text-amber-700" : "bg-white text-stone-900";
+                  const nameHighlightClass = hasChanges ? "bg-amber-500/10 text-amber-700" : "bg-white text-stone-900";
                   const hoverClass = hasChanges ? "group-hover:bg-amber-500/20" : "group-hover:bg-white";
                   return (
                   <tr key={idx} className="group border-b border-stone-200 hover:bg-stone-100">
@@ -165,7 +165,7 @@ export function AnalysisStep({
                           } else if (isDuplicate) {
                               cellClass += "bg-amber-500/20 text-rose-700 font-black ring-1 ring-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]";
                           } else {
-                              cellClass += "bg-amber-500/20 text-amber-300 font-bold ring-1 ring-amber-500/50";
+                              cellClass += "bg-amber-500/20 text-amber-700 font-bold ring-1 ring-amber-500/50";
                           }
                       } else {
                           if (isHierarchyViolation) cellClass += "text-cyan-700 font-bold bg-cyan-400/10";

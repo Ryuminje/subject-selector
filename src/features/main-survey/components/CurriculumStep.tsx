@@ -51,7 +51,7 @@ export function CurriculumStep({
 
       <button
         onClick={() => setIsExampleModalOpen(true)}
-        className="mb-4 flex items-center gap-2 px-4 py-2 bg-amber-50 hover:bg-amber-100 text-white text-sm font-semibold rounded-xl border border-amber-300 transition-all shadow-sm"
+        className="mb-4 flex items-center gap-2 px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 text-sm font-semibold rounded-xl border border-amber-300 transition-all shadow-sm"
       >
         <span className="text-base">💡</span> 올바른 엑셀 입력 예시 보기
       </button>

@@ -49,7 +49,7 @@ export function RosterAfterStep({
           <div className="flex items-center gap-3 bg-stone-100 px-3 py-1.5 rounded-lg border border-stone-300 text-xs font-medium">
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-              <span className="text-amber-200">학생 신청 변경</span>
+              <span className="text-amber-700">학생 신청 변경</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
@@ -185,7 +185,7 @@ export function RosterAfterStep({
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left border-collapse table-fixed">
                   <thead>
-                    <tr className="bg-amber-400/20 text-amber-200 border-b-2 border-stone-300">
+                    <tr className="bg-amber-400/20 text-amber-700 border-b-2 border-stone-300">
                       <th style={{ width: `${firstColWidth}%` }} className="px-3 py-2 border-r border-stone-300 text-center font-bold">과목명</th>
                       {displayCols.map(c => (
                         <th key={`${c.slot}-${c.col}`} colSpan={2} style={{ width: `${dataColWidth}%` }} className="px-3 py-2 border-r border-stone-300 text-center font-bold">
@@ -356,7 +356,7 @@ export function RosterAfterStep({
                               const tooltipText = studentChangeLogs.map(l => `${l.beforeStr} → ${l.afterStr}`).join('\n');
                               return (
                                 <Fragment key={`${c.slot}-${c.col}-${r}`}>
-                                  <td className={`px-2 py-1.5 border-r border-stone-300 text-center border-r-slate-800/30 text-xs ${isModified ? (student.modifiedSource === 'applicant' ? 'bg-amber-500/10 text-amber-300 font-bold' : 'bg-emerald-500/10 text-emerald-700 font-bold') : 'text-stone-900'}`}>
+                                  <td className={`px-2 py-1.5 border-r border-stone-300 text-center border-r-slate-800/30 text-xs ${isModified ? (student.modifiedSource === 'applicant' ? 'bg-amber-500/10 text-amber-700 font-bold' : 'bg-emerald-500/10 text-emerald-700 font-bold') : 'text-stone-900'}`}>
                                     {student ? student.id : ""}
                                   </td>
                                   <td
