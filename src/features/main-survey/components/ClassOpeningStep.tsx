@@ -72,8 +72,8 @@ export function ClassOpeningStep({
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
-        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
-          <CheckCircle2 className="w-6 h-6 text-indigo-400" />
+        <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
+          <CheckCircle2 className="w-6 h-6 text-amber-600" />
           5단계: 과목 개설 여부 및 학급 분반 추천
         </h2>
         <button
@@ -89,10 +89,10 @@ export function ClassOpeningStep({
       <GradeTabs activeGrade={activeGrade} setActiveGrade={setActiveGrade} />
 
       {/* 학급 기준 인원 설정 */}
-      <div className="p-5 bg-slate-950/40 border border-slate-800/80 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-5 bg-white/60 border border-stone-200 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h3 className="font-semibold text-slate-200">학급 분반 및 개설 기준 설정</h3>
-          <p className="text-xs text-slate-300 mt-1">
+          <h3 className="font-semibold text-stone-800">학급 분반 및 개설 기준 설정</h3>
+          <p className="text-xs text-stone-600 mt-1">
             설정된 학급 기준 인원에 따라 개설(70% 이상), 논의(70% 미만), 분반 추천(120% 초과) 및 폐강(10명 미만) 여부를 자동으로 판단합니다.
           </p>
         </div>
@@ -100,9 +100,9 @@ export function ClassOpeningStep({
           {groups.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mr-2">
               {groups.map(grp => (
-                <div key={grp} className="flex items-center gap-1.5 bg-slate-900/80 border border-slate-700/50 px-2.5 py-1 rounded-lg shadow-inner">
-                  <span className="text-[11px] font-semibold text-slate-300 tracking-wider">{grp}:</span>
-                  <span className="text-[13px] font-bold text-indigo-400">{groupTotals[grp]}반</span>
+                <div key={grp} className="flex items-center gap-1.5 bg-stone-100 border border-stone-300 px-2.5 py-1 rounded-lg shadow-inner">
+                  <span className="text-[11px] font-semibold text-stone-600 tracking-wider">{grp}:</span>
+                  <span className="text-[13px] font-bold text-amber-600">{groupTotals[grp]}반</span>
                 </div>
               ))}
             </div>
@@ -121,14 +121,14 @@ export function ClassOpeningStep({
                 });
               }
             }}
-            className="px-3 py-1.5 ml-2 mr-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-xl border border-slate-700 transition-colors flex items-center gap-1.5 shrink-0 shadow-sm hover:shadow-md"
+            className="px-3 py-1.5 ml-2 mr-1 bg-stone-100 hover:bg-stone-200 text-stone-600 text-sm font-medium rounded-xl border border-stone-300 transition-colors flex items-center gap-1.5 shrink-0 shadow-sm hover:shadow-md"
             title="수동으로 조정한 개설 반 수를 모두 초기화합니다"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-slate-300" />
+            <RotateCcw className="w-3.5 h-3.5 text-stone-600" />
             초기화
           </button>
-          <div className="flex items-center gap-3 bg-slate-900/50 px-3 py-1.5 rounded-xl border border-slate-800">
-            <label htmlFor="standardSizeInput" className="text-sm text-slate-300 font-medium whitespace-nowrap">학급 기준 인원:</label>
+          <div className="flex items-center gap-3 bg-stone-100 px-3 py-1.5 rounded-xl border border-stone-200">
+            <label htmlFor="standardSizeInput" className="text-sm text-stone-600 font-medium whitespace-nowrap">학급 기준 인원:</label>
             <input
               id="standardSizeInput"
               type="number"
@@ -139,28 +139,28 @@ export function ClassOpeningStep({
                 const val = parseInt(e.target.value) || 25;
                 setStandardClassSize(prev => ({ ...prev, [activeGrade]: val }));
               }}
-              className="w-16 bg-slate-950 border border-slate-700 text-center rounded-lg px-2 py-1 text-white font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-16 bg-white border border-stone-300 text-center rounded-lg px-2 py-1 text-stone-900 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
             />
-            <span className="text-sm text-slate-300 whitespace-nowrap">명</span>
+            <span className="text-sm text-stone-600 whitespace-nowrap">명</span>
           </div>
         </div>
       </div>
 
       {subjectStats[activeGrade].length === 0 ? (
-        <div className="bg-slate-950/50 border border-slate-800 rounded-2xl p-8 text-center">
-          <p className="text-slate-300">선택하신 학년의 데이터가 아직 없습니다. 교육과정 설정과 파일 업로드를 진행해 주세요.</p>
+        <div className="bg-white/70 border border-stone-200 rounded-2xl p-8 text-center">
+          <p className="text-stone-600">선택하신 학년의 데이터가 아직 없습니다. 교육과정 설정과 파일 업로드를 진행해 주세요.</p>
         </div>
       ) : (
-        <div className="bg-slate-950/50 border border-slate-800 rounded-2xl overflow-hidden">
+        <div className="bg-white/70 border border-stone-200 rounded-2xl overflow-hidden">
           <div className="overflow-auto max-h-[650px]">
-            <table className="w-full text-sm text-left text-slate-300 border-collapse">
-              <thead className="text-xs text-slate-300 uppercase bg-slate-900 border-b border-slate-800">
+            <table className="w-full text-sm text-left text-stone-600 border-collapse">
+              <thead className="text-xs text-stone-600 uppercase bg-white border-b border-stone-200">
                 <tr>
-                  <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[100px]">선택군</th>
-                  <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">학기</th>
-                  <th className="px-6 py-3 border-r border-slate-800/60">과목</th>
-                  <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">신청자 수</th>
-                  <th className="px-4 py-3 text-center border-r border-slate-800/60 min-w-[120px]">개설 반 수</th>
+                  <th className="px-4 py-3 text-center border-r border-stone-200 min-w-[100px]">선택군</th>
+                  <th className="px-4 py-3 text-center border-r border-stone-200 min-w-[120px]">학기</th>
+                  <th className="px-6 py-3 border-r border-stone-200">과목</th>
+                  <th className="px-4 py-3 text-center border-r border-stone-200 min-w-[120px]">신청자 수</th>
+                  <th className="px-4 py-3 text-center border-r border-stone-200 min-w-[120px]">개설 반 수</th>
                   <th className="px-4 py-3 text-center min-w-[120px]">개설여부</th>
                 </tr>
               </thead>
@@ -171,24 +171,24 @@ export function ClassOpeningStep({
                   const displayRemark = manualStep5Classes[key] !== undefined ? manualStep5Classes[key] : baseRemark;
 
                   let openingStatus = "미정";
-                  let openingStyle = "text-amber-400 font-bold bg-amber-500/10 px-2.5 py-1 rounded-md inline-block";
+                  let openingStyle = "text-amber-700 font-bold bg-amber-500/10 px-2.5 py-1 rounded-md inline-block";
 
                   if (displayRemark === "폐강") {
                     openingStatus = "폐강";
-                    openingStyle = "text-rose-400 font-bold bg-rose-600/10 px-2.5 py-1 rounded-md inline-block";
+                    openingStyle = "text-rose-700 font-bold bg-rose-600/10 px-2.5 py-1 rounded-md inline-block";
                   } else if (!isNaN(Number(displayRemark))) {
                     openingStatus = "확정";
-                    openingStyle = "text-emerald-400 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-md inline-block";
+                    openingStyle = "text-emerald-700 font-bold bg-emerald-500/10 px-2.5 py-1 rounded-md inline-block";
                   }
 
                   const isEditable = displayRemark === "논의" || displayRemark.includes("~") || manualStep5Classes[key] !== undefined;
 
                   return (
-                    <tr key={idx} className="border-b border-slate-800/50 hover:bg-slate-900/20 transition-colors">
+                    <tr key={idx} className="border-b border-stone-200 hover:bg-stone-50 transition-colors">
                       {groupSpans[idx] > 0 && (
                         <td
                           rowSpan={groupSpans[idx]}
-                          className="px-4 py-3.5 text-center font-bold text-slate-200 border-r border-slate-800/50 bg-slate-950/60 align-middle"
+                          className="px-4 py-3.5 text-center font-bold text-stone-800 border-r border-stone-200 bg-white/80 align-middle"
                         >
                           {row.group}
                         </td>
@@ -196,23 +196,23 @@ export function ClassOpeningStep({
                       {semSpans[idx] > 0 && (
                         <td
                           rowSpan={semSpans[idx]}
-                          className="px-4 py-3.5 text-center font-semibold text-slate-300 border-r border-slate-800/50 bg-slate-950/40 align-middle"
+                          className="px-4 py-3.5 text-center font-semibold text-stone-600 border-r border-stone-200 bg-white/60 align-middle"
                         >
                           {row.semester}
                         </td>
                       )}
-                      <td className="px-6 py-3.5 border-r border-slate-800/50 font-medium text-white">
+                      <td className="px-6 py-3.5 border-r border-stone-200 font-medium text-stone-900">
                         {row.subject}
                       </td>
-                      <td className="px-4 py-3.5 text-center border-r border-slate-800/50 font-semibold text-indigo-400">
+                      <td className="px-4 py-3.5 text-center border-r border-stone-200 font-semibold text-amber-600">
                         {row.applicants}명
                       </td>
-                      <td className="px-4 py-3.5 text-center align-middle border-r border-slate-800/50">
+                      <td className="px-4 py-3.5 text-center align-middle border-r border-stone-200">
                         {editingStep5Classes[key] ? (
                           <input
                             type="text"
                             autoFocus
-                            className="w-16 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-center text-slate-200"
+                            className="w-16 bg-stone-100 border border-stone-300 rounded px-2 py-1 text-center text-stone-800"
                             value={manualStep5Classes[key] !== undefined ? manualStep5Classes[key] : baseRemark}
                             onChange={(e) => setManualStep5Classes(p => ({ ...p, [key]: e.target.value }))}
                             onKeyDown={e => { if (e.key === 'Enter') setEditingStep5Classes(p => ({ ...p, [key]: false })) }}
@@ -220,7 +220,7 @@ export function ClassOpeningStep({
                           />
                         ) : (
                           <span
-                            className={isEditable ? "cursor-pointer hover:text-indigo-400 font-medium" : "text-slate-300 font-medium"}
+                            className={isEditable ? "cursor-pointer hover:text-amber-600 font-medium" : "text-stone-600 font-medium"}
                             onClick={() => { if (isEditable || true) setEditingStep5Classes(p => ({ ...p, [key]: true })) }}
                             title={isEditable || true ? "클릭하여 수동 입력" : undefined}
                           >
