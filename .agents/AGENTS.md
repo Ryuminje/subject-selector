@@ -53,7 +53,7 @@
 
 - **파일 매핑:** 원본의 `src/lib/*` → `src/features/schedule-helper/lib/*`, 원본의 `src/components/*Tab.tsx` → `src/features/schedule-helper/components/*Tab.tsx`, 원본의 `src/app/page.tsx` → `src/app/apps/schedule-helper/page.tsx`, 원본의 `src/app/layout.tsx` → `src/app/apps/schedule-helper/layout.tsx`(단, 원본의 `<html>/<body>`는 제거하고 루트 레이아웃 안에 중첩되는 일반 래퍼 `<div>` + `<ScheduleProvider>`로 변경 — App Router에서 `<html>/<body>`는 루트 레이아웃에만 있어야 합니다), 원본의 `src/app/api/schedule/route.ts`는 **경로 그대로** `src/app/api/schedule/route.ts`로 이식(허브 프로젝트에 기존 `/api/*` 라우트가 없어서 충돌이 없었고, 클라이언트 코드의 `fetch('/api/schedule')` 호출을 고칠 필요가 없었습니다).
 - **의존성:** 원본 `package.json`을 그대로 베끼지 말고 **실제로 import되는 것만** 이식하세요. `clsx`/`tailwind-merge`(→ `cn` 헬퍼)는 실제로 쓰여서 추가했지만, 원본 `package.json`에 있던 `papaparse`는 소스 어디에도 import가 없는 죽은 의존성이라 설치하지 않았습니다.
-- **데이터 소스:** 이 앱은 자체 백엔드/DB가 없고, `src/features/schedule-helper/lib/sheetData.ts`의 `fetchScheduleData()`가 공개 구글 시트 export URL(`SHEET_EXPORT_URL`, xlsx 형식)을 직접 fetch해서 파싱합니다. 시트 구조가 바뀌면(교사 행 시작 위치, "설정" 시트의 열 배치 등) 이 파일의 파싱 로직을 손봐야 합니다. 환경변수나 시크릿은 전혀 쓰지 않습니다.
+- **데이터 소스:** 이 앱은 자체 백엔드/DB가 없고, `src/features/schedule-helper/lib/sheetData.ts`의 `fetchScheduleData()`가 공개 구글 시트 export URL(`SHEET_EXPORT_URL`, xlsx 형식)을 직접 fetch해서 파싱합니다. 시트 구조가 바뀌면(교사 행 시작 위치, "설정" 시트의 열 배치 등) 이 파일의 파싱 로직을 손봐야 합니다. 환경변수나 시크릿은 전혀 쓰지 않습니다. 같은 파일에서 `SHEET_ID`/`SHEET_EDIT_URL`도 export하므로, 원본 시트로 바로 이동하는 링크가 필요하면 이 상수를 재사용하세요(구글 시트 ID를 다른 곳에 하드코딩하지 마세요) — `src/app/apps/schedule-helper/page.tsx` 헤더 우측의 "원본 구글 시트 열기" 버튼이 이미 이 상수를 씁니다.
 - **원본에 있던 실제 버그 2개를 포팅 중에 고쳤습니다** (원본 저장소에는 아직 남아있을 수 있음):
   1. `MeetingTab.tsx`가 `if (!data) return null;` 조건부 return **뒤에** `useMemo`를 호출하고 있어 React 훅 규칙 위반이었습니다 — `useMemo` 호출을 조건부 return보다 앞으로 옮기고 콜백 내부에서 `!data` 체크를 하도록 수정했습니다.
   2. `ScheduleContext.tsx`가 `sheetData.ts`의 `fetchScheduleData`를 import만 하고 실제로는 안 쓰고 있었습니다(대신 `/api/schedule`을 직접 fetch) — 죽은 import라 제거했습니다.
@@ -149,6 +149,10 @@
 ---
 
 ## 📅 개발 히스토리 로그 (최신순)
+
+### 2026-07-20 (3)
+**schedule-helper 헤더에 원본 구글 시트 바로가기 버튼 추가:**
+- `src/features/schedule-helper/lib/sheetData.ts`에 `SHEET_ID`/`SHEET_EDIT_URL` 상수를 export하도록 정리(기존엔 export URL 문자열 하나만 파일 내부 private 상수였음)하고, `src/app/apps/schedule-helper/page.tsx` 헤더 우측 상단에 새 탭으로 여는 링크 버튼을 추가했습니다.
 
 ### 2026-07-20 (2)
 **"쌤스 헬퍼" 부서 신설 및 별도 저장소 앱(schedule-helper) 통합:**
