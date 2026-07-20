@@ -35,8 +35,8 @@ export function RosterStep({
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-2xl font-semibold text-white flex items-center gap-2">
-          <Users className="w-6 h-6 text-indigo-400" />
+        <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
+          <Users className="w-6 h-6 text-amber-600" />
           타임별 선택과목 명단
         </h2>
 
@@ -48,12 +48,12 @@ export function RosterStep({
             <Download className="w-4 h-4" />
             엑셀 다운로드
           </button>
-          <div className="flex bg-slate-800/50 p-1 rounded-xl">
+          <div className="flex bg-stone-100 p-1 rounded-xl">
             <button
               onClick={() => setChangeActiveGrade("grade2")}
               className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
-                  ? "bg-indigo-500 text-white shadow-md"
-                  : "text-white hover:text-white"
+                  ? "bg-amber-500 text-stone-900 shadow-md"
+                  : "text-stone-900 hover:text-stone-900"
                 }`}
             >
               2학년
@@ -61,8 +61,8 @@ export function RosterStep({
             <button
               onClick={() => setChangeActiveGrade("grade3")}
               className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
-                  ? "bg-indigo-500 text-white shadow-md"
-                  : "text-white hover:text-white"
+                  ? "bg-amber-500 text-stone-900 shadow-md"
+                  : "text-stone-900 hover:text-stone-900"
                 }`}
             >
               3학년
@@ -121,8 +121,8 @@ export function RosterStep({
                     setRosterSubjectFilter("전체");
                   }}
                   className={`px-5 py-2 rounded-lg font-medium transition-all ${changeRosterTimeSlot === slot && rosterSubjectFilter === "전체"
-                      ? "bg-indigo-600 text-white shadow-md"
-                      : "bg-slate-800/50 text-white hover:bg-slate-700 hover:text-white"
+                      ? "bg-amber-600 text-white shadow-md"
+                      : "bg-stone-100 text-stone-900 hover:bg-stone-200 hover:text-stone-900"
                     }`}
                 >
                   {slot}타임
@@ -135,8 +135,8 @@ export function RosterStep({
                 <button
                   onClick={() => setRosterSubjectFilter("전체")}
                   className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${rosterSubjectFilter === "전체"
-                      ? "bg-amber-500 text-white shadow-md"
-                      : "bg-slate-800/50 text-white hover:bg-slate-700 hover:text-white"
+                      ? "bg-amber-500 text-stone-900 shadow-md"
+                      : "bg-stone-100 text-stone-900 hover:bg-stone-200 hover:text-stone-900"
                     }`}
                 >
                   전체 과목 (타임별)
@@ -146,8 +146,8 @@ export function RosterStep({
                     key={sub}
                     onClick={() => setRosterSubjectFilter(sub)}
                     className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${rosterSubjectFilter === sub
-                        ? "bg-amber-500 text-white shadow-md"
-                        : "bg-slate-800/50 text-white hover:bg-slate-700 hover:text-white"
+                        ? "bg-amber-500 text-stone-900 shadow-md"
+                        : "bg-stone-100 text-stone-900 hover:bg-stone-200 hover:text-stone-900"
                       }`}
                   >
                     {sub}
@@ -156,35 +156,35 @@ export function RosterStep({
               </div>
             )}
 
-            <div className="bg-slate-900 rounded-2xl border border-slate-700/50 overflow-hidden shadow-xl">
+            <div className="bg-white rounded-2xl border border-stone-300 overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left border-collapse table-fixed">
                   <thead>
-                    <tr className="bg-amber-400/20 text-amber-200 border-b-2 border-slate-700">
-                      <th style={{ width: `${firstColWidth}%` }} className="px-3 py-2 border-r border-slate-700/50 text-center font-bold">과목명</th>
+                    <tr className="bg-amber-400/20 text-amber-200 border-b-2 border-stone-300">
+                      <th style={{ width: `${firstColWidth}%` }} className="px-3 py-2 border-r border-stone-300 text-center font-bold">과목명</th>
                       {displayCols.map(c => (
-                        <th key={`${c.slot}-${c.col}`} colSpan={2} style={{ width: `${dataColWidth}%` }} className="px-3 py-2 border-r border-slate-700/50 text-center font-bold">
+                        <th key={`${c.slot}-${c.col}`} colSpan={2} style={{ width: `${dataColWidth}%` }} className="px-3 py-2 border-r border-stone-300 text-center font-bold">
                           {rosterSubjectFilter === "전체" ? c.original : `${c.slot}타임 ${c.original}`}
                         </th>
                       ))}
                       {emptyColCount > 0 && <th style={{ width: `${emptyColCount * dataColWidth}%` }}></th>}
                     </tr>
-                    <tr className="bg-slate-800 border-b border-slate-700">
-                      <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">강의실</th>
+                    <tr className="bg-stone-100 border-b border-stone-300">
+                      <th className="px-3 py-2 border-r border-stone-300 text-center font-semibold text-stone-600">강의실</th>
                       {displayCols.map(c => (
                         <Fragment key={`room-${c.slot}-${c.col}`}>
-                          <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300 bg-slate-800/80">
+                          <th colSpan={2} className="px-3 py-2 border-r border-stone-300 text-center font-semibold text-stone-600 bg-stone-200">
                             {c.col}
                           </th>
                         </Fragment>
                       ))}
                       {emptyColCount > 0 && <th></th>}
                     </tr>
-                    <tr className="bg-slate-800/50 border-b border-slate-700">
-                      <th className="px-3 py-2 border-r border-slate-700/50 text-center font-semibold text-slate-300">교사</th>
+                    <tr className="bg-stone-100 border-b border-stone-300">
+                      <th className="px-3 py-2 border-r border-stone-300 text-center font-semibold text-stone-600">교사</th>
                       {displayCols.map(c => (
                         <Fragment key={`teacher-${c.slot}-${c.col}`}>
-                          <th colSpan={2} className="px-3 py-2 border-r border-slate-700/50 text-center text-slate-300">
+                          <th colSpan={2} className="px-3 py-2 border-r border-stone-300 text-center text-stone-600">
                             {timetableData[changeActiveGrade]?.[c.slot]?.[c.col]?.teacher || "-"}
                           </th>
                         </Fragment>
@@ -268,16 +268,16 @@ export function RosterStep({
                       const rows = [];
                       for (let r = 0; r < maxStudents; r++) {
                         rows.push(
-                          <tr key={r} className="border-b border-slate-800/30 hover:bg-slate-800/20">
-                            <td className="px-3 py-1.5 border-r border-slate-700/50 text-center text-slate-300 bg-slate-900/50">{r + 1}</td>
+                          <tr key={r} className="border-b border-stone-200 hover:bg-stone-50">
+                            <td className="px-3 py-1.5 border-r border-stone-300 text-center text-stone-600 bg-stone-100">{r + 1}</td>
                             {displayCols.map(c => {
                               const student = colStudents[`${c.slot}-${c.col}`][r];
                               return (
                                 <Fragment key={`data-${c.slot}-${c.col}-${r}`}>
-                                  <td className="px-2 py-1.5 border-r border-slate-700/50 text-center text-slate-300 border-r-slate-800/30 text-xs">
+                                  <td className="px-2 py-1.5 border-r border-stone-300 text-center text-stone-600 border-r-slate-800/30 text-xs">
                                     {student ? student.id : ""}
                                   </td>
-                                  <td className="px-2 py-1.5 border-r border-slate-700/50 text-center text-slate-300 font-medium text-xs">
+                                  <td className="px-2 py-1.5 border-r border-stone-300 text-center text-stone-600 font-medium text-xs">
                                     {student ? student.name : ""}
                                   </td>
                                 </Fragment>
@@ -292,16 +292,16 @@ export function RosterStep({
                         <>
                           {rows.length > 0 ? rows : (
                             <tr>
-                              <td colSpan={displayCols.length * 2 + 1} className="px-6 py-12 text-center text-slate-400">
+                              <td colSpan={displayCols.length * 2 + 1} className="px-6 py-12 text-center text-stone-400">
                                 표시할 학생 데이터가 없습니다.
                               </td>
                             </tr>
                           )}
                           {rows.length > 0 && (
-                            <tr className="bg-indigo-900/20 border-t-2 border-indigo-500/30">
-                              <td className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">총 인원</td>
+                            <tr className="bg-amber-50 border-t-2 border-amber-300">
+                              <td className="px-3 py-3 border-r border-stone-300 text-center font-bold text-amber-700">총 인원</td>
                               {displayCols.map(c => (
-                                <td key={`total-${c.slot}-${c.col}`} colSpan={2} className="px-3 py-3 border-r border-slate-700/50 text-center font-bold text-indigo-300">
+                                <td key={`total-${c.slot}-${c.col}`} colSpan={2} className="px-3 py-3 border-r border-stone-300 text-center font-bold text-amber-700">
                                   {colStudents[`${c.slot}-${c.col}`].length}명
                                 </td>
                               ))}

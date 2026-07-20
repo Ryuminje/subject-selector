@@ -46,7 +46,7 @@ export function CategorySummaryStep({
   const totalYearHours = categorySummaryData.filter(r => r.isFirstRow).reduce((acc, row) => acc + row.yearTotal, 0);
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 bg-orange-50/60 -m-8 p-8 rounded-3xl">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
@@ -217,7 +217,7 @@ export function CategorySummaryStep({
                         {row.reduction > 0 ? (
                           <div className="flex flex-col items-center">
                             <span>{row.sem1Total}</span>
-                            <span className="text-[10px] text-rose-500 font-normal opacity-80 mt-1">({row.sem1TotalOriginal}-{row.reduction})</span>
+                            <span className="text-[10px] text-rose-600 font-normal opacity-80 mt-1">({row.sem1TotalOriginal}-{row.reduction})</span>
                           </div>
                         ) : (
                           row.sem1Total || 0
@@ -267,7 +267,7 @@ export function CategorySummaryStep({
                         {row.reduction > 0 ? (
                           <div className="flex flex-col items-center">
                             <span>{row.sem2Total}</span>
-                            <span className="text-[10px] text-rose-500 font-normal opacity-80 mt-1">({row.sem2TotalOriginal}-{row.reduction})</span>
+                            <span className="text-[10px] text-rose-600 font-normal opacity-80 mt-1">({row.sem2TotalOriginal}-{row.reduction})</span>
                           </div>
                         ) : (
                           row.sem2Total || 0
