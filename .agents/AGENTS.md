@@ -13,10 +13,12 @@
   - **오른쪽 앱 목록 패널** (사용자가 대화에서 **"작은 목록"**이라고 부릅니다) — 현재 선택된 부서의 헤더(아이콘+이름)와 그 부서 소속 앱들을 카드 목록으로 표시. 카드를 클릭하면 해당 앱의 실제 라우트(`href`)로 이동합니다.
   - DoRms 커뮤니티의 오픈소스 링크트리 템플릿(`dorms-linktree-template`) UI 컨셉(좌측 카테고리 pill → 우측 선택된 카테고리의 링크 목록)을 참고해 자체 구현한 것으로, 템플릿 코드를 그대로 가져오지 않고 이 프로젝트의 크림/앰버 라이트 테마에 맞춰 새로 작성했습니다.
 - **`src/config/hub.ts`** — 허브에 표시되는 학교 이름(`schoolName`)·소개 문구(`introText`)·부서 목록(`departments[]`, 각 부서는 `name`/`description`/`icon`/`apps[]`)을 정의하는 단일 데이터 소스입니다. **새 앱이나 부서를 추가할 때는 이 배열에 항목만 추가하면 되고, `src/app/page.tsx`의 렌더링 코드는 건드릴 필요가 없습니다.**
-- **`src/app/apps/<slug>/page.tsx`** — 실제 개별 업무 도구. 지금은 `enrollment-helper` 하나(기존 수요조사/선택과목변경/본조사 3탭 도구)뿐입니다. 새 앱을 추가할 때는:
-  1. `src/app/apps/<새-slug>/page.tsx`에 라우트를 만들고,
+- **`src/app/apps/<slug>/page.tsx`** — 실제 개별 업무 도구. 새 앱을 추가할 때는:
+  1. `src/app/apps/<새-slug>/page.tsx`에 라우트를 만들고 (필요하면 `layout.tsx`도 같이 — 아래 참고),
   2. `src/config/hub.ts`의 알맞은 부서 `apps[]`에 `title`/`description`/`href`/`icon`을 등록하세요.
-  3. 각 개별 앱 페이지는 좌상단 로고 등을 `next/link`로 `/`(허브)에 연결해, 사용자가 다시 허브로 돌아갈 수 있게 하세요 (`enrollment-helper/page.tsx`의 로고 링크 참고).
+  3. 각 개별 앱 페이지는 상단에 `/`(허브)로 돌아가는 `next/link`를 넣어, 사용자가 다시 허브로 돌아갈 수 있게 하세요 (`enrollment-helper/page.tsx`의 로고 링크, `schedule-helper/page.tsx`의 "허브로 돌아가기" 링크 참고).
+  - **`enrollment-helper`** (교육과정부) — 기존 수요조사/선택과목변경/본조사 3탭 도구. 자세한 내부 구조는 바로 아래 "코드 아키텍처 개요" 섹션 참고.
+  - **`schedule-helper`** (쌤스 헬퍼) — 별도 저장소(`Ryuminje/Myunshinh-schedule-app`, Next.js)에서 통째로 포팅해온 수업교체/협의회 시간 도우미. 자세한 내용은 아래 "🧩 별도 앱 통합(schedule-helper) 참고 메모" 섹션 참고.
 
 ---
 
@@ -42,6 +44,21 @@
   - 업로드 파싱(`useMainUploads` / `useDemandUploads`)은 실제로 다릅니다 — 본조사는 매트릭스형(`그룹::과목` 헤더 조합), 수요조사는 콤마 구분형 응답을 파싱합니다.
   - 두 폴더(`main-survey` ↔ `demand-survey`) 사이에서 코드를 옮기거나 재사용하기 전에 반드시 diff로 실제 차이를 먼저 확인하세요. 무분별한 복사·붙여넣기 금지.
 - **`MainSurveyTab`(본조사)은 `DemandSurveyTab`(수요조사)을 복사해서 만들다가 아직 개발이 덜 끝난 상태**입니다. 예를 들어 "엑셀 입력 예시" 모달은 수요조사 쪽엔 실제로 렌더링되지만(`ExampleModal` 컴포넌트), 본조사 쪽은 버튼과 `isExampleModalOpen` state만 있고 모달 자체가 없습니다. 이는 알려진 미완성 상태이지 버그가 아닙니다 — 본조사 기능을 완성할 때 수요조사 쪽 구현을 참고해서 이식하세요.
+
+---
+
+## 🧩 별도 앱 통합(schedule-helper) 참고 메모 — 2026-07-20 추가
+
+`/apps/schedule-helper`("쌤스 헬퍼" 부서의 "시간표 교체 도우미")는 이 프로젝트에서 새로 만든 게 아니라, **별도 GitHub 저장소(`Ryuminje/Myunshinh-schedule-app`, 이미 Vercel에 독립 배포되어 있던 Next.js 프로젝트)의 소스를 통째로 이 레포 안으로 포팅**한 것입니다. 앞으로 비슷하게 "다른 저장소의 앱을 이 허브에 합쳐달라"는 요청이 오면 이때 쓴 방식을 그대로 따르세요.
+
+- **파일 매핑:** 원본의 `src/lib/*` → `src/features/schedule-helper/lib/*`, 원본의 `src/components/*Tab.tsx` → `src/features/schedule-helper/components/*Tab.tsx`, 원본의 `src/app/page.tsx` → `src/app/apps/schedule-helper/page.tsx`, 원본의 `src/app/layout.tsx` → `src/app/apps/schedule-helper/layout.tsx`(단, 원본의 `<html>/<body>`는 제거하고 루트 레이아웃 안에 중첩되는 일반 래퍼 `<div>` + `<ScheduleProvider>`로 변경 — App Router에서 `<html>/<body>`는 루트 레이아웃에만 있어야 합니다), 원본의 `src/app/api/schedule/route.ts`는 **경로 그대로** `src/app/api/schedule/route.ts`로 이식(허브 프로젝트에 기존 `/api/*` 라우트가 없어서 충돌이 없었고, 클라이언트 코드의 `fetch('/api/schedule')` 호출을 고칠 필요가 없었습니다).
+- **의존성:** 원본 `package.json`을 그대로 베끼지 말고 **실제로 import되는 것만** 이식하세요. `clsx`/`tailwind-merge`(→ `cn` 헬퍼)는 실제로 쓰여서 추가했지만, 원본 `package.json`에 있던 `papaparse`는 소스 어디에도 import가 없는 죽은 의존성이라 설치하지 않았습니다.
+- **데이터 소스:** 이 앱은 자체 백엔드/DB가 없고, `src/features/schedule-helper/lib/sheetData.ts`의 `fetchScheduleData()`가 공개 구글 시트 export URL(`SHEET_EXPORT_URL`, xlsx 형식)을 직접 fetch해서 파싱합니다. 시트 구조가 바뀌면(교사 행 시작 위치, "설정" 시트의 열 배치 등) 이 파일의 파싱 로직을 손봐야 합니다. 환경변수나 시크릿은 전혀 쓰지 않습니다.
+- **원본에 있던 실제 버그 2개를 포팅 중에 고쳤습니다** (원본 저장소에는 아직 남아있을 수 있음):
+  1. `MeetingTab.tsx`가 `if (!data) return null;` 조건부 return **뒤에** `useMemo`를 호출하고 있어 React 훅 규칙 위반이었습니다 — `useMemo` 호출을 조건부 return보다 앞으로 옮기고 콜백 내부에서 `!data` 체크를 하도록 수정했습니다.
+  2. `ScheduleContext.tsx`가 `sheetData.ts`의 `fetchScheduleData`를 import만 하고 실제로는 안 쓰고 있었습니다(대신 `/api/schedule`을 직접 fetch) — 죽은 import라 제거했습니다.
+  - 이 프로젝트의 eslint 설정(`react-hooks` 최신 규칙 포함)이 원본보다 엄격해서 이 두 개 외에 `react/no-unescaped-entities`(따옴표 이스케이프)와 `react-hooks/set-state-in-effect`(localStorage를 마운트 이펙트에서 읽어와 setState하는, SSR 안전을 위해 의도된 패턴 — `eslint-disable-next-line` 처리)도 걸렸습니다. 새 외부 코드를 포팅할 때는 항상 `npx tsc --noEmit`과 `npx eslint <새 경로>`를 새로 추가한 파일에 한정해서 돌려보고 이 프로젝트 기준으로 깨끗하게 맞추세요.
+- **UI 톤:** 원본의 emerald/teal 포인트 컬러를 그대로 유지했습니다(이미 라이트 테마라 허브의 크림/앰버 톤과 크게 부딪히지 않음). 상단에 "허브로 돌아가기" 링크(`next/link` → `/`)만 추가했습니다.
 
 ---
 
@@ -132,6 +149,14 @@
 ---
 
 ## 📅 개발 히스토리 로그 (최신순)
+
+### 2026-07-20 (2)
+**"쌤스 헬퍼" 부서 신설 및 별도 저장소 앱(schedule-helper) 통합:**
+- 사용자가 "큰 목록"(허브 왼쪽 부서 pill)에 "쌤스 헬퍼 (T-Helper)" 부서를 추가하고, "작은 목록"(오른쪽 앱 카드)에 "시간표 교체 도우미"를 연결해달라고 요청했습니다.
+- 이 도구는 완전히 별도의 GitHub 저장소(`Ryuminje/Myunshinh-schedule-app`, Vercel에 이미 배포되어 있던 독립 Next.js 프로젝트)로 존재했습니다. 소스를 클론해 스택 호환성(Next 16 / React 19 / Tailwind v4, 동일)과 외부 의존성(구글 시트 공개 export URL만 fetch, DB/시크릿 없음)을 먼저 확인한 뒤, 이 저장소 안으로 코드를 통째로 포팅해 `/apps/schedule-helper`로 합쳤습니다.
+- 자세한 포팅 방식(파일 매핑, 의존성 선별, 포팅 중 고친 실제 버그 2개)은 위 "🧩 별도 앱 통합(schedule-helper) 참고 메모" 섹션에 정리했습니다. 앞으로 또 다른 저장소를 합칠 때 그대로 재사용하세요.
+- `src/config/hub.ts`에 `HubDepartment` 두 번째 항목으로 "쌤스 헬퍼" 부서를 추가했고, 왼쪽 pill 색상 순환(`palette` 배열) 두 번째 색(rose)이 자동으로 적용됩니다.
+- 브라우저에서 실제 구글 시트 데이터 로딩, 3개 탭(교체 시간표 찾기/협의회 시간 찾기/교체 불가 설정) 전환, 셀 클릭 시 교체 후보 검색 결과, 허브 왕복 링크까지 전부 수동 검증했습니다. tsc/eslint(새 파일 기준) 클린, 기존 `enrollment-helper` 회귀 없음 확인.
 
 ### 2026-07-20
 **학교 업무 도구 허브(랜딩) 페이지 신설:**

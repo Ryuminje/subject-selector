@@ -1,4 +1,4 @@
-import { FileText, GraduationCap, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, FileText, GraduationCap, HeartHandshake, type LucideIcon } from "lucide-react";
 
 export interface HubApp {
   title: string;
@@ -28,6 +28,19 @@ export const departments: HubDepartment[] = [
         description: "수요조사 · 선택과목 변경 · 수강신청(본조사) 자료를 한 번에 정리합니다.",
         href: "/apps/enrollment-helper",
         icon: FileText,
+      },
+    ],
+  },
+  {
+    name: "쌤스 헬퍼 (T-Helper)",
+    description: "선생님들의 자잘한 업무를 도와주는 프로그램 모음",
+    icon: HeartHandshake,
+    apps: [
+      {
+        title: "시간표 교체 도우미",
+        description: "수업 교체 가능한 시간, 협의회 가능 시간을 자동으로 찾아줍니다.",
+        href: "/apps/schedule-helper",
+        icon: ArrowLeftRight,
       },
     ],
   },
