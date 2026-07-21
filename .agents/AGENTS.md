@@ -238,6 +238,12 @@
 
 ## 📅 개발 히스토리 로그 (최신순)
 
+### 2026-07-21 (3)
+**시간표 업로드가 Vercel 프로덕션에서만 실패하던 버그 수정:**
+- 사용자가 실제 배포(`subject-selector.vercel.app`)에서 학교 계정을 만들고 로그인하는 건 됐는데 "시간표 엑셀 업로드"가 매번 "업로드에 실패했습니다"로 실패한다고 보고했습니다. 로그인/가입은 재현이 안 됐는데(쿼리 1번짜리라 안 걸림), 업로드만 실패한다는 게 단서였습니다.
+- `npx vercel inspect <url> --logs` / `npx vercel logs <url>`로 실제 함수 로그를 확인해 원인을 특정했습니다: `POST /api/schedule-helper/upload`가 `Prisma.$transaction` 안에서 교사 한 명당 `upsert()` 쿼리를 하나씩(N개) 날리고 있었는데, DB(NAS, 한국)와 Vercel 함수(iad1, 미국) 사이 왕복 지연이 쌓여 Prisma 기본 트랜잭션 타임아웃(5000ms)을 넘겨버렸습니다(`P2028`, "rollback cannot be executed on an expired transaction"). 로컬 개발 환경은 NAS와 같은 LAN이라 지연이 거의 없어서 이 버그가 로컬에서는 재현되지 않습니다 — **DB가 원격(NAS)에 있는 이상, 왕복 횟수가 많은 쿼리 로직은 반드시 프로덕션(Vercel↔NAS 실제 경로)에서 검증해야 합니다.**
+- `src/app/api/schedule-helper/upload/route.ts`: 교사별 `upsert` 반복(`update: {}`라 사실상 "없으면 삽입"이었음)을 `prisma.teacher.createMany({ data, skipDuplicates: true })` 배치 삽입 하나로 교체해 왕복 횟수를 N+1 → 2로 줄이고, `$transaction`에 `{ timeout: 15000 }`을 명시해 여유를 뒀습니다. **비슷하게 "루프 안에서 개별 upsert/create를 반복"하는 코드를 새로 짤 때는, DB가 NAS 원격에 있다는 걸 감안해 가능한 한 배치 API(`createMany`/`updateMany`/raw SQL bulk)로 왕복을 줄이세요.**
+
 ### 2026-07-21 (2)
 **배포 아키텍처를 "앱=Vercel, DB=NAS Postgres"로 재구성:**
 - 멀티테넌트 전환(바로 아래 2026-07-21 항목) 직후 사용자가 GitHub main을 이미 Vercel과 연결해뒀다는 걸 알게 됐고(`https://subject-selector.vercel.app`), 그 배포가 실패 상태로 옛날 빌드만 계속 서빙되고 있는 걸 발견했습니다. 원인은 `src/generated/prisma`가 gitignore되어 있는데 빌드 파이프라인에 `prisma generate`가 없었던 것 — `package.json`에 `postinstall: "prisma generate"`를 추가해 해결했습니다.
