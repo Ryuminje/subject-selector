@@ -23,6 +23,7 @@ export interface ScheduleData {
   globalMeetingBlocks: Record<string, number[]>;
   teacherDepts: Record<string, string>;
   scheduleUploadedAt: string | null;
+  joinCode: string | null;
 }
 
 interface ScheduleContextType {

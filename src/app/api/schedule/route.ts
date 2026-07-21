@@ -42,5 +42,7 @@ export async function GET(request: Request) {
     globalMeetingBlocks: JSON.parse(school.globalMeetingBlocks) as Record<string, number[]>,
     teacherDepts,
     scheduleUploadedAt: school.scheduleUploadedAt,
+    // 학교 초대 코드 — 가입 시에만 한 번 보여주고 재확인할 곳이 없었어서, 관리자에게만 다시 노출합니다.
+    joinCode: session.user.role === "ADMIN" ? school.joinCode : null,
   });
 }

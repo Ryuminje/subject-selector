@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSchedule } from "@/features/schedule-helper/lib/ScheduleContext";
 import { useSession, signOut } from "@/lib/auth-client";
-import { ArrowLeft, ArrowLeftRight, Users, Ban, Loader2, Upload, LogOut, UserCog } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Users, Ban, Loader2, Upload, LogOut, UserCog, KeyRound, Copy, Check } from "lucide-react";
 import SwapTab from "@/features/schedule-helper/components/SwapTab";
 import MeetingTab from "@/features/schedule-helper/components/MeetingTab";
 import BlockTab from "@/features/schedule-helper/components/BlockTab";
@@ -17,12 +17,21 @@ export default function ScheduleHelperPage() {
   const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<"swap" | "meeting" | "block">("swap");
   const [showUpload, setShowUpload] = useState(false);
+  const [showJoinCode, setShowJoinCode] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const isAdmin = session?.user?.role === "ADMIN";
 
   const handleLogout = async () => {
     await signOut();
     router.push("/apps/schedule-helper/login");
+  };
+
+  const handleCopyJoinCode = async () => {
+    if (!data?.joinCode) return;
+    await navigator.clipboard.writeText(data.joinCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   };
 
   if (loading) {
@@ -89,9 +98,39 @@ export default function ScheduleHelperPage() {
               <Upload className="w-4 h-4" />
               <span className="hidden sm:inline">시간표 업로드</span>
             </button>
+            <button
+              onClick={() => setShowJoinCode((v) => !v)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold rounded-xl border border-white/30 transition-colors"
+            >
+              <KeyRound className="w-4 h-4" />
+              <span className="hidden sm:inline">초대 코드</span>
+            </button>
           </div>
         )}
       </div>
+
+      {isAdmin && showJoinCode && (
+        <div className="mb-8 bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-lg font-bold text-teal-700 mb-1 flex items-center gap-2">
+            <KeyRound className="w-5 h-5" /> 학교 초대 코드
+          </h2>
+          <p className="text-sm text-slate-500 mb-4">
+            선생님들이 &quot;코드로 가입&quot;할 때 필요한 코드입니다. 공유해서 셀프 가입을 안내해주세요.
+          </p>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl font-bold tracking-[0.2em] text-teal-800 bg-teal-50 border border-teal-200 rounded-xl px-5 py-2.5">
+              {data?.joinCode ?? "-"}
+            </span>
+            <button
+              onClick={handleCopyJoinCode}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white font-semibold rounded-xl transition-colors"
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copied ? "복사됨" : "복사"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {isAdmin && showUpload && (
         <div className="mb-8">
