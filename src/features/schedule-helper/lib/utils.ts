@@ -30,3 +30,17 @@ export function parseClassInfo(str: string | undefined | null) {
 
   return { grade, classNum, subject, isMovingClass, blockGroup };
 }
+
+// 업로드된 시간표에 실제로 등장하는 과목명만 뽑아냅니다 — 관리자가 "과목별 교체 금지"를
+// 자유 타이핑하면 SwapTab의 완전일치 비교와 오타로 어긋날 수 있어, 실제 값에서 검색·선택하게 하기 위함입니다.
+export function extractSubjects(tableData: { teacher: string; [key: string]: string }[]): string[] {
+  const set = new Set<string>();
+  tableData.forEach((row) => {
+    Object.entries(row).forEach(([key, val]) => {
+      if (key === "teacher" || !val) return;
+      const info = parseClassInfo(val);
+      if (info?.subject) set.add(info.subject);
+    });
+  });
+  return Array.from(set).sort((a, b) => a.localeCompare(b, "ko"));
+}

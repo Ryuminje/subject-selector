@@ -27,6 +27,12 @@ model School {
   // 교과군 그룹 목록 (JSON: string[]) — 교사 목록 관리 화면에서 관리자가 추가/삭제
   departmentGroups String @default("[\"국어\",\"영어\",\"수학\",\"사회\",\"과학\"]")
 
+  // 교체 자체가 금지된 과목명 목록 (JSON: string[]) — 시간 이동(교체)이 아예 불가능한 과목
+  blockedSubjects String @default("[]")
+
+  // 교체·대강 모두 완전히 금지된 교사명 목록 (JSON: string[])
+  blockedTeachers String @default("[]")
+
   createdAt DateTime @default(now())
 
   teachers Teacher[]

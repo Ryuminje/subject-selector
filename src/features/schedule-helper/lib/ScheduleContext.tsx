@@ -21,6 +21,8 @@ export interface ScheduleData {
   defaultBlockSettings: Record<string, Record<string, number[]>>;
   tempBlockSettings: Record<string, Record<string, number[]>>;
   globalMeetingBlocks: Record<string, number[]>;
+  blockedSubjects: string[];
+  blockedTeachers: string[];
   teacherDepts: Record<string, string>;
   scheduleUploadedAt: string | null;
   joinCode: string | null;
@@ -34,6 +36,8 @@ interface ScheduleContextType {
   addSharedBlock: (teacher: string, blocks: Record<string, number[]>) => Promise<void>;
   removeSharedBlock: (teacher: string) => Promise<void>;
   isBlocked: (teacher: string, day: string, period: number) => boolean;
+  isSubjectBlocked: (subject: string) => boolean;
+  isTeacherBlocked: (teacher: string) => boolean;
   refetch: () => Promise<void>;
 }
 
@@ -117,6 +121,10 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return false;
   };
 
+  const isSubjectBlocked = (subject: string) => data?.blockedSubjects.includes(subject) ?? false;
+
+  const isTeacherBlocked = (teacher: string) => data?.blockedTeachers.includes(teacher) ?? false;
+
   return (
     <ScheduleContext.Provider
       value={{
@@ -127,6 +135,8 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         addSharedBlock,
         removeSharedBlock,
         isBlocked,
+        isSubjectBlocked,
+        isTeacherBlocked,
         refetch
       }}
     >
