@@ -24,6 +24,9 @@ model School {
   // 전체 교사 공통 협의회 불가 요일/교시 (JSON: Record<day, number[]>)
   globalMeetingBlocks String @default("{}")
 
+  // 교과군 그룹 목록 (JSON: string[]) — 교사 목록 관리 화면에서 관리자가 추가/삭제
+  departmentGroups String @default("[\"국어\",\"영어\",\"수학\",\"사회\",\"과학\"]")
+
   createdAt DateTime @default(now())
 
   teachers Teacher[]

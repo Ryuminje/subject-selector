@@ -18,12 +18,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   const body = await request.json().catch(() => null);
-  const data: { department?: string | null; fixedBlockDays?: string } = {};
+  const data: { fixedBlockDays?: string } = {};
 
-  if (body && "department" in body) {
-    const dept = typeof body.department === "string" ? body.department.trim() : "";
-    data.department = dept || null;
-  }
   if (body && "fixedBlockDays" in body && body.fixedBlockDays && typeof body.fixedBlockDays === "object") {
     data.fixedBlockDays = JSON.stringify(body.fixedBlockDays);
   }

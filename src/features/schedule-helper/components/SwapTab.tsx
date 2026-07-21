@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSchedule } from "@/features/schedule-helper/lib/ScheduleContext";
+import { useSession } from "@/lib/auth-client";
 import { parseClassInfo, cn } from "@/features/schedule-helper/lib/utils";
-import { Search, X, Check, ArrowRightLeft, Star } from "lucide-react";
+import { Search, X, Check, ArrowRightLeft, Star, Pin } from "lucide-react";
 
 interface SearchResult {
   teacher: string;
@@ -15,11 +16,23 @@ interface SearchResult {
 
 export default function SwapTab() {
   const { data, isBlocked } = useSchedule();
+  const { data: session } = useSession();
   const [selectedCell, setSelectedCell] = useState<{ teacher: string; day: string; period: number } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [results, setResults] = useState<{ swap: SearchResult[]; sub: SearchResult[] }>({ swap: [], sub: [] });
+  const theadRef = useRef<HTMLTableSectionElement>(null);
+  const [stickyTop, setStickyTop] = useState(0);
+
+  // 로그인한 계정 이름과 일치하는 교사 행을 "내 시간표"로 맨 위에 고정하기 위해,
+  // 헤더(sticky) 높이만큼 아래로 sticky 위치를 잡아줍니다.
+  useEffect(() => {
+    if (theadRef.current) setStickyTop(theadRef.current.getBoundingClientRect().height);
+  }, [data]);
 
   if (!data) return null;
+
+  const myName = session?.user?.name;
+  const myRow = myName ? data.tableData.find((r) => r.teacher === myName) : undefined;
 
   const handleCellClick = (teacher: string, day: string, period: number) => {
     const row = data.tableData.find((r) => r.teacher === teacher);
@@ -79,11 +92,72 @@ export default function SwapTab() {
   const selectedClassStr = selectedCell ? data.tableData.find((r) => r.teacher === selectedCell.teacher)?.[selectedCell.day + selectedCell.period] : null;
   const myInfo = parseClassInfo(selectedClassStr);
 
+  const renderRow = (row: typeof data.tableData[number], pinned: boolean) => (
+    <tr
+      key={row.teacher}
+      className={cn("transition-colors", pinned ? "bg-amber-50 hover:bg-amber-100" : "hover:bg-emerald-50")}
+      style={pinned ? { position: "sticky", top: stickyTop, zIndex: 15 } : undefined}
+    >
+      <td
+        className={cn(
+          "p-1 border sticky left-0 z-10 font-bold border-r-2 border-r-teal-600 w-[85px] whitespace-nowrap overflow-hidden text-ellipsis text-center text-[11px] sm:text-xs",
+          pinned ? "bg-amber-100 border-slate-200" : "bg-slate-50 border-slate-200"
+        )}
+      >
+        {pinned ? (
+          <span className="inline-flex items-center gap-0.5 text-amber-800">
+            <Pin className="w-3 h-3 shrink-0" /> {row.teacher}
+          </span>
+        ) : (
+          row.teacher
+        )}
+      </td>
+      {data.days.map((d) =>
+        data.periods.map((p, pi) => {
+          const classStr = row[d + p];
+          const info = parseClassInfo(classStr);
+          const isSelected = selectedCell?.teacher === row.teacher && selectedCell?.day === d && selectedCell?.period === p;
+          const isPartner = selectedCell && (
+            results.swap.some(r => r.teacher === row.teacher && r.day === d && r.period === p) ||
+            results.sub.some(r => r.teacher === row.teacher && r.day === d && r.period === p)
+          );
+
+          return (
+            <td
+              key={`${d}-${p}`}
+              onClick={() => classStr && handleCellClick(row.teacher, d, p)}
+              className={cn(
+                "h-14 border border-slate-200 p-0.5 text-center align-middle transition-colors relative overflow-hidden",
+                pi === 0 && "border-l-2 border-l-slate-400",
+                classStr && "cursor-pointer hover:bg-amber-100",
+                isSelected && "bg-teal-100 border-2 border-teal-500 font-bold z-10",
+                isPartner && "bg-emerald-100 border-2 border-emerald-500 font-bold z-10"
+              )}
+            >
+              {info && (
+                <div className="flex flex-col items-center justify-center leading-tight">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 truncate w-full block">
+                    {info.subject.length > 5 ? info.subject.substring(0, 4) + ".." : info.subject}
+                  </span>
+                  {info.grade !== "?" && info.classNum !== "?" && (
+                    <span className="text-[9px] sm:text-[10px] text-teal-700 font-bold bg-teal-500/10 px-1 py-0.5 rounded mt-0.5 inline-block truncate max-w-full">
+                      {info.grade}-{info.classNum}
+                    </span>
+                  )}
+                </div>
+              )}
+            </td>
+          );
+        })
+      )}
+    </tr>
+  );
+
   return (
     <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="overflow-auto max-h-[75vh] relative">
         <table className="w-full border-collapse text-sm table-fixed">
-          <thead className="bg-teal-600 text-white sticky top-0 z-20 shadow-md">
+          <thead ref={theadRef} className="bg-teal-600 text-white sticky top-0 z-20 shadow-md">
             <tr>
               <th rowSpan={2} className="p-2 border-r border-teal-500/50 sticky left-0 z-30 bg-teal-700 w-[85px] whitespace-nowrap overflow-hidden text-ellipsis text-xs sm:text-sm">교사명</th>
               {data.days.map((d) => (
@@ -99,7 +173,10 @@ export default function SwapTab() {
             </tr>
           </thead>
           <tbody>
+            {myRow && renderRow(myRow, true)}
             {data.tableData.map((row) => {
+              if (row.teacher === myName) return null;
+
               const isVisible = !selectedCell ||
                                 row.teacher === selectedCell.teacher ||
                                 results.swap.some(r => r.teacher === row.teacher) ||
@@ -107,51 +184,7 @@ export default function SwapTab() {
 
               if (!isVisible) return null;
 
-              return (
-                <tr key={row.teacher} className="hover:bg-emerald-50 transition-colors">
-                <td className="p-1 border border-slate-200 sticky left-0 z-10 bg-slate-50 font-bold border-r-2 border-r-teal-600 w-[85px] whitespace-nowrap overflow-hidden text-ellipsis text-center text-[11px] sm:text-xs">
-                  {row.teacher}
-                </td>
-                {data.days.map((d) =>
-                  data.periods.map((p, pi) => {
-                    const classStr = row[d + p];
-                    const info = parseClassInfo(classStr);
-                    const isSelected = selectedCell?.teacher === row.teacher && selectedCell?.day === d && selectedCell?.period === p;
-                    const isPartner = selectedCell && (
-                      results.swap.some(r => r.teacher === row.teacher && r.day === d && r.period === p) ||
-                      results.sub.some(r => r.teacher === row.teacher && r.day === d && r.period === p)
-                    );
-
-                    return (
-                      <td
-                        key={`${d}-${p}`}
-                        onClick={() => classStr && handleCellClick(row.teacher, d, p)}
-                        className={cn(
-                          "h-14 border border-slate-200 p-0.5 text-center align-middle transition-colors relative overflow-hidden",
-                          pi === 0 && "border-l-2 border-l-slate-400",
-                          classStr && "cursor-pointer hover:bg-amber-100",
-                          isSelected && "bg-teal-100 border-2 border-teal-500 font-bold z-10",
-                          isPartner && "bg-emerald-100 border-2 border-emerald-500 font-bold z-10"
-                        )}
-                      >
-                        {info && (
-                          <div className="flex flex-col items-center justify-center leading-tight">
-                            <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 truncate w-full block">
-                              {info.subject.length > 5 ? info.subject.substring(0, 4) + ".." : info.subject}
-                            </span>
-                            {info.grade !== "?" && info.classNum !== "?" && (
-                              <span className="text-[9px] sm:text-[10px] text-teal-700 font-bold bg-teal-500/10 px-1 py-0.5 rounded mt-0.5 inline-block truncate max-w-full">
-                                {info.grade}-{info.classNum}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })
-                )}
-              </tr>
-              );
+              return renderRow(row, false);
             })}
           </tbody>
         </table>
