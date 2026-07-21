@@ -10,3 +10,8 @@ dev.db
 dev.db-journal
 prisma/*.db
 prisma/*.db-journal
+.vercel
+.env*
+
+# NAS 배포 시 SQLite 파일을 담는 볼륨 마운트 대상 (Docker Compose)
+data/
