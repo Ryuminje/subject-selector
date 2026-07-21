@@ -29,27 +29,29 @@ export async function POST(request: Request) {
 
   const schoolId = session.user.schoolId;
 
-  await prisma.$transaction([
-    prisma.school.update({
-      where: { id: schoolId },
-      data: {
-        scheduleData: JSON.stringify({
-          teachers: parsed.teachers,
-          days: parsed.days,
-          periods: parsed.periods,
-          tableData: parsed.tableData,
-        }),
-        scheduleUploadedAt: new Date(),
-      },
-    }),
-    ...parsed.teachers.map((name) =>
-      prisma.teacher.upsert({
-        where: { schoolId_name: { schoolId, name } },
-        create: { schoolId, name },
-        update: {},
-      })
-    ),
-  ]);
+  await prisma.$transaction(
+    [
+      prisma.school.update({
+        where: { id: schoolId },
+        data: {
+          scheduleData: JSON.stringify({
+            teachers: parsed.teachers,
+            days: parsed.days,
+            periods: parsed.periods,
+            tableData: parsed.tableData,
+          }),
+          scheduleUploadedAt: new Date(),
+        },
+      }),
+      prisma.teacher.createMany({
+        data: parsed.teachers.map((name) => ({ schoolId, name })),
+        skipDuplicates: true,
+      }),
+    ],
+    // DB가 NAS에 있어 왕복 지연이 커서(교사 수만큼 개별 upsert하던 방식은 5초 기본 타임아웃을 넘겼음),
+    // 배치 처리로 왕복 횟수를 줄이고 타임아웃도 여유 있게 설정합니다.
+    { timeout: 15000 }
+  );
 
   return NextResponse.json({
     teacherCount: parsed.teachers.length,
