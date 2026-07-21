@@ -2,18 +2,79 @@
 
 import { useState } from "react";
 import { useSchedule } from "@/features/schedule-helper/lib/ScheduleContext";
-import { UserX, Search, CalendarOff, PlusCircle, X, CheckCircle2, Info } from "lucide-react";
-import { cn } from "@/features/schedule-helper/lib/utils";
+import { useSession } from "@/lib/auth-client";
+import { UserX, Search, CalendarOff, PlusCircle, X, CheckCircle2, Info, Ban, AlertTriangle } from "lucide-react";
+import { cn, extractSubjects } from "@/features/schedule-helper/lib/utils";
 
 export default function BlockTab() {
-  const { data, sharedBlockSettings, addSharedBlock, removeSharedBlock } = useSchedule();
+  const { data, sharedBlockSettings, addSharedBlock, removeSharedBlock, refetch } = useSchedule();
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTeacher, setSelectedTeacher] = useState<string | null>(null);
   const [tempDays, setTempDays] = useState<Record<string, Set<number>>>({});
+  const [newSubject, setNewSubject] = useState("");
+  const [subjectError, setSubjectError] = useState<string | null>(null);
+  const [teacherQuery, setTeacherQuery] = useState("");
 
   if (!data) return null;
 
   const filteredTeachers = data.teachers.filter(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const allSubjects = extractSubjects(data.tableData);
+  const availableSubjects = allSubjects.filter((s) => !data.blockedSubjects.includes(s));
+  const matchingSubjects = availableSubjects.filter((s) => s.toLowerCase().includes(newSubject.trim().toLowerCase()));
+  const isExactRealSubject = allSubjects.includes(newSubject.trim());
+
+  const matchingBlockableTeachers = data.teachers.filter(
+    (t) => !data.blockedTeachers.includes(t) && t.toLowerCase().includes(teacherQuery.trim().toLowerCase())
+  );
+
+  const handleAddSubject = async (subjectArg?: string) => {
+    const subject = (subjectArg ?? newSubject).trim();
+    if (!subject) return;
+    setSubjectError(null);
+    const res = await fetch("/api/schedule-helper/blocked-subjects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setSubjectError(body.error ?? "추가에 실패했습니다.");
+      return;
+    }
+    setNewSubject("");
+    await refetch();
+  };
+
+  const handleRemoveSubject = async (subject: string) => {
+    await fetch("/api/schedule-helper/blocked-subjects", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject }),
+    });
+    await refetch();
+  };
+
+  const handleAddBlockedTeacher = async (teacher: string) => {
+    await fetch("/api/schedule-helper/blocked-teachers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teacher }),
+    });
+    setTeacherQuery("");
+    await refetch();
+  };
+
+  const handleRemoveBlockedTeacher = async (teacher: string) => {
+    await fetch("/api/schedule-helper/blocked-teachers", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teacher }),
+    });
+    await refetch();
+  };
 
   const handleTeacherSelect = (teacher: string) => {
     setSelectedTeacher(teacher);
@@ -77,6 +138,153 @@ export default function BlockTab() {
   const totalBlockedTeachers = new Set([...sharedBlockEntries.map(e => e[0]), ...defaultBlockEntries.map(e => e[0])]).size;
 
   return (
+    <div className="space-y-6">
+
+      {/* 0. 과목별 교체 금지 + 0-1. 교사별 교체 금지 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+        <h2 className="text-lg font-bold text-teal-700 mb-1 flex items-center gap-2">
+          <Ban className="w-5 h-5" /> 과목별 교체 금지
+        </h2>
+        <p className="text-sm text-slate-500 mb-4">
+          여기 등록된 과목은 어떤 선생님이 가르치든 시간을 바꿀 수 없습니다(대강은 가능).
+        </p>
+
+        <div className="flex flex-wrap gap-2 mb-4">
+          {data.blockedSubjects.length === 0 ? (
+            <span className="text-sm text-slate-400">등록된 과목이 없습니다.</span>
+          ) : (
+            data.blockedSubjects.map((subject) => (
+              <span
+                key={subject}
+                className="inline-flex items-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-700 px-3 py-1.5 rounded-xl text-sm font-bold"
+              >
+                {subject}
+                {isAdmin && (
+                  <button onClick={() => handleRemoveSubject(subject)} className="hover:bg-rose-100 rounded-full transition-colors" title="삭제">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </span>
+            ))
+          )}
+        </div>
+
+        {isAdmin && (
+          <div>
+            {allSubjects.length === 0 ? (
+              <p className="text-sm text-slate-400">먼저 시간표를 업로드해야 과목을 검색할 수 있습니다.</p>
+            ) : (
+              <>
+                <div className="relative mb-2">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={newSubject}
+                    onChange={(e) => setNewSubject(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleAddSubject()}
+                    placeholder="시간표에 있는 과목명을 검색하세요..."
+                    className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all"
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-100">
+                  {matchingSubjects.length === 0 ? (
+                    <div className="p-3 text-sm text-slate-400">일치하는 과목이 없습니다.</div>
+                  ) : (
+                    matchingSubjects.map((subject) => (
+                      <button
+                        key={subject}
+                        onClick={() => handleAddSubject(subject)}
+                        className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-teal-50 hover:text-teal-800 transition-colors"
+                      >
+                        {subject}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+
+            {newSubject.trim() && !isExactRealSubject && (
+              <div className="mt-2 flex items-center gap-2">
+                <p className="text-xs text-amber-600 flex items-center gap-1 flex-1">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> 시간표에 없는 과목명입니다. 그래도 직접 추가할 수 있습니다.
+                </p>
+                <button
+                  onClick={() => handleAddSubject()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white text-xs font-semibold rounded-lg transition-colors shrink-0"
+                >
+                  <PlusCircle className="w-3.5 h-3.5" /> 직접 추가
+                </button>
+              </div>
+            )}
+            {subjectError && <p className="text-xs text-rose-600 mt-2">{subjectError}</p>}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+        <h2 className="text-lg font-bold text-teal-700 mb-1 flex items-center gap-2">
+          <UserX className="w-5 h-5" /> 교사별 교체 금지
+        </h2>
+        <p className="text-sm text-slate-500 mb-4">
+          여기 등록된 교사는 어떤 수업이든 교체와 대강 모두에서 완전히 제외됩니다.
+        </p>
+
+        <div className="flex flex-wrap gap-2 mb-4">
+          {data.blockedTeachers.length === 0 ? (
+            <span className="text-sm text-slate-400">등록된 교사가 없습니다.</span>
+          ) : (
+            data.blockedTeachers.map((teacher) => (
+              <span
+                key={teacher}
+                className="inline-flex items-center gap-1.5 bg-rose-50 border border-rose-200 text-rose-700 px-3 py-1.5 rounded-xl text-sm font-bold"
+              >
+                {teacher} 선생님
+                {isAdmin && (
+                  <button onClick={() => handleRemoveBlockedTeacher(teacher)} className="hover:bg-rose-100 rounded-full transition-colors" title="삭제">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </span>
+            ))
+          )}
+        </div>
+
+        {isAdmin && (
+          <div>
+            <div className="relative mb-2">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={teacherQuery}
+                onChange={(e) => setTeacherQuery(e.target.value)}
+                placeholder="교사 이름을 검색하세요..."
+                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all"
+              />
+            </div>
+            <div className="max-h-48 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-100">
+              {matchingBlockableTeachers.length === 0 ? (
+                <div className="p-3 text-sm text-slate-400">일치하는 교사가 없습니다.</div>
+              ) : (
+                matchingBlockableTeachers.map((teacher) => (
+                  <button
+                    key={teacher}
+                    onClick={() => handleAddBlockedTeacher(teacher)}
+                    className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-teal-50 hover:text-teal-800 transition-colors"
+                  >
+                    {teacher} 선생님
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      </div>
+
     <div className="flex flex-col lg:flex-row gap-6 items-stretch">
 
       {/* 1. 교사 선택 */}
@@ -308,6 +516,7 @@ export default function BlockTab() {
         )}
       </div>
 
+    </div>
     </div>
   );
 }

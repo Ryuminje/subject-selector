@@ -24,12 +24,12 @@ interface ChainResult {
 }
 
 export default function SwapTab() {
-  const { data, isBlocked } = useSchedule();
+  const { data, isBlocked, isSubjectBlocked, isTeacherBlocked } = useSchedule();
   const { data: session } = useSession();
   const [selectedCell, setSelectedCell] = useState<{ teacher: string; day: string; period: number } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [results, setResults] = useState<{ swap: SearchResult[]; sub: SearchResult[]; chain: ChainResult[] }>({ swap: [], sub: [], chain: [] });
-  const [checkedChainIdx, setCheckedChainIdx] = useState<Set<number>>(new Set());
+  const [selectedChainIdx, setSelectedChainIdx] = useState<number | null>(null);
   const theadRef = useRef<HTMLTableSectionElement>(null);
   const [stickyTop, setStickyTop] = useState(0);
 
@@ -50,7 +50,13 @@ export default function SwapTab() {
     if (!classStr) return;
 
     setSelectedCell({ teacher, day, period });
-    setCheckedChainIdx(new Set());
+    setSelectedChainIdx(null);
+
+    if (isTeacherBlocked(teacher)) {
+      setResults({ swap: [], sub: [], chain: [] });
+      setModalOpen(true);
+      return;
+    }
 
     const myInfo = parseClassInfo(classStr);
     if (!myInfo || myInfo.grade === "?" || myInfo.classNum === "?") {
@@ -62,30 +68,36 @@ export default function SwapTab() {
     const swapResults: SearchResult[] = [];
     const subResults: SearchResult[] = [];
     const myDept = data.teacherDepts[teacher];
+    // 과목 자체가 교체 금지 목록에 있으면 시간을 옮기는 교체(1단계/2단계)는 아예 검색하지 않습니다.
+    // 동과 대강은 시간 이동이 없으므로(사람만 바뀜) 과목 금지와 무관하게 정상 동작해야 합니다.
+    const subjectBlocked = isSubjectBlocked(myInfo.subject);
 
     data.tableData.forEach((otherRow) => {
       if (otherRow.teacher === teacher) return;
+      if (isTeacherBlocked(otherRow.teacher)) return;
 
       // Swap Logic
-      data.days.forEach((dayName) => {
-        data.periods.forEach((perNum) => {
-          if (isBlocked(otherRow.teacher, dayName, perNum)) return;
-          const otherStr = otherRow[dayName + perNum];
-          if (otherStr) {
-            const oInfo = parseClassInfo(otherStr);
-            if (oInfo && oInfo.grade === myInfo.grade && oInfo.classNum === myInfo.classNum) {
-              if (!otherRow[day + period] && !row[dayName + perNum]) {
-                swapResults.push({
-                  teacher: otherRow.teacher,
-                  day: dayName,
-                  period: perNum,
-                  subject: oInfo.subject,
-                });
+      if (!subjectBlocked) {
+        data.days.forEach((dayName) => {
+          data.periods.forEach((perNum) => {
+            if (isBlocked(otherRow.teacher, dayName, perNum)) return;
+            const otherStr = otherRow[dayName + perNum];
+            if (otherStr) {
+              const oInfo = parseClassInfo(otherStr);
+              if (oInfo && oInfo.grade === myInfo.grade && oInfo.classNum === myInfo.classNum && !isSubjectBlocked(oInfo.subject)) {
+                if (!otherRow[day + period] && !row[dayName + perNum]) {
+                  swapResults.push({
+                    teacher: otherRow.teacher,
+                    day: dayName,
+                    period: perNum,
+                    subject: oInfo.subject,
+                  });
+                }
               }
             }
-          }
+          });
         });
-      });
+      }
 
       // Sub Logic
       if (myInfo.isMovingClass && myDept) {
@@ -101,9 +113,10 @@ export default function SwapTab() {
     // B가 지금 이 시간(day,period)에 이미 다른 수업(w)이 있어서 막히는 경우 —
     // w와 같은 반을 가르치는 C를 찾아 B↔C를 먼저 교체하면 B가 이 시간에 비게 되어 나↔B 교체가 가능해집니다.
     const chainResults: ChainResult[] = [];
-    if (swapResults.length === 0) {
+    if (swapResults.length === 0 && !subjectBlocked) {
       outer: for (const bRow of data.tableData) {
         if (bRow.teacher === teacher) continue;
+        if (isTeacherBlocked(bRow.teacher)) continue;
         for (const dayB of data.days) {
           for (const perB of data.periods) {
             if (isBlocked(bRow.teacher, dayB, perB)) continue;
@@ -111,6 +124,7 @@ export default function SwapTab() {
             if (!bStr) continue;
             const bInfo = parseClassInfo(bStr);
             if (!bInfo || bInfo.grade !== myInfo.grade || bInfo.classNum !== myInfo.classNum) continue;
+            if (isSubjectBlocked(bInfo.subject)) continue;
             if (row[dayB + perB]) continue; // 내가 그 시간에 비어있어야 함
             if (isBlocked(bRow.teacher, day, period)) continue;
 
@@ -118,9 +132,11 @@ export default function SwapTab() {
             if (!wStr) continue; // B가 이미 이 시간에 비어있으면 1단계로 해결됨 (여기 올 일 없음)
             const wInfo = parseClassInfo(wStr);
             if (!wInfo || wInfo.grade === "?" || wInfo.classNum === "?") continue;
+            if (isSubjectBlocked(wInfo.subject)) continue;
 
             for (const cRow of data.tableData) {
               if (cRow.teacher === teacher || cRow.teacher === bRow.teacher) continue;
+              if (isTeacherBlocked(cRow.teacher)) continue;
               for (const dayC of data.days) {
                 for (const perC of data.periods) {
                   if (isBlocked(cRow.teacher, dayC, perC)) continue;
@@ -128,6 +144,7 @@ export default function SwapTab() {
                   if (!cStr) continue;
                   const cInfo = parseClassInfo(cStr);
                   if (!cInfo || cInfo.grade !== wInfo.grade || cInfo.classNum !== wInfo.classNum) continue;
+                  if (isSubjectBlocked(cInfo.subject)) continue;
                   if (bRow[dayC + perC]) continue; // B가 그 시간에 비어있어야 함
                   if (cRow[day + period]) continue; // C가 이 시간에 비어있어야 함
                   if (isBlocked(cRow.teacher, day, period)) continue;
@@ -150,13 +167,8 @@ export default function SwapTab() {
     setModalOpen(true);
   };
 
-  const toggleChain = (idx: number) => {
-    setCheckedChainIdx((prev) => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
-      return next;
-    });
+  const selectChain = (idx: number) => {
+    setSelectedChainIdx((prev) => (prev === idx ? null : idx));
   };
 
   const selectedClassStr = selectedCell ? data.tableData.find((r) => r.teacher === selectedCell.teacher)?.[selectedCell.day + selectedCell.period] : null;
@@ -191,19 +203,14 @@ export default function SwapTab() {
             results.swap.some(r => r.teacher === row.teacher && r.day === d && r.period === p) ||
             results.sub.some(r => r.teacher === row.teacher && r.day === d && r.period === p)
           );
+          const selectedChain = selectedChainIdx !== null ? results.chain[selectedChainIdx] : undefined;
           // 1단계(B↔C 교체): B의 지금 시간(w) ↔ C의 원래 시간
-          const isChainStep1 = [...checkedChainIdx].some((idx) => {
-            const ch = results.chain[idx];
-            return ch && selectedCell && (
-              (row.teacher === ch.b.teacher && d === selectedCell.day && p === selectedCell.period) ||
-              (row.teacher === ch.c.teacher && d === ch.c.day && p === ch.c.period)
-            );
-          });
+          const isChainStep1 = !!selectedChain && !!selectedCell && (
+            (row.teacher === selectedChain.b.teacher && d === selectedCell.day && p === selectedCell.period) ||
+            (row.teacher === selectedChain.c.teacher && d === selectedChain.c.day && p === selectedChain.c.period)
+          );
           // 2단계(나↔B 교체): B의 원래 시간으로 내가 이동
-          const isChainStep2 = [...checkedChainIdx].some((idx) => {
-            const ch = results.chain[idx];
-            return ch && row.teacher === ch.b.teacher && d === ch.b.day && p === ch.b.period;
-          });
+          const isChainStep2 = !!selectedChain && row.teacher === selectedChain.b.teacher && d === selectedChain.b.day && p === selectedChain.b.period;
 
           return (
             <td
@@ -239,7 +246,8 @@ export default function SwapTab() {
   );
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="flex flex-col lg:flex-row gap-4 items-start">
+    <div className="flex-1 min-w-0 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="overflow-auto max-h-[75vh] relative">
         <table className="w-full border-collapse text-sm table-fixed">
           <thead ref={theadRef} className="bg-teal-600 text-white sticky top-0 z-20 shadow-md">
@@ -275,15 +283,16 @@ export default function SwapTab() {
           </tbody>
         </table>
       </div>
+    </div>
 
-      {/* Floating Panel */}
+      {/* Docked Panel */}
       {modalOpen && (
-        <div className="fixed top-24 right-4 md:right-8 z-50 w-[320px] md:w-[400px] bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] border border-teal-200 overflow-hidden animate-in slide-in-from-right-8 duration-300">
+        <div className="w-full lg:w-[380px] shrink-0 lg:sticky lg:top-24 bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] border border-teal-200 overflow-hidden animate-in fade-in duration-200">
           <div className="bg-teal-600 p-3 md:p-4 flex justify-between items-center text-white">
             <h2 className="text-base md:text-lg font-bold flex items-center gap-2">
               <Search className="w-4 h-4 md:w-5 md:h-5" /> 수업 매칭 결과
             </h2>
-            <button onClick={() => { setModalOpen(false); setSelectedCell(null); setCheckedChainIdx(new Set()); }} className="hover:bg-teal-500 p-1 rounded-full transition-colors">
+            <button onClick={() => { setModalOpen(false); setSelectedCell(null); setSelectedChainIdx(null); }} className="hover:bg-teal-500 p-1 rounded-full transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -300,7 +309,11 @@ export default function SwapTab() {
                 </div>
               </div>
 
-              {(!myInfo || myInfo.grade === "?" || myInfo.classNum === "?") ? (
+              {selectedCell && isTeacherBlocked(selectedCell.teacher) ? (
+                <div className="text-center p-8 text-rose-600 font-bold bg-rose-50 rounded-xl">
+                  이 교사는 관리자가 지정한 교체 금지 교사입니다. (교체·대강 모두 불가)
+                </div>
+              ) : (!myInfo || myInfo.grade === "?" || myInfo.classNum === "?") ? (
                 <div className="text-center p-6 text-rose-500 font-bold bg-rose-50 rounded-xl">
                   학반을 특정할 수 없는 수업입니다.
                 </div>
@@ -341,7 +354,11 @@ export default function SwapTab() {
                     </h3>
                   )}
 
-                  {results.swap.length === 0 ? (
+                  {isSubjectBlocked(myInfo.subject) ? (
+                    <div className="text-center p-8 text-rose-600 font-bold bg-rose-50 rounded-xl">
+                      &apos;{myInfo.subject}&apos; 과목은 교체가 금지되어 있습니다.
+                    </div>
+                  ) : results.swap.length === 0 ? (
                     <div className="text-center p-8 text-slate-400 bg-slate-50 rounded-xl">
                       교체 가능한 대상이 없습니다.
                     </div>
@@ -372,28 +389,21 @@ export default function SwapTab() {
                       </p>
                       <div className="space-y-2">
                         {results.chain.map((ch, i) => (
-                          <label
+                          <div
                             key={i}
+                            onClick={() => selectChain(i)}
                             className={cn(
-                              "flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition-colors",
-                              checkedChainIdx.has(i) ? "border-slate-300 bg-slate-50" : "border-slate-100 hover:bg-slate-50"
+                              "p-3 border rounded-xl cursor-pointer transition-colors text-xs text-slate-700 space-y-1",
+                              selectedChainIdx === i ? "border-purple-400 bg-purple-50 ring-1 ring-purple-400" : "border-slate-100 hover:bg-slate-50"
                             )}
                           >
-                            <input
-                              type="checkbox"
-                              checked={checkedChainIdx.has(i)}
-                              onChange={() => toggleChain(i)}
-                              className="mt-1 w-4 h-4 accent-orange-600 shrink-0"
-                            />
-                            <div className="text-xs text-slate-700 space-y-1">
-                              <div><b className="text-orange-600">1단계</b> {ch.b.teacher} ↔ {ch.c.teacher} 교체 — {ch.c.day}요일 {ch.c.period}교시 {ch.c.subject} ↔ (지금시간) {ch.w.subject}</div>
-                              <div><b className="text-purple-700">2단계</b> 나 ↔ {ch.b.teacher} 교체 — {ch.b.day}요일 {ch.b.period}교시 {ch.b.subject}</div>
-                            </div>
-                          </label>
+                            <div><b className="text-orange-600">1단계</b> {ch.b.teacher} ↔ {ch.c.teacher} 교체 — {ch.c.day}요일 {ch.c.period}교시 {ch.c.subject} ↔ (지금시간) {ch.w.subject}</div>
+                            <div><b className="text-purple-700">2단계</b> 나 ↔ {ch.b.teacher} 교체 — {ch.b.day}요일 {ch.b.period}교시 {ch.b.subject}</div>
+                          </div>
                         ))}
                       </div>
 
-                      {checkedChainIdx.size > 0 && (
+                      {selectedChainIdx !== null && (
                         <div className="mt-3 flex items-center gap-4 text-xs font-semibold text-slate-500">
                           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-orange-400 inline-block" /> 1단계 이동</span>
                           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-purple-400 inline-block" /> 2단계 이동</span>
