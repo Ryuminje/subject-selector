@@ -68,8 +68,9 @@
 
 ### 스택 선택
 
-- **DB: Prisma + SQLite** (`@prisma/adapter-better-sqlite3` 드라이버 어댑터 사용). Postgres 같은 별도 컨테이너 없이 파일 하나(`dev.db`, 프로덕션은 `DATABASE_URL`이 가리키는 경로)로 끝나서 기존 NAS/Docker 배포 방식과 잘 맞습니다.
-  - **Prisma 7 문법 주의:** 이 버전은 `generator client { provider = "prisma-client" }` (구버전 `prisma-client-js` 아님)를 쓰고, 생성된 클라이언트를 `src/generated/prisma`에 출력합니다(스키마 파일의 `output` 참고, `.gitignore`에 이미 등록됨). **드라이버 어댑터가 필수**라 `new PrismaClient()`를 인자 없이 호출하면 타입 에러가 납니다 — 반드시 `new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: process.env.DATABASE_URL }) })` 형태로 써야 합니다(`src/lib/prisma.ts` 참고).
+- **DB: Prisma + PostgreSQL** (`@prisma/adapter-pg` 드라이버 어댑터 사용). **처음엔 SQLite(`@prisma/adapter-better-sqlite3`)로 만들었다가 2026-07-21에 Postgres로 다시 바꿨습니다** — 앱을 Vercel(서버리스)에 올리려는데 SQLite는 파일 기반이라 서버리스 환경(읽기 전용 파일시스템, 요청마다 다른 인스턴스일 수 있음)에서 영속성이 없어 근본적으로 안 맞았기 때문입니다. Postgres 서버 자체는 **NAS에 Docker로 띄워두고**(`~/docker/subject-selector-db/docker-compose.yml`, `postgres:16-alpine`), 라우터에서 TCP 포트(NAS 내부 `55432`)를 포워딩해서 Vercel에서도 접근하게 했습니다. 즉 "앱은 Vercel, DB는 자기 NAS" 하이브리드 구조입니다. 자세한 내용은 아래 "🌐 배포 아키텍처" 섹션 참고.
+  - **Prisma 7 문법 주의:** 이 버전은 `generator client { provider = "prisma-client" }` (구버전 `prisma-client-js` 아님)를 쓰고, 생성된 클라이언트를 `src/generated/prisma`에 출력합니다(스키마 파일의 `output` 참고, `.gitignore`에 이미 등록됨). **드라이버 어댑터가 필수**라 `new PrismaClient()`를 인자 없이 호출하면 타입 에러가 납니다 — 반드시 `new PrismaClient({ adapter: new PrismaPg(process.env.DATABASE_URL) })` 형태로 써야 합니다(`src/lib/prisma.ts` 참고). SQLite였을 때는 `new PrismaBetterSqlite3({ url })`이었는데 어댑터 생성자 시그니처가 provider마다 다르니 다른 DB로 또 바꿀 일이 있으면 해당 adapter 패키지의 타입 정의부터 확인하세요.
+  - **`src/generated/prisma`는 `.gitignore`되어 있어 저장소에 커밋되지 않습니다.** Vercel/NAS 어디서든 빌드 시 `npx prisma generate`가 먼저 실행되어야 하는데, `package.json`의 `"postinstall": "prisma generate"`가 이를 자동으로 처리합니다 — **이 스크립트를 지우면 배포가 `Module not found: Can't resolve '@/generated/prisma/client'`로 즉시 깨집니다.** (2026-07-21, Vercel 첫 배포 실패 원인이 정확히 이거였습니다.)
   - 스키마/마이그레이션 CLI는 `.env`가 아니라 `prisma.config.ts`(및 그 안에서 로드하는 `.env`)를 봅니다. `npx prisma migrate dev`, `npx prisma generate`로 스키마를 바꿀 때마다 클라이언트를 재생성해야 합니다.
 - **인증: better-auth** (NextAuth/Auth.js 아님). 처음엔 NextAuth v5를 쓰려 했지만, 이 시점 기준 NextAuth v5가 여전히 beta(5.0.0-beta.31)에 머물러 있고 better-auth는 안정 버전(1.6.x)까지 나와 있어 전환했습니다. `npx auth ...` CLI 명령은 better-auth의 CLI입니다(패키지명이 `auth`라 헷갈리기 쉬움 — NextAuth의 것이 아닙니다).
   - `src/lib/auth.ts` — `betterAuth()` 설정. `prismaAdapter(prisma, { provider: "sqlite" })`, `emailAndPassword: { enabled: true }`, 그리고 `user.additionalFields`로 `role`("ADMIN"|"TEACHER" 문자열 — better-auth의 additionalFields는 Prisma enum을 지원하지 않아 일반 string으로 관리)/`schoolId`/`teacherId`를 계정에 붙였습니다. `plugins: [nextCookies()]`가 **반드시 마지막 플러그인**이어야 하며, 이게 있어야 `auth.api.*` 호출 시 Next.js Route Handler/Proxy 안에서 세션 쿠키가 자동으로 설정됩니다.
@@ -86,7 +87,7 @@
 
 - `src/app/apps/schedule-helper/(app)/` — **route group**. `layout.tsx`(폰트 + `<ScheduleProvider>`)와 기존 `page.tsx`, `teachers/page.tsx`가 여기 있습니다. `(app)`는 URL에 나타나지 않으므로 여전히 `/apps/schedule-helper`, `/apps/schedule-helper/teachers`로 접근합니다.
 - `src/app/apps/schedule-helper/login/page.tsx`, `signup/page.tsx` — **`(app)` 밖에** 있습니다. 로그인 전 페이지에서 `ScheduleProvider`가 불필요한 `/api/schedule` 요청을 쏘지 않게 하려는 의도적인 분리입니다.
-- **`src/proxy.ts`** (Next.js 16부터 `middleware.ts`가 `proxy.ts`로 이름이 바뀌었고 **기본적으로 Node.js 런타임에서 실행**됩니다 — 이 프로젝트처럼 better-sqlite3 같은 네이티브 모듈을 인증 체크에서 써야 하는 경우 핵심적인 변화입니다. Edge 런타임이었다면 애초에 동작하지 않았을 것). `/apps/schedule-helper/:path*`를 매칭해서 `login`/`signup` 경로를 제외한 나머지에 세션이 없으면 로그인 페이지로 리다이렉트합니다. 허브·`enrollment-helper`는 이 matcher에 안 걸리므로 영향 없습니다.
+- **`src/proxy.ts`** (Next.js 16부터 `middleware.ts`가 `proxy.ts`로 이름이 바뀌었고 **기본적으로 Node.js 런타임에서 실행**됩니다 — SQLite였을 때는 better-sqlite3 네이티브 모듈 때문에 Edge 런타임이었다면 애초에 동작하지 않았을 결정적인 이유였고, Postgres로 바꾼 지금도(`pg`는 순수 JS라 Edge에서도 돌아갈 수 있음) Prisma 클라이언트 자체가 Node API에 기대는 부분이 있어 Node 런타임을 유지하는 게 안전합니다). `/apps/schedule-helper/:path*`를 매칭해서 `login`/`signup` 경로를 제외한 나머지에 세션이 없으면 로그인 페이지로 리다이렉트합니다. 허브·`enrollment-helper`는 이 matcher에 안 걸리므로 영향 없습니다.
 - 가입 흐름: "학교 만들기"(`POST /api/schedule-helper/schools` — School 생성 + joinCode 발급 + admin 계정 생성, 이메일 중복 등으로 계정 생성이 실패하면 방금 만든 School을 롤백 삭제) / "코드로 가입"(`POST /api/schedule-helper/join` — joinCode로 School을 찾아 TEACHER 계정 생성). 둘 다 `src/app/apps/schedule-helper/signup/page.tsx`의 탭 토글 UI에서 호출합니다.
 
 ### 데이터 흐름 요약
@@ -105,9 +106,45 @@
 
 ### 배포 시 주의
 
-- `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` 세 환경변수가 반드시 필요합니다(`.env.example` 참고). `BETTER_AUTH_SECRET`은 `npx auth secret`으로 생성.
-- SQLite 파일(`DATABASE_URL`이 가리키는 경로)이 Docker 볼륨에 영속되도록 마운트해야 합니다 — 컨테이너 재시작마다 계정/학교 데이터가 날아가면 안 됩니다.
-- 배포 파이프라인에 `npx prisma migrate deploy`(dev 전용인 `migrate dev` 아님)를 빌드/배포 스텝에 추가해야 마이그레이션이 실제 서버에도 적용됩니다. 아직 CI/배포 스크립트에 반영 안 되어 있으니, 실제 배포 전에 반드시 추가하세요.
+- `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` 세 환경변수가 반드시 필요합니다(`.env.example` 참고). `BETTER_AUTH_SECRET`은 `npx auth secret`으로 생성. **로컬 개발용과 배포(Vercel/NAS)용 값은 반드시 분리**하세요 — 로컬 `.env`를 그대로 배포 환경에 재사용하지 마세요.
+- 배포 파이프라인에 `npx prisma migrate deploy`(dev 전용인 `migrate dev` 아님)를 빌드/배포 스텝에 추가해야 마이그레이션이 실제 서버에도 적용됩니다. NAS Docker 배포는 `Dockerfile`의 `CMD`에서 자동으로 실행하지만, Vercel은 아직 반영 안 되어 있으니 스키마를 바꿀 때마다 NAS Postgres에 직접 `npx prisma migrate deploy`(또는 로컬에서 `migrate dev`, 어차피 DATABASE_URL이 NAS를 가리키므로 결과는 같음)를 실행해야 합니다.
+- **`package.json`의 `postinstall: "prisma generate"`를 절대 지우지 마세요** — `src/generated/prisma`가 `.gitignore`되어 있어서, 이게 없으면 어떤 배포 환경에서든 첫 빌드부터 `Module not found` 에러로 깨집니다.
+- 실제 배포 아키텍처(앱은 어디, DB는 어디, 왜 이렇게 나눴는지)는 바로 아래 "🌐 배포 아키텍처" 섹션을 보세요.
+
+---
+
+## 🌐 배포 아키텍처 — 2026-07-21 확정
+
+**앱(Next.js)은 Vercel, DB(Postgres)는 자기 소유 NAS.** 앱을 매번 NAS에 수동 배포(`deploy.sh`)하는 대신 GitHub `main` 푸시 시 Vercel이 자동 빌드/배포하도록 하고, 그 대신 이미 갖고 있는 NAS 저장공간(7TB+)을 DB 호스팅에 씁니다. Turso/Neon 같은 유료/제3자 DB 서비스를 새로 계약하지 않아도 되는 게 장점입니다.
+
+### Vercel (앱)
+
+- 프로젝트: `minje88/subject-selector` (Vercel 계정 `fbalswp-1880`, 팀 `minje88`). GitHub `Ryuminje/subject-selector`의 `main` 브랜치와 연결되어 있어 푸시할 때마다 자동 재배포됩니다.
+- **실제 프로덕션 URL은 `https://subject-selector.vercel.app`** (짧은 alias). `npx vercel ls` / `npx vercel project ls`가 보여주는 `https://subject-selector-*-minje88.vercel.app` 형태의 URL은 **배포 하나하나에 대한 고유 URL**이고 Vercel의 Deployment Protection이 걸려 있어 브라우저로 열면 Vercel 로그인 화면으로 리다이렉트됩니다 — 이건 배포 실패가 아니라 정상 동작이니, 실제 서비스 상태를 확인할 땐 항상 짧은 alias(`subject-selector.vercel.app`)로 열어보세요. `BETTER_AUTH_URL` 등 앱이 자기 자신을 가리켜야 하는 환경변수도 반드시 이 alias를 써야 합니다.
+- 로컬에서 이 프로젝트를 다루려면 `npx vercel link --project subject-selector --yes`로 연결(이미 연결되어 있으면 스킵됨, `.vercel/` 생김 — gitignore됨). CLI는 첫 실행 시 디바이스 인증 플로우로 로그인을 요구합니다.
+- 환경변수는 `echo -n "값" | npx vercel env add KEY production` 형태로 추가합니다(대화형 프롬프트라 값을 stdin으로 흘려보내야 함). `npx vercel env ls`로 확인.
+- 배포 로그/상태 확인: `npx vercel ls`(최근 배포 목록과 상태), `npx vercel inspect <deployment-url> --logs`(특정 배포의 빌드 로그 전체).
+- **첫 Vercel 배포가 실패했던 이유**: `src/generated/prisma`가 gitignore되어 있는데 `postinstall` 스크립트가 없어서 빌드 시 Prisma client가 아예 생성되지 않았음 — 위 "postinstall" 관련 경고 참고.
+
+### NAS (DB만)
+
+- Postgres는 `~/docker/subject-selector-db/docker-compose.yml`(`postgres:16-alpine`)로 별도 컨테이너로 띄워져 있습니다. **NAS 전체 앱(`~/docker/my-webapp/`, `Dockerfile`/`docker-compose.yml`/`deploy.sh`)은 2026-07-21부로 잠정 중단 상태** — 코드는 남아있지만 실제로 그 경로에 최신 앱을 배포해서 쓰고 있진 않습니다. 나중에 다시 쓰게 되면 NAS 앱과 NAS DB가 같은 머신에 있으니 `DATABASE_URL`을 `postgresql://...@192.168.0.21:55432/...`처럼 로컬 LAN IP로 바로 잡으면 되고, 외부 도메인/포트포워딩은 필요 없습니다.
+- **포트 포워딩**: 라우터에서 외부 TCP `55432` → `192.168.0.21:55432`. 도메인은 DuckDNS(`fbalswp.duckdns.org`)를 씁니다. Vercel의 `DATABASE_URL`은 이 외부 주소(`fbalswp.duckdns.org:55432`)를 가리키고, **로컬 개발 환경의 `DATABASE_URL`은 같은 LAN이므로 포트포워딩을 거치지 않고 `192.168.0.21:55432`로 직접 접속**합니다 — 두 값이 다른 게 정상입니다.
+- DB 비밀번호는 `openssl rand -hex 20`으로 생성했고, NAS의 `docker-compose.yml`(POSTGRES_PASSWORD)과 로컬 `.env`, Vercel의 `DATABASE_URL` 세 곳에 각각 반영되어 있어야 동기화가 맞습니다. 바꿀 일이 있으면 이 세 곳을 다 갱신하세요.
+- 데이터 영속화: `~/docker/subject-selector-db/data`가 Postgres의 실제 데이터 디렉토리(볼륨 마운트) — 컨테이너를 지우고 다시 만들어도 이 폴더만 살아있으면 데이터는 유지됩니다.
+
+### NAS SSH 작업 시 알아둘 것
+
+- `fbalswp` 계정을 NAS의 `docker` 그룹에 넣어뒀습니다(`sudo usermod -aG docker fbalswp`, 이미 완료) — 이제 `sudo` 없이 `docker`/`docker compose` 명령을 바로 쓸 수 있습니다. **`sudo`가 필요한 새 작업이 생기면 비밀번호를 대화형으로 입력해야 해서 자동화가 막힙니다** — 가능하면 `docker` 그룹 권한만으로 되는 방식을 우선 찾아보세요.
+- 이 프로젝트 환경(Windows + Git Bash)에는 **`rsync`가 없습니다** — `deploy.sh`는 rsync 기반이라 Windows에서 직접 실행하면 즉시 실패합니다. 대신 `tar`로 압축해서 `scp`로 옮기는 방식을 씁니다:
+  ```bash
+  tar --exclude=node_modules --exclude=.git --exclude=.next --exclude=src/generated \
+      --exclude=".env*" --exclude=dev.db --exclude=data \
+      -czf /c/path/to/scratchpad/deploy.tar.gz .
+  scp -O deploy.tar.gz fbalswp@192.168.0.21:/home/fbalswp/docker/my-webapp/deploy.tar.gz
+  ssh fbalswp@192.168.0.21 "cd ~/docker/my-webapp && tar -xzf deploy.tar.gz && rm deploy.tar.gz"
+  ```
+  **`scp`에 반드시 `-O` 플래그를 붙이세요** — Windows OpenSSH의 최신 SFTP 기반 scp가 이 NAS의 sshd와 안 맞아 `dest open ... No such file or directory`로 조용히 실패합니다. `-O`는 예전 SCP 프로토콜을 강제해서 문제를 피합니다. tar 압축 시 대상 경로는 반드시 POSIX 스타일(`/c/Users/...`)로 써야 합니다 — Windows 스타일(`C:\Users\...`)을 주면 tar가 콜론(`:`)을 `host:path` 원격 접속 문법으로 오인해서 엉뚱한 에러(`Cannot connect to C`)를 냅니다.
 
 ---
 
@@ -200,6 +237,18 @@
 ---
 
 ## 📅 개발 히스토리 로그 (최신순)
+
+### 2026-07-21 (2)
+**배포 아키텍처를 "앱=Vercel, DB=NAS Postgres"로 재구성:**
+- 멀티테넌트 전환(바로 아래 2026-07-21 항목) 직후 사용자가 GitHub main을 이미 Vercel과 연결해뒀다는 걸 알게 됐고(`https://subject-selector.vercel.app`), 그 배포가 실패 상태로 옛날 빌드만 계속 서빙되고 있는 걸 발견했습니다. 원인은 `src/generated/prisma`가 gitignore되어 있는데 빌드 파이프라인에 `prisma generate`가 없었던 것 — `package.json`에 `postinstall: "prisma generate"`를 추가해 해결했습니다.
+- 이 김에 SQLite가 Vercel 서버리스 환경(읽기 전용 파일시스템, 인스턴스 간 비영속)과 근본적으로 안 맞는다는 점도 확인 → NAS는 그대로 두고(`sudo docker compose up -d --build`가 `sudo` 비밀번호 프롬프트에서 막혀 완주 못함), **NAS를 DB 전용으로만 쓰고 앱은 Vercel에서 서빙**하는 방향으로 전환했습니다.
+- NAS의 `fbalswp` 계정을 `docker` 그룹에 추가해 이후 `sudo` 없이 원격 Docker 작업이 가능하게 만들었습니다.
+- NAS에 Postgres 컨테이너(`postgres:16-alpine`)를 새로 띄우고, Prisma datasource를 `sqlite` → `postgresql`로, 드라이버 어댑터를 `@prisma/adapter-better-sqlite3` → `@prisma/adapter-pg`로 교체(`src/lib/prisma.ts`). `src/lib/auth.ts`의 `prismaAdapter(prisma, { provider: ... })`도 같이 "postgresql"로 맞춰야 했는데 처음에 놓쳤다가 뒤늦게 발견해 수정했습니다 — 다행히 로컬 테스트에서는 provider 불일치 상태로도 기본 CRUD는 우연히 잘 동작해서 눈치채기 어려웠던 부분이라, 이후 DB provider를 바꿀 땐 `auth.ts`도 같이 확인하세요.
+- 기존 sqlite 전용 마이그레이션 SQL은 postgres 문법과 안 맞아 재사용 불가 — `prisma/migrations`를 통째로 지우고 postgres 기준으로 새로 생성했습니다.
+- 라우터에 외부 TCP `55432` → NAS `192.168.0.21:55432` 포트포워딩을 뚫고, `fbalswp.duckdns.org:55432`로 실제 Postgres 프로토콜 연결(인증+쿼리)까지 외부에서 성공하는 것을 확인했습니다. 로컬 개발 환경은 같은 LAN이라 포트포워딩을 거치지 않고 `192.168.0.21:55432`로 직접 접속하도록 `.env`를 구성했고, Vercel 프로덕션 환경변수(`DATABASE_URL`/`BETTER_AUTH_SECRET`/`BETTER_AUTH_URL`)는 `npx vercel env add`로 등록했습니다.
+- Vercel의 실제 프로덕션 URL이 `subject-selector.vercel.app`(짧은 alias)이고, `vercel ls`가 보여주는 `-minje88` 접미사 URL은 Deployment Protection이 걸린 배포별 URL이라는 것도 이번에 파악했습니다 — 자세한 내용은 위 "🌐 배포 아키텍처" 섹션 참고.
+- 부수 정리: 더 이상 안 쓰는 `bcryptjs`/`better-sqlite3`/`@prisma/adapter-better-sqlite3` 의존성을 제거했습니다.
+- Windows Git Bash에 `rsync`가 없어서 `deploy.sh`(NAS 앱 배포용)가 이 환경에서 실행 불가능하다는 것도 확인 — 지금은 NAS 앱 배포 자체를 쓰지 않기로 해서 급하지 않지만, 나중에 다시 필요해지면 `deploy.sh`를 tar+scp 기반으로 바꾸거나 rsync를 설치해야 합니다.
 
 ### 2026-07-21
 **schedule-helper를 멀티테넌트(학교별 계정) 서비스로 전환:**
