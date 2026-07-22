@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "@/lib/auth-client";
 import { ClipboardCheck, Search, Loader2, AlertCircle, CheckCircle2, ListChecks, X } from "lucide-react";
 import { useBulkCheck } from "./useBulkCheck";
+import ExtraRosterSettings from "./ExtraRosterSettings";
 
 interface TrainingTitleOption {
   id: string;
@@ -42,6 +43,8 @@ export default function BulkCheckTab({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="space-y-6">
+      {isAdmin && <ExtraRosterSettings />}
+
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
         <h2 className="text-lg font-bold text-teal-700 mb-4 flex items-center gap-2">
           <ClipboardCheck className="w-5 h-5" /> 미제출자 일괄 확인

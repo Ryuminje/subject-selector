@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveTeacherName } from "@/features/schedule-helper/lib/resolveTeacherName";
+import { getCertificateRoster } from "@/features/schedule-helper/lib/getCertificateRoster";
 
 export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -26,12 +27,8 @@ export async function GET(request: Request) {
     }
   }
 
-  const [teachers, submissions] = await Promise.all([
-    prisma.teacher.findMany({
-      where: { schoolId: session.user.schoolId },
-      select: { name: true },
-      orderBy: { name: "asc" },
-    }),
+  const [allNames, submissions] = await Promise.all([
+    getCertificateRoster(session.user.schoolId),
     prisma.trainingCertificate.findMany({
       where: { schoolId: session.user.schoolId, trainingTitle },
       select: { teacherName: true },
@@ -39,7 +36,6 @@ export async function GET(request: Request) {
   ]);
 
   const submittedNames = new Set(submissions.map((s) => s.teacherName));
-  const allNames = teachers.map((t) => t.name);
   const submitted = allNames.filter((n) => submittedNames.has(n));
   const unsubmitted = allNames.filter((n) => !submittedNames.has(n));
 

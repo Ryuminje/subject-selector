@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getCertificateRoster } from "@/features/schedule-helper/lib/getCertificateRoster";
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -21,17 +22,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "연수 제목을 입력해 주세요." }, { status: 400 });
   }
 
-  const teachers = await prisma.teacher.findMany({
-    where: { schoolId: session.user.schoolId },
-    select: { name: true },
-    orderBy: { name: "asc" },
-  });
+  const roster = await getCertificateRoster(session.user.schoolId);
 
   const created = await prisma.signSession.create({
     data: {
       schoolId: session.user.schoolId,
       trainingTitles: JSON.stringify(titles),
-      rosterSnapshot: JSON.stringify(teachers.map((t) => t.name)),
+      rosterSnapshot: JSON.stringify(roster),
       createdByUserId: session.user.id,
     },
     select: { id: true },
