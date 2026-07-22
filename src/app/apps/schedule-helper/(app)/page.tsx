@@ -82,31 +82,33 @@ export default function ScheduleHelperPage() {
             관리자가 등록한 시간표와 교사 목록 설정이 함께 적용됩니다
           </p>
         </div>
-        {isAdmin && (
-          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-            <Link
-              href="/apps/schedule-helper/teachers"
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold rounded-xl border border-white/30 transition-colors"
-            >
-              <UserCog className="w-4 h-4" />
-              <span className="hidden sm:inline">교사 목록 관리</span>
-            </Link>
-            <button
-              onClick={() => setShowUpload((v) => !v)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold rounded-xl border border-white/30 transition-colors"
-            >
-              <Upload className="w-4 h-4" />
-              <span className="hidden sm:inline">시간표 업로드</span>
-            </button>
-            <button
-              onClick={() => setShowJoinCode((v) => !v)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold rounded-xl border border-white/30 transition-colors"
-            >
-              <KeyRound className="w-4 h-4" />
-              <span className="hidden sm:inline">초대 코드</span>
-            </button>
-          </div>
-        )}
+        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+          {isAdmin && (
+            <>
+              <Link
+                href="/apps/schedule-helper/teachers"
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold rounded-xl border border-white/30 transition-colors"
+              >
+                <UserCog className="w-4 h-4" />
+                <span className="hidden sm:inline">교사 목록 관리</span>
+              </Link>
+              <button
+                onClick={() => setShowUpload((v) => !v)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold rounded-xl border border-white/30 transition-colors"
+              >
+                <Upload className="w-4 h-4" />
+                <span className="hidden sm:inline">시간표 업로드</span>
+              </button>
+              <button
+                onClick={() => setShowJoinCode((v) => !v)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold rounded-xl border border-white/30 transition-colors"
+              >
+                <KeyRound className="w-4 h-4" />
+                <span className="hidden sm:inline">초대 코드</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {isAdmin && showJoinCode && (
