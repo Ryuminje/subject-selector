@@ -38,10 +38,11 @@ model School {
 
   createdAt DateTime @default(now())
 
-  teachers              Teacher[]
-  trainingTitles        TrainingTitle[]
-  trainingCertificates  TrainingCertificate[]
-  signSessions          SignSession[]
+  teachers                Teacher[]
+  trainingTitles          TrainingTitle[]
+  trainingCertificates    TrainingCertificate[]
+  signSessions            SignSession[]
+  certificateRosterExtras CertificateRosterExtra[]
 }
 
 // 시간표에 등장하는 교사 한 명 (로그인 계정 유무와 무관하게 존재 — 업로드 시 이름으로 자동 upsert)
@@ -138,6 +139,21 @@ model SignSessionSignature {
 
   @@unique([sessionId, teacherName])
   @@index([sessionId])
+}
+
+// 연수 이수증 수거 — 시간표(Teacher)에 없는 인원(행정직원 등)을 일괄확인/QR 서명 명단에만 추가로 포함시키기 위한 명단.
+// 시간표 교체 도우미(SwapTab)는 School.scheduleData.teachers를 기준으로 하므로 이 명단은 영향을 주지 않습니다.
+
+model CertificateRosterExtra {
+  id       String @id @default(cuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  name      String
+  addedBy   String // 추가한 관리자 이름 (참고용 — 삭제 권한은 관리자 전원에게 있음)
+  createdAt DateTime @default(now())
+
+  @@unique([schoolId, name])
 }
 
 // 로그인 계정(user/session/account/verification)은 better-auth CLI(`npx auth generate`)가
