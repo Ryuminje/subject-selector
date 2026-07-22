@@ -33,9 +33,15 @@ model School {
   // 교체·대강 모두 완전히 금지된 교사명 목록 (JSON: string[])
   blockedTeachers String @default("[]")
 
+  // 연수 이수증 수거용 Gemini API 키 — 관리자가 등록하면 같은 학교 전원이 사용 (평문 저장, joinCode와 동일한 신뢰 수준)
+  geminiApiKey String?
+
   createdAt DateTime @default(now())
 
-  teachers Teacher[]
+  teachers              Teacher[]
+  trainingTitles        TrainingTitle[]
+  trainingCertificates  TrainingCertificate[]
+  signSessions          SignSession[]
 }
 
 // 시간표에 등장하는 교사 한 명 (로그인 계정 유무와 무관하게 존재 — 업로드 시 이름으로 자동 upsert)
@@ -57,6 +63,81 @@ model Teacher {
   tempBlockDays String @default("{}")
 
   @@unique([schoolId, name])
+}
+
+// 연수 이수증 수거 — 담당 선생님이 등록한 연수 제목. 등록된 연수만 전체 교사가 제출할 수 있고,
+// 제출 현황(일괄확인)은 그 연수를 등록한 담당 선생님과 관리자만 조회할 수 있습니다.
+
+model TrainingTitle {
+  id       String @id @default(cuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  title             String
+  registeredByName  String // 담당 선생님 이름 — 제출 시점과 동일하게 session 기준으로 서버가 채움
+  createdAt         DateTime @default(now())
+
+  @@unique([schoolId, title])
+  @@index([schoolId, registeredByName])
+}
+
+// 연수 이수증 수거 — 제출된 이수증 한 건 (teacherName은 자유 입력이 아니라 제출 시점 session.user 기준으로 서버가 채움)
+
+model TrainingCertificate {
+  id       String @id @default(cuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  teacherName   String
+  trainingTitle String
+  number        String // 이수번호
+  institution   String // 이수기관
+  certDate      String // 이수날짜 (Gemini 추출값, 자유 텍스트로 유지)
+
+  fileName  String
+  mimeType  String
+  fileBytes Bytes // Postgres bytea — 원본 파일 바이트
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId, teacherName])
+  @@index([schoolId, trainingTitle])
+}
+
+// 연수 이수증 수거 — QR 서명 세션 (단일 연수 또는 복수 연수 그룹)
+
+model SignSession {
+  id       String @id @default(cuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  trainingTitles  String // JSON string[] — 단일 1개, 복수연수 2개 이상
+  rosterSnapshot  String // JSON string[] — 세션 생성 시점 Teacher.name 스냅샷
+  locked          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  createdByUserId String   // better-auth User.id (조회용, @relation 없음 — User 모델 손대지 않는 원칙)
+
+  signatures SignSessionSignature[]
+
+  @@index([schoolId, createdAt])
+}
+
+// 연수 이수증 수거 — 세션 내 교사 1명당 서명 1건
+// (복수 연수 세션이어도 서명은 한 번만 — 그 서명이 세션의 모든 연수 제목에 동시 적용됨, 원본 Code.gs의
+// submitSignature가 sheetNameList.forEach로 같은 서명 이미지를 모든 연수 시트에 동시 기록하던 것과 동일한 동작)
+
+model SignSessionSignature {
+  id        String      @id @default(cuid())
+  sessionId String
+  session   SignSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  teacherName  String
+  signaturePng Bytes
+
+  signedAt DateTime @default(now())
+
+  @@unique([sessionId, teacherName])
+  @@index([sessionId])
 }
 
 // 로그인 계정(user/session/account/verification)은 better-auth CLI(`npx auth generate`)가
