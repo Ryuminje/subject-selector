@@ -148,6 +148,20 @@
 
 ---
 
+## 📜 연수 이수증 수거(certificates) 참고 메모 — 2026-07-22 추가
+
+`/apps/schedule-helper/certificates`("연수 이수증 수거")는 사용자가 별도로 운영하던 Google Apps Script 앱("교원 연수 이수증 제출 자동화 시스템", Sheets/Drive/PropertiesService 기반)을 schedule-helper의 서브 메뉴로 이식한 것입니다. Google 의존성은 전부 걷어내고 기존 NAS Postgres로 통합했습니다. 허브 카드(`src/config/hub.ts`)와 `(app)/page.tsx`가 아닌 독립 라우트로 진입하며, `certificates/layout.tsx`는 폰트만 감싸고 `ScheduleProvider`를 쓰지 않습니다(시간표 데이터와 무관한 기능이라 무거운 `/api/schedule` fetch를 피함).
+
+- **4개 기능과 접근 범위**: 제출하기(로그인 전원, 본인 이름은 `resolveTeacherName(session.user)`로 서버가 강제 — 클라이언트가 이름을 자유 입력할 수 없어 스푸핑 불가) / 내역조회(관리자는 전체 검색, 일반 교사는 본인 것만 강제 필터) / 일괄확인(관리자 또는 해당 연수의 등록자만, 아래 `TrainingTitle` 참고) / 서명받기 QR(원본 그대로 **완전 익명** 유지 — 세션 cuid 자체가 유일한 접근 통제라는 트레이드오프를 사용자가 명시적으로 승인함).
+- **`resolveTeacherName(user)`** (`src/features/schedule-helper/lib/resolveTeacherName.ts`) — `user.teacherId`가 있으면 그 `Teacher.name`, 없으면 `user.name` 폴백. 제출/내역조회/일괄확인/연수삭제 전부 이 헬퍼로 신원을 서버에서 재확인하고, 클라이언트가 보낸 이름은 절대 신뢰하지 않습니다.
+- **`TrainingTitle` 레지스트리**: "연수 제목"은 자유 텍스트가 아니라 사전 등록제입니다. 로그인한 아무나 새 연수를 등록할 수 있고(`POST /api/schedule-helper/certificates/training-titles`, `@@unique([schoolId, title])`), 등록된 연수는 전 교사가 제출 가능(`submit`이 등록 여부를 검사, 미등록 연수 제출 시 400)합니다. **일괄확인 조회와 삭제는 관리자 또는 그 연수를 등록한 본인(`registeredByName`)만 가능**(`DELETE /api/schedule-helper/certificates/training-titles/[id]`) — 다른 교사가 등록한 연수의 제출 현황을 남이 못 보게 하려는 의도입니다. `TrainingTitleSelect.tsx`가 원본 앱의 드롭다운 UX(제목 검색 + 미존재시 "새 연수로 등록" 인라인 버튼)를 재현합니다.
+- **파일/서명 저장**: `TrainingCertificate.fileBytes`, `SignSessionSignature.signaturePng` 모두 Prisma `Bytes`(Postgres `bytea`)로 행에 직접 저장, 별도 오브젝트 스토리지 없음. 스트리밍 라우트(`[id]/file`, `signatures/[id]/image`)는 `NextResponse`에 raw `Buffer` 바디 + `Content-Type`/`Content-Disposition: inline` 헤더. **`Cache-Control`은 반드시 `private, no-cache`** — 한 번 `max-age=31536000, immutable`로 뒀다가, 같은 브라우저 탭에서 로그아웃 후 다른 교사로 로그인하면 브라우저 캐시가 이전 교사의 파일을 그대로 서빙하는 실제 위험을 발견해 고쳤습니다. 새로운 bytea 스트리밍 라우트를 추가할 때 이 캐시 헤더를 그대로 복사하세요.
+- **Gemini API 키**: 개발자 env var가 아니라 `School.geminiApiKey`(평문, `joinCode`와 동일한 신뢰 수준)에 학교 관리자가 직접 등록(`gemini-key` GET/PATCH, admin-only). `lib/gemini.ts`의 `analyzeCertificateImage`는 순수 `fetch` 기반 Gemini 2.5 Flash 호출이고, 실패해도 제출 자체를 막지 않고 `extractionFailed: true`로 수동 입력 폴백을 유도합니다.
+- **QR 서명(`SignSession`/`SignSessionSignature`) 익명 라우트**: `sessions/[id]` GET과 `sessions/[id]/sign` POST는 로그인 검사가 **의도적으로 없습니다** — QR/URL을 아는 사람이면 누구나 로스터의 이름으로 서명 가능한, 원본 앱과 동일한 트레이드오프입니다. `src/proxy.ts`의 `PUBLIC_PATHS`에 `/apps/schedule-helper/certificates/sign`이 등록되어 있어야 이 페이지가 로그인 리다이렉트를 안 탑니다 — 나중에 "로그인 요구"로 되돌리는 방향의 수정은 이 설계를 깨는 것이니 하지 마세요. 한 사람의 서명은 세션의 모든 연수 제목에 동시에 적용됩니다(그룹 서명 1회 = 여러 연수 동시 서명 처리, `SignSessionSignature`엔 `trainingTitle` 필드가 없음 — 원래 있었다가 원본 앱의 실제 동작(`Code.gs`의 `submitSignature`가 그룹의 모든 연수 시트에 동일 서명을 씀)을 재확인하고 스키마에서 제거).
+- **스키마**: `School.geminiApiKey`, `TrainingTitle`(`id/schoolId/title/registeredByName/createdAt`), `TrainingCertificate`(`teacherName/trainingTitle/number/institution/certDate/fileName/mimeType/fileBytes`), `SignSession`(`trainingTitles`/`rosterSnapshot`는 JSON string[], `locked`), `SignSessionSignature`(`sessionId+teacherName` unique). 관련 마이그레이션 3개: `add_training_certificates`, `simplify_sign_session_signature`(그룹서명 스키마 교정), `add_training_title_registry`.
+
+---
+
 ## 🛠️ 주요 구현 히스토리 (기능별)
 
 **1단계: 기초 자료 입력 (교육과정 및 위계)**
@@ -237,6 +251,15 @@
 ---
 
 ## 📅 개발 히스토리 로그 (최신순)
+
+### 2026-07-22
+**연수 이수증 수거(certificates) 앱 이식 — Google Apps Script → schedule-helper 서브 메뉴:**
+- 사용자가 별도 운영하던 Google Sheets/Drive 기반 "교원 연수 이수증 제출 자동화 시스템"을 NAS Postgres 기반으로 완전히 새로 이식했습니다. 자세한 아키텍처는 위 "📜 연수 이수증 수거(certificates) 참고 메모" 섹션 참고. 별도 브랜치(`feature/training-certificates`)에서 작업했습니다.
+- **Wave 1**: 제출하기(Gemini 2.5 Flash로 이수번호/기관/날짜 자동추출 → 확인모달 → 저장, 본인 이름 서버 강제)/내역조회(역할별 스코핑)/일괄확인(최초엔 admin-only)/Gemini API 키 학교별 등록 화면.
+- **Wave 2**: QR 서명 수거 — 관리자가 세션(단일/복수 연수) 생성 → QR/URL 공유 → 교사가 **로그인 없이** 명단에서 이름 선택 후 캔버스 서명 → 관리자 화면에서 5초 폴링으로 진행률 확인, 잠금/인쇄. 원본 앱의 "익명 접근 + 세션 id가 유일한 접근통제" 설계를 그대로 유지(사용자 승인).
+  - 개발 중 `SignSessionSignature`가 애초엔 `(session, teacher, trainingTitle)`별로 서명을 따로 받는 걸로 잘못 모델링했다가, 원본 `Code.gs`의 `submitSignature`가 실제로는 그룹 세션의 모든 연수에 동일 서명 1개를 동시에 적용한다는 걸 재확인하고 스키마를 교정(`trainingTitle` 필드 제거, unique를 `[sessionId, teacherName]`으로 축소)했습니다. 빈 테이블이라 마이그레이션 SQL을 직접 작성해 `migrate deploy`로 적용(비대화형 환경이라 `migrate dev`의 destructive-change 확인 프롬프트를 못 받았기 때문).
+- **연수 제목 레지스트리(TrainingTitle)**: 자유 텍스트 제목 입력 방식을, 원본 앱의 드롭다운 UX를 재현한 사전 등록제로 전환 — 누구나 등록 가능, 등록된 연수는 전원 제출 가능, 일괄확인 조회/삭제는 관리자 또는 등록자 본인만 가능. `submit`에도 미등록 연수 제출을 막는 검증을 추가했습니다.
+- 매 기능마다 disposable 테스트 학교(실제 회원가입/초대코드 플로우로 생성)로 종단 검증했고, 403/409/캐시누수 등 부정 경로도 실제로 재현해 확인했습니다. `tsc --noEmit`/`eslint` 신규 파일 범위 클린.
 
 ### 2026-07-21 (8)
 **교사별 교체 금지 기능 추가 + 두 "교체 금지" 카드 좌우 그리드 배치:**

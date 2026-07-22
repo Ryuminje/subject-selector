@@ -1,4 +1,4 @@
-import { ArrowLeftRight, FileText, GraduationCap, HeartHandshake, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, FileText, GraduationCap, HeartHandshake, ScrollText, type LucideIcon } from "lucide-react";
 
 export interface HubApp {
   title: string;
@@ -41,6 +41,12 @@ export const departments: HubDepartment[] = [
         description: "수업 교체 가능한 시간, 협의회 가능 시간을 자동으로 찾아줍니다.",
         href: "/apps/schedule-helper",
         icon: ArrowLeftRight,
+      },
+      {
+        title: "연수 이수증 수거",
+        description: "연수 이수증 제출, 조회, QR 서명 수거를 한 곳에서 관리합니다.",
+        href: "/apps/schedule-helper/certificates",
+        icon: ScrollText,
       },
     ],
   },
