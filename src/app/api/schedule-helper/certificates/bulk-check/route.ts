@@ -16,11 +16,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "확인할 연수 제목을 입력해 주세요." }, { status: 400 });
   }
 
+  const registeredTitle = await prisma.trainingTitle.findUnique({
+    where: { schoolId_title: { schoolId: session.user.schoolId, title: trainingTitle } },
+  });
+
   // 제출 현황은 관리자이거나, 그 연수를 등록한 담당 선생님만 조회 가능
   if (session.user.role !== "ADMIN") {
-    const registeredTitle = await prisma.trainingTitle.findUnique({
-      where: { schoolId_title: { schoolId: session.user.schoolId, title: trainingTitle } },
-    });
     const teacherName = await resolveTeacherName(session.user);
     if (!registeredTitle || registeredTitle.registeredByName !== teacherName) {
       return NextResponse.json({ error: "이 연수를 등록한 담당 선생님만 확인할 수 있습니다." }, { status: 403 });
@@ -28,7 +29,9 @@ export async function GET(request: Request) {
   }
 
   const [allNames, submissions] = await Promise.all([
-    getCertificateRoster(session.user.schoolId),
+    registeredTitle?.rosterSnapshot
+      ? Promise.resolve(JSON.parse(registeredTitle.rosterSnapshot) as string[])
+      : getCertificateRoster(session.user.schoolId),
     prisma.trainingCertificate.findMany({
       where: { schoolId: session.user.schoolId, trainingTitle },
       select: { teacherName: true },

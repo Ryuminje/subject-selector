@@ -43,7 +43,7 @@ export default function SubmitTab({ isAdmin }: { isAdmin: boolean }) {
           <label className="text-sm font-bold text-slate-700 mb-1.5 block">연수 제목</label>
           <TrainingTitleSelect value={trainingTitle} onChange={setTrainingTitle} />
           <p className="text-xs text-slate-400 mt-1.5">
-            목록에 없는 연수라면 담당 선생님이 새로 등록할 수 있어요.
+            목록에 없는 연수라면 &quot;연수목록 관리&quot; 탭에서 새로 등록할 수 있어요.
           </p>
         </div>
 

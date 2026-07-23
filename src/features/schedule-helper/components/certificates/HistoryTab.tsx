@@ -1,13 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import { History, Search, FileText, Loader2 } from "lucide-react";
+import { History, Search, FileText, Loader2, Trash2 } from "lucide-react";
 import { useCertificateHistory } from "./useCertificateHistory";
 
 export default function HistoryTab({ isAdmin }: { isAdmin: boolean }) {
-  const { rows, loading, error, search } = useCertificateHistory(isAdmin);
+  const { rows, loading, error, search, remove } = useCertificateHistory(isAdmin);
   const [nameQuery, setNameQuery] = useState("");
   const [titleQuery, setTitleQuery] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDelete = async (id: string, title: string) => {
+    if (!window.confirm(`"${title}" 제출 내역을 삭제할까요? 첨부한 파일도 함께 삭제되며 되돌릴 수 없습니다.`)) return;
+    setDeletingId(id);
+    setDeleteError(null);
+    const result = await remove(id);
+    setDeletingId(null);
+    if (!result.ok) setDeleteError(result.error ?? "삭제 중 오류가 발생했습니다.");
+  };
 
   return (
     <div className="space-y-6">
@@ -76,28 +87,47 @@ export default function HistoryTab({ isAdmin }: { isAdmin: boolean }) {
             <p className="font-semibold text-slate-500">{isAdmin ? "검색 결과가 없습니다." : "제출한 이수증이 없습니다."}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {rows.map((row) => (
-              <a
-                key={row.id}
-                href={`/api/schedule-helper/certificates/${row.id}/file`}
-                target="_blank"
-                rel="noreferrer"
-                className="block p-4 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-300 rounded-xl transition-colors"
-              >
-                <div className="font-bold text-slate-800 mb-1">{row.trainingTitle}</div>
-                <div className="text-sm text-slate-600">
-                  {row.teacherName} 선생님 · {new Date(row.createdAt).toLocaleDateString("ko-KR")}
+          <div>
+            {deleteError && <p className="text-sm text-rose-600 mb-3">{deleteError}</p>}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {rows.map((row) => (
+                <div
+                  key={row.id}
+                  className="relative p-4 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-300 rounded-xl transition-colors group"
+                >
+                  <a
+                    href={`/api/schedule-helper/certificates/${row.id}/file`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block pr-8"
+                  >
+                    <div className="font-bold text-slate-800 mb-1">{row.trainingTitle}</div>
+                    <div className="text-sm text-slate-600">
+                      {row.teacherName} 선생님 · {new Date(row.createdAt).toLocaleDateString("ko-KR")}
+                    </div>
+                    {(row.institution || row.certDate || row.number) && (
+                      <div className="text-xs text-slate-500 mt-1.5">
+                        {[row.institution, row.certDate && `이수일: ${row.certDate}`, row.number && `이수번호: ${row.number}`]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    )}
+                  </a>
+                  <button
+                    onClick={() => handleDelete(row.id, row.trainingTitle)}
+                    disabled={deletingId === row.id}
+                    title="삭제"
+                    className="absolute top-3 right-3 p-1.5 rounded-full text-slate-400 hover:bg-rose-100 hover:text-rose-600 disabled:opacity-60 transition-colors"
+                  >
+                    {deletingId === row.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
-                {(row.institution || row.certDate || row.number) && (
-                  <div className="text-xs text-slate-500 mt-1.5">
-                    {[row.institution, row.certDate && `이수일: ${row.certDate}`, row.number && `이수번호: ${row.number}`]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </div>
-                )}
-              </a>
-            ))}
+              ))}
+            </div>
           </div>
         )}
       </div>

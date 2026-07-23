@@ -2,71 +2,74 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { QrCode, Plus, X, Loader2, History, Lock, Unlock } from "lucide-react";
+import { QrCode, Loader2, History, Lock, Unlock } from "lucide-react";
 import { useSignSession } from "./useSignSession";
+import { useRosterPresets } from "./useRosterPresets";
+import RosterPresetManager from "./RosterPresetManager";
+import TrainingTitleMultiSelect from "./TrainingTitleMultiSelect";
 
 export default function SignTab() {
   const router = useRouter();
   const { creating, error, createSession, pastSessions, loadingSessions, loadPastSessions } = useSignSession();
-  const [titles, setTitles] = useState<string[]>([""]);
+  const rosterPresets = useRosterPresets();
+  const { presets } = rosterPresets;
+  const [titles, setTitles] = useState<string[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>("");
 
-  const updateTitle = (idx: number, value: string) => {
-    setTitles((prev) => prev.map((t, i) => (i === idx ? value : t)));
-  };
-
-  const addTitleRow = () => setTitles((prev) => [...prev, ""]);
-  const removeTitleRow = (idx: number) => setTitles((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
+  const selectedPreset = presets?.find((p) => p.id === selectedPresetId) ?? null;
 
   const handleCreate = async () => {
-    const cleaned = titles.map((t) => t.trim()).filter(Boolean);
-    if (cleaned.length === 0) return;
-    const sessionId = await createSession(cleaned);
+    if (titles.length === 0) return;
+    const sessionId = await createSession(titles, selectedPreset?.names, selectedPreset?.name ?? null);
     if (sessionId) router.push(`/apps/schedule-helper/certificates/sessions/${sessionId}`);
   };
 
   return (
     <div className="space-y-6">
+      <RosterPresetManager
+        presets={rosterPresets.presets}
+        loadingPresets={rosterPresets.loadingPresets}
+        createPreset={rosterPresets.createPreset}
+        updatePreset={rosterPresets.updatePreset}
+        deletePreset={rosterPresets.deletePreset}
+        fetchBaseRoster={rosterPresets.fetchBaseRoster}
+      />
+
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
         <h2 className="text-lg font-bold text-teal-700 mb-1 flex items-center gap-2">
           <QrCode className="w-5 h-5" /> QR 서명 세션 만들기
         </h2>
         <p className="text-sm text-slate-500 mb-4">
-          연수 제목을 하나 이상 입력하세요. 2개 이상 입력하면 여러 연수를 한 번의 서명으로 동시에 처리하는
+          등록된 연수 중 하나 이상을 선택하세요. 2개 이상 선택하면 여러 연수를 한 번의 서명으로 동시에 처리하는
           &quot;복수 연수&quot; 세션이 됩니다.
         </p>
 
-        <div className="space-y-2 mb-3">
-          {titles.map((title, idx) => (
-            <div key={idx} className="flex gap-2">
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => updateTitle(idx, e.target.value)}
-                placeholder={`연수 제목 ${idx + 1}`}
-                className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all"
-              />
-              {titles.length > 1 && (
-                <button
-                  onClick={() => removeTitleRow(idx)}
-                  className="w-10 h-10 shrink-0 flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          ))}
+        <label className="text-sm font-bold text-slate-700 mb-1.5 block">연수 제목</label>
+        <div className="mb-4">
+          <TrainingTitleMultiSelect value={titles} onChange={setTitles} />
         </div>
 
-        <button
-          onClick={addTitleRow}
-          className="w-full mb-4 py-2.5 border-2 border-dashed border-slate-200 hover:border-teal-300 hover:bg-teal-50/30 rounded-xl text-sm font-semibold text-slate-500 hover:text-teal-700 transition-colors inline-flex items-center justify-center gap-1.5"
+        <label className="text-sm font-bold text-slate-700 mb-1.5 block">참여 명단</label>
+        <select
+          value={selectedPresetId}
+          onChange={(e) => setSelectedPresetId(e.target.value)}
+          className="w-full mb-4 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all"
         >
-          <Plus className="w-4 h-4" /> 연수 추가
-        </button>
+          <option value="">자동 (연수별 등록 명단 적용)</option>
+          {presets?.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name} · {p.names.length}명
+            </option>
+          ))}
+        </select>
+        <p className="text-xs text-slate-400 -mt-2.5 mb-4">
+          기본값은 각 연수에 등록된 명단을 그대로 사용합니다(복수 연수 시 연수별로 서명이 분리됩니다). 아래에서
+          프리셋을 고르면 선택한 모든 연수에 그 명단이 동일하게 적용됩니다.
+        </p>
 
         <button
           onClick={handleCreate}
-          disabled={creating || titles.every((t) => !t.trim())}
+          disabled={creating || titles.length === 0}
           className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-500 disabled:opacity-60 transition-colors"
         >
           {creating && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -108,6 +111,11 @@ export default function SignTab() {
                   {s.isGroup && (
                     <span className="text-[11px] bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full font-semibold">
                       복수연수
+                    </span>
+                  )}
+                  {s.rosterPresetName && (
+                    <span className="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-semibold">
+                      {s.rosterPresetName}
                     </span>
                   )}
                 </div>

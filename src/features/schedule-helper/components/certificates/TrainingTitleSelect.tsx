@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, PlusCircle, Loader2, UserCheck } from "lucide-react";
+import { ChevronDown, UserCheck } from "lucide-react";
 
 interface TrainingTitleOption {
   id: string;
@@ -19,8 +19,6 @@ export default function TrainingTitleSelect({
   const [options, setOptions] = useState<TrainingTitleOption[]>([]);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);
-  const [registering, setRegistering] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const loadOptions = () => {
@@ -56,31 +54,6 @@ export default function TrainingTitleSelect({
     onChange(title);
     setQuery(title);
     setOpen(false);
-  };
-
-  const handleRegister = async () => {
-    const title = query.trim();
-    if (!title) return;
-    setRegistering(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/schedule-helper/certificates/training-titles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        setError(body.error ?? "등록 중 오류가 발생했습니다.");
-        return;
-      }
-      loadOptions();
-      handleSelect(title);
-    } catch {
-      setError("등록 중 오류가 발생했습니다.");
-    } finally {
-      setRegistering(false);
-    }
   };
 
   return (
@@ -126,17 +99,10 @@ export default function TrainingTitleSelect({
             )}
           </div>
           {query.trim() && !isExactMatch && (
-            <div className="p-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={handleRegister}
-                disabled={registering}
-                className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-60 text-white text-xs font-bold rounded-lg transition-colors"
-              >
-                {registering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlusCircle className="w-3.5 h-3.5" />}
-                &quot;{query.trim()}&quot; 새 연수로 등록
-              </button>
-              {error && <p className="text-[11px] text-rose-600 mt-1.5 text-center">{error}</p>}
+            <div className="p-2.5 border-t border-slate-100 text-center">
+              <p className="text-[11px] text-slate-400">
+                새 연수는 &quot;연수목록 관리&quot; 탭에서 참여명단과 함께 등록하세요.
+              </p>
             </div>
           )}
         </div>

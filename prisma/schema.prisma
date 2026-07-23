@@ -38,11 +38,12 @@ model School {
 
   createdAt DateTime @default(now())
 
-  teachers                Teacher[]
-  trainingTitles          TrainingTitle[]
-  trainingCertificates    TrainingCertificate[]
-  signSessions            SignSession[]
-  certificateRosterExtras CertificateRosterExtra[]
+  teachers                 Teacher[]
+  trainingTitles           TrainingTitle[]
+  trainingCertificates     TrainingCertificate[]
+  signSessions             SignSession[]
+  certificateRosterExtras  CertificateRosterExtra[]
+  certificateRosterPresets CertificateRosterPreset[]
 }
 
 // 시간표에 등장하는 교사 한 명 (로그인 계정 유무와 무관하게 존재 — 업로드 시 이름으로 자동 upsert)
@@ -75,7 +76,8 @@ model TrainingTitle {
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   title             String
-  registeredByName  String // 담당 선생님 이름 — 제출 시점과 동일하게 session 기준으로 서버가 채움
+  registeredByName  String  // 담당 선생님 이름 — 제출 시점과 동일하게 session 기준으로 서버가 채움
+  rosterSnapshot    String? // JSON string[] — 이 연수 전용 참여명단. null이면 getCertificateRoster() 기본값으로 대체
   createdAt         DateTime @default(now())
 
   @@unique([schoolId, title])
@@ -112,11 +114,13 @@ model SignSession {
   schoolId String
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  trainingTitles  String // JSON string[] — 단일 1개, 복수연수 2개 이상
-  rosterSnapshot  String // JSON string[] — 세션 생성 시점 Teacher.name 스냅샷
-  locked          Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  createdByUserId String   // better-auth User.id (조회용, @relation 없음 — User 모델 손대지 않는 원칙)
+  trainingTitles   String  // JSON string[] — 단일 1개, 복수연수 2개 이상
+  rosterSnapshot   String  // JSON string[] — 세션 생성 시점 명단 스냅샷(합집합). 프리셋/전체 기본 명시 선택 시 그 명단, 아니면 titleRosters 합집합
+  titleRosters     String? // JSON Record<title, string[]> — 세션 생성 시점 "연수별" 명단 스냅샷. roster를 명시적으로 지정(전체 기본/프리셋 선택)한 세션은 null 유지
+  rosterPresetName String? // 이 세션 생성에 사용한 CertificateRosterPreset.name (없으면 "전체 명단" 기본 경로)
+  locked           Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  createdByUserId  String   // better-auth User.id (조회용, @relation 없음 — User 모델 손대지 않는 원칙)
 
   signatures SignSessionSignature[]
 
@@ -154,6 +158,24 @@ model CertificateRosterExtra {
   createdAt DateTime @default(now())
 
   @@unique([schoolId, name])
+}
+
+// 연수 이수증 수거 — 용도별로 이름 붙여 저장해두고 재사용하는 명단 프리셋(예: "전체 교직원", "부장단만").
+// names는 드래그 앤 드롭으로 정한 순서를 그대로 보존하는 JSON string[] — 재정렬 없음, 저장된 순서가 곧 서명부 순서.
+
+model CertificateRosterPreset {
+  id       String @id @default(cuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  name      String
+  names     String // JSON string[] — 순서 유지된 이름 목록
+  createdBy String // 만든 관리자 이름 (참고용)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, name])
+  @@index([schoolId, updatedAt])
 }
 
 // 로그인 계정(user/session/account/verification)은 better-auth CLI(`npx auth generate`)가

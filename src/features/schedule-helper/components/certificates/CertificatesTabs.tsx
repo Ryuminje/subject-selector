@@ -1,20 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import { Send, History, ClipboardCheck, QrCode } from "lucide-react";
+import { Send, History, ClipboardCheck, QrCode, ListChecks } from "lucide-react";
+import TrainingTitleManager from "./TrainingTitleManager";
 import SubmitTab from "./SubmitTab";
 import HistoryTab from "./HistoryTab";
 import BulkCheckTab from "./BulkCheckTab";
 import SignTab from "./SignTab";
 
-type Tab = "submit" | "history" | "bulk" | "sign";
+type Tab = "titles" | "submit" | "history" | "bulk" | "sign";
 
 export default function CertificatesTabs({ isAdmin }: { isAdmin: boolean }) {
-  const [activeTab, setActiveTab] = useState<Tab>("submit");
+  const [activeTab, setActiveTab] = useState<Tab>("titles");
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2 md:gap-4 mb-2 bg-white p-2 rounded-2xl shadow-sm border border-emerald-100">
+        <button
+          onClick={() => setActiveTab("titles")}
+          className={`flex items-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all flex-1 md:flex-none justify-center ${
+            activeTab === "titles"
+              ? "bg-teal-100 text-teal-800 shadow-sm"
+              : "text-slate-500 hover:bg-slate-50 hover:text-teal-600"
+          }`}
+        >
+          <ListChecks className="w-5 h-5" />
+          연수목록 관리
+        </button>
         <button
           onClick={() => setActiveTab("submit")}
           className={`flex items-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all flex-1 md:flex-none justify-center ${
@@ -64,6 +76,7 @@ export default function CertificatesTabs({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+        {activeTab === "titles" && <TrainingTitleManager isAdmin={isAdmin} />}
         {activeTab === "submit" && <SubmitTab isAdmin={isAdmin} />}
         {activeTab === "history" && <HistoryTab isAdmin={isAdmin} />}
         {activeTab === "bulk" && <BulkCheckTab isAdmin={isAdmin} />}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCertificateRoster } from "@/features/schedule-helper/lib/getCertificateRoster";
+import { sanitizeRosterNames } from "@/features/schedule-helper/lib/sanitizeRosterNames";
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -22,13 +23,41 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "연수 제목을 입력해 주세요." }, { status: 400 });
   }
 
-  const roster = await getCertificateRoster(session.user.schoolId);
+  const explicitRoster = sanitizeRosterNames(body?.roster);
+  const rosterPresetName = explicitRoster.length > 0 && typeof body?.rosterPresetName === "string" ? body.rosterPresetName : null;
+
+  let roster: string[];
+  let titleRosters: Record<string, string[]> | null = null;
+
+  if (explicitRoster.length > 0) {
+    // "전체 명단(기본)" 또는 저장된 프리셋을 명시적으로 선택 — 오늘과 동일하게 모든 연수 제목에 동일한 명단 적용
+    roster = explicitRoster;
+  } else {
+    // 기본 경로 — 선택한 각 연수 제목에 등록된 전용 명단을 그대로 사용(없으면 전체 기본 명단으로 폴백), 연수별로 서명이 분리됨
+    const titleList = titles as string[];
+    const registeredTitles = await prisma.trainingTitle.findMany({
+      where: { schoolId: session.user.schoolId, title: { in: titleList } },
+      select: { title: true, rosterSnapshot: true },
+    });
+    const rosterByTitle = new Map(registeredTitles.map((t) => [t.title, t.rosterSnapshot]));
+    const defaultRoster = await getCertificateRoster(session.user.schoolId);
+
+    const map: Record<string, string[]> = {};
+    for (const title of titleList) {
+      const snapshot = rosterByTitle.get(title);
+      map[title] = snapshot ? sanitizeRosterNames(JSON.parse(snapshot)) : defaultRoster;
+    }
+    titleRosters = map;
+    roster = sanitizeRosterNames(Object.values(map).flat());
+  }
 
   const created = await prisma.signSession.create({
     data: {
       schoolId: session.user.schoolId,
       trainingTitles: JSON.stringify(titles),
       rosterSnapshot: JSON.stringify(roster),
+      titleRosters: titleRosters ? JSON.stringify(titleRosters) : null,
+      rosterPresetName,
       createdByUserId: session.user.id,
     },
     select: { id: true },
@@ -65,6 +94,7 @@ export async function GET(request: Request) {
         createdAt: s.createdAt,
         totalCount: roster.length,
         signedCount: s._count.signatures,
+        rosterPresetName: s.rosterPresetName,
       };
     }),
   });
