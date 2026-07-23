@@ -1,20 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { ListChecks, Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { ListChecks, Loader2, Plus, Pencil, Trash2, UserCheck } from "lucide-react";
+import { useSession } from "@/lib/auth-client";
 import type { RosterPreset, useRosterPresets } from "./useRosterPresets";
 import RosterTable from "./RosterTable";
 
 type UseRosterPresetsReturn = ReturnType<typeof useRosterPresets>;
 
 export default function RosterPresetManager({
+  isAdmin,
   presets,
   loadingPresets,
   createPreset,
   updatePreset,
   deletePreset,
   fetchBaseRoster,
-}: Pick<UseRosterPresetsReturn, "presets" | "loadingPresets" | "createPreset" | "updatePreset" | "deletePreset" | "fetchBaseRoster">) {
+}: { isAdmin: boolean } & Pick<
+  UseRosterPresetsReturn,
+  "presets" | "loadingPresets" | "createPreset" | "updatePreset" | "deletePreset" | "fetchBaseRoster"
+>) {
+  const { data: session } = useSession();
+  const myName = session?.user?.name;
+  const canEdit = (p: RosterPreset) => isAdmin || p.createdBy === myName;
   const [expanded, setExpanded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null); // "new"이면 생성 중
   const [editMode, setEditMode] = useState(false);
@@ -203,22 +211,27 @@ export default function RosterPresetManager({
                     <div className="flex items-center justify-between mb-3">
                       <div className="font-bold text-slate-800">
                         {selectedPreset?.name}{" "}
-                        <span className="text-sm font-normal text-slate-500">· {selectedPreset?.names.length}명</span>
+                        <span className="text-sm font-normal text-slate-500 inline-flex items-center gap-1">
+                          · <UserCheck className="w-3.5 h-3.5" /> {selectedPreset?.createdBy} ·{" "}
+                          {selectedPreset?.names.length}명
+                        </span>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => selectedPreset && startEdit(selectedPreset)}
-                          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
-                        >
-                          <Pencil className="w-3.5 h-3.5" /> 편집
-                        </button>
-                        <button
-                          onClick={() => selectedPreset && handleDelete(selectedPreset.id)}
-                          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 border border-rose-200 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> 삭제
-                        </button>
-                      </div>
+                      {selectedPreset && canEdit(selectedPreset) && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => startEdit(selectedPreset)}
+                            className="inline-flex items-center gap-1 text-xs px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" /> 편집
+                          </button>
+                          <button
+                            onClick={() => handleDelete(selectedPreset.id)}
+                            className="inline-flex items-center gap-1 text-xs px-3 py-1.5 border border-rose-200 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> 삭제
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 

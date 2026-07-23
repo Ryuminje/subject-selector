@@ -18,14 +18,25 @@ export async function GET(request: Request) {
     schoolId: string;
     teacherName?: string;
     trainingTitle?: { contains: string; mode: "insensitive" };
+    OR?: Array<{ teacherName?: string; trainingTitle?: { in: string[] } }>;
   } = { schoolId: session.user.schoolId };
 
   if (isAdmin) {
     if (teacherNameQuery) where.teacherName = teacherNameQuery;
     if (titleQuery) where.trainingTitle = { contains: titleQuery, mode: "insensitive" };
   } else {
-    // 일반 교사는 쿼리 파라미터와 무관하게 본인 이름으로 강제
-    where.teacherName = await resolveTeacherName(session.user);
+    // 일반 교사는 본인 제출 내역 + 본인이 등록한 연수에 제출된 내역을 함께 봄 (쿼리 파라미터 무시)
+    const teacherName = await resolveTeacherName(session.user);
+    const registeredTitles = await prisma.trainingTitle.findMany({
+      where: { schoolId: session.user.schoolId, registeredByName: teacherName },
+      select: { title: true },
+    });
+    const titleList = registeredTitles.map((t) => t.title);
+    if (titleList.length > 0) {
+      where.OR = [{ teacherName }, { trainingTitle: { in: titleList } }];
+    } else {
+      where.teacherName = teacherName;
+    }
   }
 
   const rows = await prisma.trainingCertificate.findMany({

@@ -51,6 +51,7 @@ export default function TrainingListManager({ isAdmin }: { isAdmin: boolean }) {
       {subTab === "sign" && <TrainingTitleManager isAdmin={isAdmin} category="sign" />}
       {subTab === "presets" && (
         <RosterPresetManager
+          isAdmin={isAdmin}
           presets={rosterPresets.presets}
           loadingPresets={rosterPresets.loadingPresets}
           createPreset={rosterPresets.createPreset}

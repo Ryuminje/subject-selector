@@ -24,6 +24,11 @@ export const auth = betterAuth({
         type: "string",
         required: false,
       },
+      // 이메일이 아닌 아이디 로그인용 (관리자 발급 계정 전용), 학교 안에서만 유일 — email엔 내부 합성값이 들어감
+      loginId: {
+        type: "string",
+        required: false,
+      },
     },
   },
   plugins: [nextCookies()],
