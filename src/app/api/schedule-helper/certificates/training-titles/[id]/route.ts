@@ -24,7 +24,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   const body = await request.json().catch(() => null);
-  const data: { title?: string; rosterSnapshot?: string | null } = {};
+  const data: { title?: string; rosterSnapshot?: string | null; category?: string } = {};
 
   if (typeof body?.title === "string") {
     const title = body.title.trim();
@@ -48,10 +48,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     data.rosterSnapshot = names.length > 0 ? JSON.stringify(names) : null;
   }
 
+  if (typeof body?.category === "string") {
+    data.category = body.category === "sign" ? "sign" : "certificate";
+  }
+
   const updated = await prisma.trainingTitle.update({
     where: { id },
     data,
-    select: { id: true, title: true, registeredByName: true, rosterSnapshot: true },
+    select: { id: true, title: true, registeredByName: true, rosterSnapshot: true, category: true },
   });
 
   return NextResponse.json({
@@ -60,6 +64,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       title: updated.title,
       registeredByName: updated.registeredByName,
       rosterSnapshot: updated.rosterSnapshot ? (JSON.parse(updated.rosterSnapshot) as string[]) : null,
+      category: updated.category,
     },
   });
 }

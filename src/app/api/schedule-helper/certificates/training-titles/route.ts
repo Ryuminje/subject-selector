@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const titles = await prisma.trainingTitle.findMany({
     where: { schoolId: session.user.schoolId },
     orderBy: { createdAt: "desc" },
-    select: { id: true, title: true, registeredByName: true, rosterSnapshot: true },
+    select: { id: true, title: true, registeredByName: true, rosterSnapshot: true, category: true },
   });
 
   return NextResponse.json({
@@ -22,6 +22,7 @@ export async function GET(request: Request) {
       title: t.title,
       registeredByName: t.registeredByName,
       rosterSnapshot: t.rosterSnapshot ? (JSON.parse(t.rosterSnapshot) as string[]) : null,
+      category: t.category,
     })),
   });
 }
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
     }
     rosterSnapshot = JSON.stringify(names);
   }
+  const category = body?.category === "sign" ? "sign" : "certificate";
 
   const existing = await prisma.trainingTitle.findUnique({
     where: { schoolId_title: { schoolId: session.user.schoolId, title } },
@@ -57,8 +59,8 @@ export async function POST(request: Request) {
   const registeredByName = await resolveTeacherName(session.user);
 
   const created = await prisma.trainingTitle.create({
-    data: { schoolId: session.user.schoolId, title, registeredByName, rosterSnapshot },
-    select: { id: true, title: true, registeredByName: true, rosterSnapshot: true },
+    data: { schoolId: session.user.schoolId, title, registeredByName, rosterSnapshot, category },
+    select: { id: true, title: true, registeredByName: true, rosterSnapshot: true, category: true },
   });
 
   return NextResponse.json({
@@ -67,6 +69,7 @@ export async function POST(request: Request) {
       title: created.title,
       registeredByName: created.registeredByName,
       rosterSnapshot: created.rosterSnapshot ? (JSON.parse(created.rosterSnapshot) as string[]) : null,
+      category: created.category,
     },
   });
 }

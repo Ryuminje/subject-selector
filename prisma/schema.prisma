@@ -78,6 +78,7 @@ model TrainingTitle {
   title             String
   registeredByName  String  // 담당 선생님 이름 — 제출 시점과 동일하게 session 기준으로 서버가 채움
   rosterSnapshot    String? // JSON string[] — 이 연수 전용 참여명단. null이면 getCertificateRoster() 기본값으로 대체
+  category          String  @default("certificate") // "certificate"(이수증 수거) | "sign"(서명 연수/QR서명) — 어느 메뉴/선택창에 노출될지 구분
   createdAt         DateTime @default(now())
 
   @@unique([schoolId, title])
