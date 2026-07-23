@@ -10,6 +10,7 @@ export interface PastSession {
   createdAt: string;
   totalCount: number;
   signedCount: number;
+  rosterPresetName: string | null;
 }
 
 export function useSignSession() {
@@ -18,28 +19,31 @@ export function useSignSession() {
   const [pastSessions, setPastSessions] = useState<PastSession[] | null>(null);
   const [loadingSessions, setLoadingSessions] = useState(true);
 
-  const createSession = useCallback(async (titles: string[]): Promise<string | null> => {
-    setCreating(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/schedule-helper/certificates/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trainingTitles: titles }),
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        setError(body.error ?? "세션 생성 중 오류가 발생했습니다.");
+  const createSession = useCallback(
+    async (titles: string[], roster?: string[], rosterPresetName?: string | null): Promise<string | null> => {
+      setCreating(true);
+      setError(null);
+      try {
+        const res = await fetch("/api/schedule-helper/certificates/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ trainingTitles: titles, roster, rosterPresetName }),
+        });
+        const body = await res.json();
+        if (!res.ok) {
+          setError(body.error ?? "세션 생성 중 오류가 발생했습니다.");
+          return null;
+        }
+        return body.sessionId as string;
+      } catch {
+        setError("세션 생성 중 오류가 발생했습니다.");
         return null;
+      } finally {
+        setCreating(false);
       }
-      return body.sessionId as string;
-    } catch {
-      setError("세션 생성 중 오류가 발생했습니다.");
-      return null;
-    } finally {
-      setCreating(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   const loadPastSessions = useCallback(() => {
     setLoadingSessions(true);

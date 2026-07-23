@@ -28,12 +28,16 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const titles = JSON.parse(signSession.trainingTitles) as string[];
   const titleIndex = Math.min(Math.max(Number(url.searchParams.get("title") ?? 0), 0), titles.length - 1);
   const roster = JSON.parse(signSession.rosterSnapshot) as string[];
+  const titleRosters = signSession.titleRosters
+    ? (JSON.parse(signSession.titleRosters) as Record<string, string[]>)
+    : null;
+  const rosterForTitle = titleRosters?.[titles[titleIndex]] ?? roster;
   const signatureByName = new Map(signSession.signatures.map((s) => [s.teacherName, s.id]));
 
   return NextResponse.json({
     schoolName: signSession.school.name,
     trainingTitle: titles[titleIndex],
     createdAt: signSession.createdAt,
-    teachers: roster.map((name) => ({ name, signatureId: signatureByName.get(name) ?? null })),
+    teachers: rosterForTitle.map((name) => ({ name, signatureId: signatureByName.get(name) ?? null })),
   });
 }

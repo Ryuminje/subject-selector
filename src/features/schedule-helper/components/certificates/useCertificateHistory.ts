@@ -56,5 +56,15 @@ export function useCertificateHistory(isAdmin: boolean) {
       .finally(() => setLoading(false));
   }, [isAdmin]);
 
-  return { rows, loading, error, search };
+  const remove = useCallback(async (id: string) => {
+    const res = await fetch(`/api/schedule-helper/certificates/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return { ok: false, error: body.error ?? "삭제 중 오류가 발생했습니다." };
+    }
+    setRows((prev) => (prev ? prev.filter((r) => r.id !== id) : prev));
+    return { ok: true };
+  }, []);
+
+  return { rows, loading, error, search, remove };
 }
