@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSchedule } from "@/features/schedule-helper/lib/ScheduleContext";
 import { useSession, signOut } from "@/lib/auth-client";
-import { ArrowLeft, ArrowLeftRight, Users, Ban, Loader2, Upload, LogOut, UserCog, KeyRound, Copy, Check } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Users, Ban, Loader2, Upload, LogOut, UserCog, KeyRound, Copy, Check, UserPlus } from "lucide-react";
 import SwapTab from "@/features/schedule-helper/components/SwapTab";
 import MeetingTab from "@/features/schedule-helper/components/MeetingTab";
 import BlockTab from "@/features/schedule-helper/components/BlockTab";
@@ -24,7 +24,7 @@ export default function ScheduleHelperPage() {
 
   const handleLogout = async () => {
     await signOut();
-    router.push("/apps/schedule-helper/login");
+    router.push("/apps/schedule-helper/login?next=" + encodeURIComponent("/apps/schedule-helper"));
   };
 
   const handleCopyJoinCode = async () => {
@@ -63,13 +63,22 @@ export default function ScheduleHelperPage() {
           <ArrowLeft className="w-4 h-4" />
           허브로 돌아가기
         </Link>
-        <button
-          onClick={handleLogout}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-slate-500 hover:text-rose-600 text-sm font-medium rounded-xl border border-slate-200 shadow-sm transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
-          로그아웃
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/apps/schedule-helper/account"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-slate-500 hover:text-teal-600 text-sm font-medium rounded-xl border border-slate-200 shadow-sm transition-colors"
+          >
+            <KeyRound className="w-4 h-4" />
+            비밀번호 변경
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-slate-500 hover:text-rose-600 text-sm font-medium rounded-xl border border-slate-200 shadow-sm transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            로그아웃
+          </button>
+        </div>
       </div>
 
       {/* Header */}
@@ -91,6 +100,13 @@ export default function ScheduleHelperPage() {
               >
                 <UserCog className="w-4 h-4" />
                 <span className="hidden sm:inline">교사 목록 관리</span>
+              </Link>
+              <Link
+                href="/apps/schedule-helper/accounts"
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold rounded-xl border border-white/30 transition-colors"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span className="hidden sm:inline">계정 관리</span>
               </Link>
               <button
                 onClick={() => setShowUpload((v) => !v)}

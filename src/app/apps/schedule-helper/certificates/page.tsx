@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "@/lib/auth-client";
-import { ArrowLeft, LogOut, Loader2 } from "lucide-react";
+import { ArrowLeft, LogOut, Loader2, KeyRound } from "lucide-react";
 import CertificatesTabs from "@/features/schedule-helper/components/certificates/CertificatesTabs";
 
 export default function CertificatesPage() {
@@ -12,7 +12,7 @@ export default function CertificatesPage() {
 
   const handleLogout = async () => {
     await signOut();
-    router.push("/apps/schedule-helper/login");
+    router.push("/apps/schedule-helper/login?next=" + encodeURIComponent("/apps/schedule-helper/certificates"));
   };
 
   if (isPending) {
@@ -36,13 +36,22 @@ export default function CertificatesPage() {
           <ArrowLeft className="w-4 h-4" />
           허브로 돌아가기
         </Link>
-        <button
-          onClick={handleLogout}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-slate-500 hover:text-rose-600 text-sm font-medium rounded-xl border border-slate-200 shadow-sm transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
-          로그아웃
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/apps/schedule-helper/account"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-slate-500 hover:text-teal-600 text-sm font-medium rounded-xl border border-slate-200 shadow-sm transition-colors"
+          >
+            <KeyRound className="w-4 h-4" />
+            비밀번호 변경
+          </Link>
+          <button
+            onClick={handleLogout}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-slate-500 hover:text-rose-600 text-sm font-medium rounded-xl border border-slate-200 shadow-sm transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            로그아웃
+          </button>
+        </div>
       </div>
 
       <div className="bg-gradient-to-br from-emerald-600 to-teal-500 p-6 md:p-8 rounded-3xl shadow-lg text-white mb-8">

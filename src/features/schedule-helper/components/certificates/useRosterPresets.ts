@@ -6,6 +6,7 @@ export interface RosterPreset {
   id: string;
   name: string;
   names: string[];
+  createdBy: string;
   updatedAt: string;
 }
 

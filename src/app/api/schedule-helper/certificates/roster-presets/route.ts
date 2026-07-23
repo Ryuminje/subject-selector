@@ -9,18 +9,21 @@ export async function GET(request: Request) {
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
-  if (session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "관리자만 접근할 수 있습니다." }, { status: 403 });
-  }
 
   const presets = await prisma.certificateRosterPreset.findMany({
     where: { schoolId: session.user.schoolId },
     orderBy: { updatedAt: "desc" },
-    select: { id: true, name: true, names: true, updatedAt: true },
+    select: { id: true, name: true, names: true, createdBy: true, updatedAt: true },
   });
 
   return NextResponse.json({
-    presets: presets.map((p) => ({ id: p.id, name: p.name, names: JSON.parse(p.names) as string[], updatedAt: p.updatedAt })),
+    presets: presets.map((p) => ({
+      id: p.id,
+      name: p.name,
+      names: JSON.parse(p.names) as string[],
+      createdBy: p.createdBy,
+      updatedAt: p.updatedAt,
+    })),
   });
 }
 
@@ -28,9 +31,6 @@ export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
-  }
-  if (session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "관리자만 만들 수 있습니다." }, { status: 403 });
   }
 
   const body = await request.json().catch(() => null);
@@ -55,8 +55,10 @@ export async function POST(request: Request) {
 
   const created = await prisma.certificateRosterPreset.create({
     data: { schoolId: session.user.schoolId, name, names: JSON.stringify(names), createdBy },
-    select: { id: true, name: true, names: true, updatedAt: true },
+    select: { id: true, name: true, names: true, createdBy: true, updatedAt: true },
   });
 
-  return NextResponse.json({ preset: { id: created.id, name: created.name, names, updatedAt: created.updatedAt } });
+  return NextResponse.json({
+    preset: { id: created.id, name: created.name, names, createdBy: created.createdBy, updatedAt: created.updatedAt },
+  });
 }

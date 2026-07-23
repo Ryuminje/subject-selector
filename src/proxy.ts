@@ -19,7 +19,9 @@ export async function proxy(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
 
   if (!session) {
-    return NextResponse.redirect(new URL("/apps/schedule-helper/login", request.url));
+    const loginUrl = new URL("/apps/schedule-helper/login", request.url);
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();

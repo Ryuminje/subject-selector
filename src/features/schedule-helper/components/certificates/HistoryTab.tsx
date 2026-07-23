@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import { History, Search, FileText, Loader2, Trash2 } from "lucide-react";
+import { useSession } from "@/lib/auth-client";
 import { useCertificateHistory } from "./useCertificateHistory";
 
 export default function HistoryTab({ isAdmin }: { isAdmin: boolean }) {
   const { rows, loading, error, search, remove } = useCertificateHistory(isAdmin);
+  const { data: session } = useSession();
+  const myName = session?.user?.name;
   const [nameQuery, setNameQuery] = useState("");
   const [titleQuery, setTitleQuery] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -71,9 +74,14 @@ export default function HistoryTab({ isAdmin }: { isAdmin: boolean }) {
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
         <h2 className="text-lg font-bold text-teal-700 mb-4 flex items-center gap-2">
-          <FileText className="w-5 h-5" /> {isAdmin ? "조회 결과" : "내 제출 내역"}
+          <FileText className="w-5 h-5" /> {isAdmin ? "조회 결과" : "내 제출 · 내가 등록한 연수 제출 현황"}
           {rows && <span className="text-sm font-medium text-slate-500 ml-1">({rows.length}건)</span>}
         </h2>
+        {!isAdmin && (
+          <p className="text-sm text-slate-400 -mt-3 mb-4">
+            내가 제출한 이수증과, 내가 등록한 연수에 다른 선생님이 제출한 이수증을 함께 볼 수 있습니다.
+          </p>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-12 text-teal-600">
@@ -113,18 +121,20 @@ export default function HistoryTab({ isAdmin }: { isAdmin: boolean }) {
                       </div>
                     )}
                   </a>
-                  <button
-                    onClick={() => handleDelete(row.id, row.trainingTitle)}
-                    disabled={deletingId === row.id}
-                    title="삭제"
-                    className="absolute top-3 right-3 p-1.5 rounded-full text-slate-400 hover:bg-rose-100 hover:text-rose-600 disabled:opacity-60 transition-colors"
-                  >
-                    {deletingId === row.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="w-4 h-4" />
-                    )}
-                  </button>
+                  {(isAdmin || row.teacherName === myName) && (
+                    <button
+                      onClick={() => handleDelete(row.id, row.trainingTitle)}
+                      disabled={deletingId === row.id}
+                      title="삭제"
+                      className="absolute top-3 right-3 p-1.5 rounded-full text-slate-400 hover:bg-rose-100 hover:text-rose-600 disabled:opacity-60 transition-colors"
+                    >
+                      {deletingId === row.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
