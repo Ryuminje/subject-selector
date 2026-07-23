@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { QrCode, Loader2, History, Lock, Unlock } from "lucide-react";
 import { useSignSession } from "./useSignSession";
 import { useRosterPresets } from "./useRosterPresets";
-import RosterPresetManager from "./RosterPresetManager";
 import TrainingTitleMultiSelect from "./TrainingTitleMultiSelect";
 
 export default function SignTab() {
@@ -26,15 +25,6 @@ export default function SignTab() {
 
   return (
     <div className="space-y-6">
-      <RosterPresetManager
-        presets={rosterPresets.presets}
-        loadingPresets={rosterPresets.loadingPresets}
-        createPreset={rosterPresets.createPreset}
-        updatePreset={rosterPresets.updatePreset}
-        deletePreset={rosterPresets.deletePreset}
-        fetchBaseRoster={rosterPresets.fetchBaseRoster}
-      />
-
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
         <h2 className="text-lg font-bold text-teal-700 mb-1 flex items-center gap-2">
           <QrCode className="w-5 h-5" /> QR 서명 세션 만들기
@@ -63,8 +53,9 @@ export default function SignTab() {
           ))}
         </select>
         <p className="text-xs text-slate-400 -mt-2.5 mb-4">
-          기본값은 각 연수에 등록된 명단을 그대로 사용합니다(복수 연수 시 연수별로 서명이 분리됩니다). 아래에서
-          프리셋을 고르면 선택한 모든 연수에 그 명단이 동일하게 적용됩니다.
+          기본값은 각 연수에 등록된 명단을 그대로 사용합니다(복수 연수 시 연수별로 서명이 분리됩니다). 프리셋을
+          고르면 선택한 모든 연수에 그 명단이 동일하게 적용됩니다. 프리셋은 &quot;연수목록 관리 → 명단 프리셋
+          관리&quot;에서 만들 수 있습니다.
         </p>
 
         <button

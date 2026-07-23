@@ -7,6 +7,7 @@ interface TrainingTitleOption {
   id: string;
   title: string;
   registeredByName: string;
+  category: "certificate" | "sign";
 }
 
 export default function TrainingTitleSelect({
@@ -24,7 +25,9 @@ export default function TrainingTitleSelect({
   const loadOptions = () => {
     fetch("/api/schedule-helper/certificates/training-titles")
       .then((res) => res.json())
-      .then((body) => setOptions(body.titles ?? []))
+      .then((body) =>
+        setOptions((body.titles ?? []).filter((t: TrainingTitleOption) => t.category === "certificate"))
+      )
       .catch(() => {});
   };
 
@@ -101,7 +104,7 @@ export default function TrainingTitleSelect({
           {query.trim() && !isExactMatch && (
             <div className="p-2.5 border-t border-slate-100 text-center">
               <p className="text-[11px] text-slate-400">
-                새 연수는 &quot;연수목록 관리&quot; 탭에서 참여명단과 함께 등록하세요.
+                새 연수는 &quot;연수목록 관리 → 이수증 수거 관리&quot;에서 참여명단과 함께 등록하세요.
               </p>
             </div>
           )}

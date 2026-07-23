@@ -2,11 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+export type TrainingTitleCategory = "certificate" | "sign";
+
 export interface TrainingTitleItem {
   id: string;
   title: string;
   registeredByName: string;
   rosterSnapshot: string[] | null;
+  category: TrainingTitleCategory;
 }
 
 type MutationResult = { ok: true; trainingTitle: TrainingTitleItem } | { ok: false; error: string };
@@ -33,20 +36,26 @@ export function useTrainingTitles() {
       .finally(() => setLoadingTitles(false));
   }, []);
 
-  const createTitle = useCallback(async (title: string, names?: string[]): Promise<MutationResult> => {
-    const res = await fetch("/api/schedule-helper/certificates/training-titles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, names }),
-    });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: body.error ?? "등록 중 오류가 발생했습니다." };
-    setTitles((prev) => [body.trainingTitle, ...(prev ?? [])]);
-    return { ok: true, trainingTitle: body.trainingTitle };
-  }, []);
+  const createTitle = useCallback(
+    async (title: string, names: string[] | undefined, category: TrainingTitleCategory): Promise<MutationResult> => {
+      const res = await fetch("/api/schedule-helper/certificates/training-titles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, names, category }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: body.error ?? "등록 중 오류가 발생했습니다." };
+      setTitles((prev) => [body.trainingTitle, ...(prev ?? [])]);
+      return { ok: true, trainingTitle: body.trainingTitle };
+    },
+    []
+  );
 
   const updateTitle = useCallback(
-    async (id: string, patch: { title?: string; names?: string[] }): Promise<MutationResult> => {
+    async (
+      id: string,
+      patch: { title?: string; names?: string[]; category?: TrainingTitleCategory }
+    ): Promise<MutationResult> => {
       const res = await fetch(`/api/schedule-helper/certificates/training-titles/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

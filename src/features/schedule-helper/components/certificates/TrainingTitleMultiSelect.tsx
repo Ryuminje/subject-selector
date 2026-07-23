@@ -24,7 +24,7 @@ export default function TrainingTitleMultiSelect({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const options = titles ?? [];
+  const options = (titles ?? []).filter((t) => t.category === "sign");
   const matching = options.filter(
     (o) => !value.includes(o.title) && o.title.toLowerCase().includes(query.trim().toLowerCase())
   );
@@ -82,7 +82,9 @@ export default function TrainingTitleMultiSelect({
           <div className="max-h-56 overflow-y-auto divide-y divide-slate-100">
             {matching.length === 0 ? (
               <div className="px-4 py-3 text-sm text-slate-400">
-                {options.length === 0 ? "등록된 연수가 없습니다. \"연수목록 관리\" 탭에서 먼저 등록하세요." : "일치하는 연수가 없습니다."}
+                {options.length === 0
+                  ? "등록된 연수가 없습니다. \"연수목록 관리 → 서명 연수 관리\"에서 먼저 등록하세요."
+                  : "일치하는 연수가 없습니다."}
               </div>
             ) : (
               matching.map((o) => (

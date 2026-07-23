@@ -1,16 +1,37 @@
 "use client";
 
 import { useState } from "react";
-import { ListChecks, Loader2, Plus, Pencil, Trash2, UserCheck } from "lucide-react";
+import { ListChecks, QrCode, Loader2, Plus, Pencil, Trash2, UserCheck } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
-import { useTrainingTitles, type TrainingTitleItem } from "./useTrainingTitles";
+import { useTrainingTitles, type TrainingTitleItem, type TrainingTitleCategory } from "./useTrainingTitles";
 import { useRosterPresets } from "./useRosterPresets";
 import RosterTable from "./RosterTable";
 
-export default function TrainingTitleManager({ isAdmin }: { isAdmin: boolean }) {
+const CATEGORY_META: Record<TrainingTitleCategory, { label: string; icon: typeof ListChecks; description: string }> = {
+  certificate: {
+    label: "이수증 수거 관리",
+    icon: ListChecks,
+    description:
+      "제출하기 탭에서 선택할 수 있는 연수 목록입니다. 연수 제목과 참여명단을 함께 등록하세요. 연수마다 서로 다른 명단을 지정할 수 있고, 지정하지 않으면 전체 기본 명단이 적용됩니다.",
+  },
+  sign: {
+    label: "서명 연수 관리 (QR서명)",
+    icon: QrCode,
+    description: "서명받기 탭의 QR 세션 생성 시 선택할 수 있는 연수 목록입니다. 참여명단은 그 연수만의 서명 대상자가 됩니다.",
+  },
+};
+
+export default function TrainingTitleManager({
+  isAdmin,
+  category,
+}: {
+  isAdmin: boolean;
+  category: TrainingTitleCategory;
+}) {
   const { data: session } = useSession();
-  const { titles, loadingTitles, createTitle, updateTitle, deleteTitle } = useTrainingTitles();
+  const { titles: allTitles, loadingTitles, createTitle, updateTitle, deleteTitle } = useTrainingTitles();
   const { presets, fetchBaseRoster } = useRosterPresets();
+  const meta = CATEGORY_META[category];
 
   const [selectedId, setSelectedId] = useState<string | null>(null); // "new"이면 새 연수 등록 중
   const [editMode, setEditMode] = useState(false);
@@ -21,6 +42,7 @@ export default function TrainingTitleManager({ isAdmin }: { isAdmin: boolean }) 
   const [loadingBase, setLoadingBase] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const titles = allTitles?.filter((t) => t.category === category) ?? null;
   const myName = session?.user?.name;
   const canEdit = (t: TrainingTitleItem) => isAdmin || t.registeredByName === myName;
 
@@ -94,7 +116,7 @@ export default function TrainingTitleManager({ isAdmin }: { isAdmin: boolean }) 
     setError(null);
     const result =
       selectedId === "new"
-        ? await createTitle(editTitle.trim(), editNames)
+        ? await createTitle(editTitle.trim(), editNames, category)
         : await updateTitle(selectedId as string, { title: editTitle.trim(), names: editNames });
     setSaving(false);
     if (!result.ok) {
@@ -142,7 +164,7 @@ export default function TrainingTitleManager({ isAdmin }: { isAdmin: boolean }) 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-lg font-bold text-teal-700 flex items-center gap-2">
-            <ListChecks className="w-5 h-5" /> 연수목록 관리
+            <meta.icon className="w-5 h-5" /> {meta.label}
           </h2>
           <button
             onClick={startCreate}
@@ -152,10 +174,7 @@ export default function TrainingTitleManager({ isAdmin }: { isAdmin: boolean }) 
             {loadingBase ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} 새 연수 등록
           </button>
         </div>
-        <p className="text-sm text-slate-500 mb-4">
-          연수 제목과 참여명단을 함께 등록하세요. 연수마다 서로 다른 명단을 지정할 수 있고, 지정하지 않으면 전체
-          기본 명단이 적용됩니다.
-        </p>
+        <p className="text-sm text-slate-500 mb-4">{meta.description}</p>
 
         {loadingTitles ? (
           <div className="flex justify-center py-8 text-teal-600">
@@ -189,35 +208,33 @@ export default function TrainingTitleManager({ isAdmin }: { isAdmin: boolean }) 
         {selectedId && (selectedTitle || selectedId === "new") && (
           <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 mt-4">
             {editMode ? (
-              <div className="mb-3 space-y-2">
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <input
-                    type="text"
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    placeholder="연수 제목"
-                    className="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
-                  />
-                  {presets && presets.length > 0 && (
-                    <select
-                      onChange={(e) => {
-                        if (e.target.value) handleLoadPreset(e.target.value);
-                        e.target.value = "";
-                      }}
-                      defaultValue=""
-                      className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 shrink-0"
-                    >
-                      <option value="" disabled>
-                        프리셋에서 불러오기
-                      </option>
+              <div className="mb-3 space-y-3">
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="연수 제목"
+                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
+                />
+
+                {presets && presets.length > 0 && (
+                  <div>
+                    <div className="text-xs font-bold text-slate-500 mb-1.5">명단 프리셋에서 바로 불러오기</div>
+                    <div className="flex flex-wrap gap-2">
                       {presets.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} · {p.names.length}명
-                        </option>
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => handleLoadPreset(p.id)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-teal-50 border border-teal-200 text-teal-800 hover:bg-teal-100 hover:border-teal-300 transition-colors"
+                        >
+                          {p.name} <span className="opacity-70">· {p.names.length}명</span>
+                        </button>
                       ))}
-                    </select>
-                  )}
-                </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <input
                     type="text"

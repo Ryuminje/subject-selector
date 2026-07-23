@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Send, History, ClipboardCheck, QrCode, ListChecks } from "lucide-react";
-import TrainingTitleManager from "./TrainingTitleManager";
+import TrainingListManager from "./TrainingListManager";
 import SubmitTab from "./SubmitTab";
 import HistoryTab from "./HistoryTab";
 import BulkCheckTab from "./BulkCheckTab";
@@ -76,7 +76,7 @@ export default function CertificatesTabs({ isAdmin }: { isAdmin: boolean }) {
       </div>
 
       <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-        {activeTab === "titles" && <TrainingTitleManager isAdmin={isAdmin} />}
+        {activeTab === "titles" && <TrainingListManager isAdmin={isAdmin} />}
         {activeTab === "submit" && <SubmitTab isAdmin={isAdmin} />}
         {activeTab === "history" && <HistoryTab isAdmin={isAdmin} />}
         {activeTab === "bulk" && <BulkCheckTab isAdmin={isAdmin} />}
