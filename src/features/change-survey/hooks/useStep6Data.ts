@@ -124,11 +124,21 @@ export function useStep6Data(
         if (matchedCategory === "과학") scienceCount++;
       });
 
-      const subjectCounts: Record<string, number> = {};
+      // 띄어쓰기·로마자 표기가 달라도 같은 과목으로 인식하도록 정규화해서 비교합니다.
+      const completedBeforeNormSet = new Set(completedBefore.map(normalizeSubjectName));
+      const currentSubjectNormCounts: Record<string, number> = {};
+      const normToDisplay: Record<string, string> = {};
       currentSubjects.forEach(s => {
-        subjectCounts[s] = (subjectCounts[s] || 0) + 1;
+        const norm = normalizeSubjectName(s);
+        currentSubjectNormCounts[norm] = (currentSubjectNormCounts[norm] || 0) + 1;
+        if (!normToDisplay[norm]) normToDisplay[norm] = s;
       });
-      const duplicateSubjects = Object.keys(subjectCounts).filter(s => subjectCounts[s] > 1);
+      const duplicateNormSet = new Set<string>();
+      Object.entries(currentSubjectNormCounts).forEach(([norm, count]) => {
+        // 2학기 내에서 같은 과목을 두 번 이상 선택했거나, 과거에 이미 이수한 과목을 다시 선택한 경우
+        if (count > 1 || completedBeforeNormSet.has(norm)) duplicateNormSet.add(norm);
+      });
+      const duplicateSubjects = Array.from(duplicateNormSet).map(norm => normToDisplay[norm]);
 
       const hierarchyViolations: { subject: string; prereq: string; message: string }[] = [];
 
@@ -146,6 +156,10 @@ export function useStep6Data(
         }
       });
 
+      const missingCategories: ("사회" | "과학")[] = [];
+      if (socialCount === 0) missingCategories.push("사회");
+      if (scienceCount === 0) missingCategories.push("과학");
+
       return {
         id: student.id,
         name: student.name,
@@ -156,7 +170,8 @@ export function useStep6Data(
         socialCount,
         scienceCount,
         duplicateSubjects,
-        hierarchyViolations
+        hierarchyViolations,
+        missingCategories
       };
     });
 

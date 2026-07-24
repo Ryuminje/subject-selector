@@ -69,8 +69,8 @@ export function AnalysisStep({
             <button
               onClick={() => setChangeActiveGrade("grade2")}
               className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
-                  ? "bg-stone-200 text-stone-900 shadow"
-                  : "text-stone-600 hover:text-stone-800"
+                  ? "bg-amber-500 text-stone-900 shadow-md"
+                  : "text-stone-900 hover:text-stone-900"
                 }`}
             >
               2학년
@@ -78,8 +78,8 @@ export function AnalysisStep({
             <button
               onClick={() => setChangeActiveGrade("grade3")}
               className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
-                  ? "bg-stone-200 text-stone-900 shadow"
-                  : "text-stone-600 hover:text-stone-800"
+                  ? "bg-amber-500 text-stone-900 shadow-md"
+                  : "text-stone-900 hover:text-stone-900"
                 }`}
             >
               3학년
@@ -135,7 +135,6 @@ export function AnalysisStep({
                       const isHierarchyViolation = subject && row.hierarchyViolations?.some((v: any) => normS(v.subject) === normS(subject) || normS(v.prereq) === normS(subject));
 
                       let isChangedByApplicant = false;
-                      let debugInfo = "";
                       if (adjustmentLog[row.id] && subject) {
                           isChangedByApplicant = adjustmentLog[row.id].some(l => {
                               if (l.status !== 'success' || l.source !== 'applicant') return false;
@@ -158,30 +157,23 @@ export function AnalysisStep({
                           });
                       }
 
-                      let cellClass = "inline-block px-1.5 py-0.5 rounded text-xs ";
-                      if (isChangedByApplicant) {
-                          if (isHierarchyViolation) {
-                              cellClass += "bg-amber-500/20 text-cyan-700 font-black ring-1 ring-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.5)]";
-                          } else if (isDuplicate) {
-                              cellClass += "bg-amber-500/20 text-rose-700 font-black ring-1 ring-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]";
-                          } else {
-                              cellClass += "bg-amber-500/20 text-amber-700 font-bold ring-1 ring-amber-500/50";
-                          }
+                      let cellClass = "px-2 py-2.5 border-r border-stone-200 text-center transition-colors ";
+                      if (isHierarchyViolation) {
+                          cellClass += "bg-cyan-500/10 text-cyan-800 font-semibold";
+                      } else if (isDuplicate) {
+                          cellClass += "bg-yellow-500/10 text-yellow-800 font-semibold";
+                      } else if (isChangedByApplicant) {
+                          cellClass += "bg-amber-500/10 text-amber-700 font-semibold";
                       } else {
-                          if (isHierarchyViolation) cellClass += "text-cyan-700 font-bold bg-cyan-400/10";
-                          else if (isDuplicate) cellClass += "text-yellow-700 font-bold bg-yellow-400/10";
-                          else cellClass += "bg-stone-100 text-stone-600";
+                          cellClass += "text-stone-700";
+                      }
+                      if (isChangedByApplicant && (isHierarchyViolation || isDuplicate)) {
+                          cellClass += " ring-1 ring-inset ring-amber-400";
                       }
 
                       return (
-                        <td key={slot} className="px-2 py-2.5 border-r border-stone-200 text-center">
-                          {subject ? (
-                              <span className={cellClass} title={debugInfo}>
-                                  {subject}
-                              </span>
-                          ) : (
-                              <span className="text-stone-500">-</span>
-                          )}
+                        <td key={slot} className={cellClass}>
+                          {subject || <span className="text-stone-500 font-normal">-</span>}
                         </td>
                       );
                     })}
@@ -194,6 +186,11 @@ export function AnalysisStep({
                       {row.hierarchyViolations?.map((v: any, i: number) => (
                         <span key={i} className="text-cyan-700 text-xs whitespace-nowrap">
                           {v.message}
+                        </span>
+                      ))}
+                      {row.missingCategories?.map((category) => (
+                        <span key={category} className="text-violet-700 text-xs whitespace-nowrap">
+                          {category} 과목 이수 필요
                         </span>
                       ))}
                     </td>
