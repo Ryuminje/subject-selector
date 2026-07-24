@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LogIn, ArrowLeft, Mail, KeyRound, School, ChevronDown } from "lucide-react";
+import { LogIn, ArrowLeft, ShieldCheck, KeyRound, School, ChevronDown } from "lucide-react";
 import { signIn } from "@/lib/auth-client";
 
 type Mode = "email" | "id";
@@ -128,8 +128,8 @@ function LoginForm() {
                 mode === "email" ? "bg-white text-teal-700 shadow-sm" : "text-slate-500"
               }`}
             >
-              <Mail className="w-4 h-4" />
-              이메일로 로그인
+              <ShieldCheck className="w-4 h-4" />
+              관리자 로그인
             </button>
             <button
               type="button"
