@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   }
   if (!isValidLoginId(loginId)) {
     return NextResponse.json(
-      { error: "아이디는 영문/숫자/._- 만 사용해 2~30자로 입력해 주세요." },
+      { error: "아이디는 한글/영문/숫자/._- 를 사용해 2~30자로 입력해 주세요." },
       { status: 400 }
     );
   }

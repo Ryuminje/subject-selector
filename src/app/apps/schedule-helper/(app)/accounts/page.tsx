@@ -14,12 +14,23 @@ import {
   Check,
   Upload,
   RotateCcw,
+  Users,
+  Trash2,
 } from "lucide-react";
 
 interface AccountRow {
   id: string;
   name: string;
   loginId: string;
+  createdAt: string;
+}
+
+interface MemberRow {
+  id: string;
+  name: string;
+  email: string;
+  loginId: string | null;
+  role: string;
   createdAt: string;
 }
 
@@ -40,6 +51,11 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<AccountRow[] | null>(null);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [copied, setCopied] = useState(false);
+
+  const [members, setMembers] = useState<MemberRow[] | null>(null);
+  const [loadingMembers, setLoadingMembers] = useState(true);
+  const [memberDeletingId, setMemberDeletingId] = useState<string | null>(null);
+  const [memberError, setMemberError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [loginId, setLoginId] = useState("");
@@ -67,14 +83,28 @@ export default function AccountsPage() {
       .finally(() => setLoadingAccounts(false));
   };
 
+  const loadMembers = () => {
+    setLoadingMembers(true);
+    fetch("/api/schedule-helper/members")
+      .then((res) => res.json())
+      .then((body) => setMembers(body.members ?? []))
+      .catch(() => setMembers([]))
+      .finally(() => setLoadingMembers(false));
+  };
+
   // 최초 진입 시 계정 목록을 불러옴 (setState는 항상 .then()/.finally() 안에서만 — 이펙트 본문에서 직접 호출 금지,
-  // loadAccounts는 setLoadingAccounts(true)를 동기 호출하므로 여기서 그대로 재사용하지 않고 fetch 체인을 별도로 둠)
+  // loadAccounts/loadMembers는 setLoading...(true)를 동기 호출하므로 여기서 그대로 재사용하지 않고 fetch 체인을 별도로 둠)
   useEffect(() => {
     fetch("/api/schedule-helper/teachers/accounts")
       .then((res) => res.json())
       .then((body) => setAccounts(body.accounts ?? []))
       .catch(() => setAccounts([]))
       .finally(() => setLoadingAccounts(false));
+    fetch("/api/schedule-helper/members")
+      .then((res) => res.json())
+      .then((body) => setMembers(body.members ?? []))
+      .catch(() => setMembers([]))
+      .finally(() => setLoadingMembers(false));
   }, []);
 
   const handleCopyJoinCode = async () => {
@@ -102,6 +132,7 @@ export default function AccountsPage() {
     setLoginId("");
     setPassword("");
     loadAccounts();
+    loadMembers();
   };
 
   const handleBulkUpload = async () => {
@@ -124,6 +155,22 @@ export default function AccountsPage() {
     }
     setBulkResult({ created: body.created ?? [], skipped: body.skipped ?? [] });
     setBulkFile(null);
+    loadAccounts();
+    loadMembers();
+  };
+
+  const handleDeleteMember = async (member: MemberRow) => {
+    if (!window.confirm(`"${member.name}" 님의 계정을 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    setMemberError(null);
+    setMemberDeletingId(member.id);
+    const res = await fetch(`/api/schedule-helper/members/${member.id}`, { method: "DELETE" });
+    const body = await res.json().catch(() => ({}));
+    setMemberDeletingId(null);
+    if (!res.ok) {
+      setMemberError(body.error ?? "삭제 중 오류가 발생했습니다.");
+      return;
+    }
+    loadMembers();
     loadAccounts();
   };
 
@@ -181,9 +228,71 @@ export default function AccountsPage() {
       </div>
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mb-6">
+        <h2 className="text-lg font-bold text-teal-700 mb-1 flex items-center gap-2">
+          <Users className="w-5 h-5" /> 전체 가입 인원
+        </h2>
+        <p className="text-sm text-slate-500 mb-4">
+          이메일 셀프가입·아이디 발급 계정을 모두 포함한, 이 학교에 가입된 전체 인원입니다.
+        </p>
+        {memberError && <p className="text-sm text-rose-600 mb-3">{memberError}</p>}
+        {loadingMembers ? (
+          <div className="flex justify-center py-8 text-teal-600">
+            <Loader2 className="w-6 h-6 animate-spin" />
+          </div>
+        ) : !members?.length ? (
+          <p className="text-sm text-slate-400 text-center py-6">가입된 인원이 없습니다.</p>
+        ) : (
+          <div className="space-y-2">
+            {members.map((m) => {
+              const isSelf = m.id === session?.user?.id;
+              return (
+                <div
+                  key={m.id}
+                  className="flex items-center justify-between gap-2 p-3.5 bg-slate-50 border border-slate-200 rounded-xl"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-slate-800">{m.name}</span>
+                      {isSelf && <span className="text-xs text-slate-400">(나)</span>}
+                      <span
+                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                          m.role === "ADMIN" ? "bg-teal-100 text-teal-700" : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {m.role === "ADMIN" ? "관리자" : "교사"}
+                      </span>
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-500">
+                        {m.loginId ? "아이디 로그인" : "이메일"}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-500 truncate">{m.loginId ?? m.email}</p>
+                  </div>
+                  {!isSelf && (
+                    <button
+                      onClick={() => handleDeleteMember(m)}
+                      disabled={memberDeletingId === m.id}
+                      className="inline-flex items-center gap-1 text-xs px-3 py-1.5 border border-rose-200 rounded-lg text-rose-600 hover:bg-rose-50 disabled:opacity-50 transition-colors shrink-0"
+                    >
+                      {memberDeletingId === m.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-3.5 h-3.5" />
+                      )}
+                      삭제
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 mb-6">
         <h2 className="text-lg font-bold text-teal-700 mb-1">학교 코드</h2>
         <p className="text-sm text-slate-500 mb-4">
-          아이디로 로그인할 때 아이디·비밀번호와 함께 이 코드가 필요합니다. 계정을 나눠줄 때 함께 안내하세요.
+          아이디 로그인은 화면에서 학교를 검색해서 선택하므로 이 코드가 필요 없습니다. 이 코드는 선생님이
+          이메일로 직접 &quot;코드로 가입&quot;할 때만 필요합니다.
         </p>
         <div className="flex items-center gap-3">
           <span className="text-2xl font-bold tracking-[0.2em] text-teal-800 bg-teal-50 border border-teal-200 rounded-xl px-5 py-2.5">
@@ -203,7 +312,7 @@ export default function AccountsPage() {
         <h2 className="text-lg font-bold text-teal-700 mb-1 flex items-center gap-2">
           <UserPlus className="w-5 h-5" /> 계정 하나 만들기
         </h2>
-        <p className="text-sm text-slate-500 mb-4">아이디는 영문/숫자/._- 만 사용해 2~30자로 입력하세요.</p>
+        <p className="text-sm text-slate-500 mb-4">아이디는 한글/영문/숫자/._- 를 사용해 2~30자로 입력하세요.</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
           <input
             type="text"
