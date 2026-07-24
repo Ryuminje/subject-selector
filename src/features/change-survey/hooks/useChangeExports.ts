@@ -663,6 +663,7 @@ export function useChangeExports(
       if (student.basicCount >= 10) remarks.push("기초과목 최대학점 초과");
       if (student.duplicateSubjects?.length) remarks.push(`중복: ${student.duplicateSubjects.join(", ")}`);
       if (student.hierarchyViolations?.length) remarks.push(student.hierarchyViolations.map((v: any) => v.message).join(", "));
+      if (student.missingCategories?.length) remarks.push(student.missingCategories.map((c) => `${c} 과목 이수 필요`).join(", "));
 
       aoa.push([
         idx + 1,

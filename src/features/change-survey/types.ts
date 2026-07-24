@@ -30,6 +30,7 @@ export interface Step6Row {
   scienceCount: number;
   duplicateSubjects: string[];
   hierarchyViolations: { subject: string; prereq: string; message: string }[];
+  missingCategories: ("사회" | "과학")[];
 }
 
 export type ChangeActiveTab =
