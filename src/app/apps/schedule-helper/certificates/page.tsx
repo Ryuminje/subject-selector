@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "@/lib/auth-client";
-import { ArrowLeft, LogOut, Loader2, KeyRound } from "lucide-react";
+import { ArrowLeft, LogOut, Loader2, KeyRound, UserPlus } from "lucide-react";
 import CertificatesTabs from "@/features/schedule-helper/components/certificates/CertificatesTabs";
 
 export default function CertificatesPage() {
@@ -54,13 +54,24 @@ export default function CertificatesPage() {
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-emerald-600 to-teal-500 p-6 md:p-8 rounded-3xl shadow-lg text-white mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-2 flex items-center gap-2">
-          <span>📜</span> 연수 이수증 수거
-        </h1>
-        <p className="text-emerald-50 font-medium text-sm md:text-base">
-          이수증 제출부터 QR 서명 수거까지 한 곳에서 관리합니다
-        </p>
+      <div className="bg-gradient-to-br from-emerald-600 to-teal-500 p-6 md:p-8 rounded-3xl shadow-lg text-white mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold mb-2 flex items-center gap-2">
+            <span>📜</span> 연수 이수증 수거
+          </h1>
+          <p className="text-emerald-50 font-medium text-sm md:text-base">
+            이수증 제출부터 QR 서명 수거까지 한 곳에서 관리합니다
+          </p>
+        </div>
+        {isAdmin && (
+          <Link
+            href="/apps/schedule-helper/accounts"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold rounded-xl border border-white/30 transition-colors shrink-0"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span className="hidden sm:inline">계정 관리</span>
+          </Link>
+        )}
       </div>
 
       <CertificatesTabs isAdmin={isAdmin} />

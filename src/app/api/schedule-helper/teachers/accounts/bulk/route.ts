@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       continue;
     }
     if (!isValidLoginId(loginId)) {
-      skipped.push({ name, loginId, reason: "아이디 형식이 올바르지 않습니다 (영문/숫자/._- , 2~30자)." });
+      skipped.push({ name, loginId, reason: "아이디 형식이 올바르지 않습니다 (한글/영문/숫자/._- , 2~30자)." });
       continue;
     }
     if (takenLoginIds.has(loginId)) {

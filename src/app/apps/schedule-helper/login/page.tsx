@@ -1,12 +1,17 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LogIn, ArrowLeft, Mail, KeyRound } from "lucide-react";
+import { LogIn, ArrowLeft, Mail, KeyRound, School, ChevronDown } from "lucide-react";
 import { signIn } from "@/lib/auth-client";
 
 type Mode = "email" | "id";
+
+interface SchoolOption {
+  id: string;
+  name: string;
+}
 
 // 오픈 리다이렉트 방지: schedule-helper 내부 경로로만 리다이렉트
 function resolveNextPath(next: string | null): string {
@@ -23,12 +28,40 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const [schoolJoinCode, setSchoolJoinCode] = useState("");
+  const [selectedSchool, setSelectedSchool] = useState<SchoolOption | null>(null);
+  const [schoolQuery, setSchoolQuery] = useState("");
+  const [schoolOpen, setSchoolOpen] = useState(false);
+  const [schoolResults, setSchoolResults] = useState<SchoolOption[]>([]);
+  const [schoolLoading, setSchoolLoading] = useState(false);
+  const schoolBoxRef = useRef<HTMLDivElement>(null);
   const [loginId, setLoginId] = useState("");
   const [idPassword, setIdPassword] = useState("");
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!schoolOpen) return;
+    const timer = setTimeout(() => {
+      setSchoolLoading(true);
+      fetch(`/api/schedule-helper/schools/search?q=${encodeURIComponent(schoolQuery.trim())}`)
+        .then((res) => res.json())
+        .then((body) => setSchoolResults(body.schools ?? []))
+        .catch(() => setSchoolResults([]))
+        .finally(() => setSchoolLoading(false));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [schoolQuery, schoolOpen]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (schoolBoxRef.current && !schoolBoxRef.current.contains(e.target as Node)) {
+        setSchoolOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleSubmitEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,12 +78,16 @@ function LoginForm() {
 
   const handleSubmitId = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedSchool) {
+      setError("학교를 선택해 주세요.");
+      return;
+    }
     setError(null);
     setLoading(true);
     const res = await fetch("/api/schedule-helper/login-id", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ schoolJoinCode, loginId, password: idPassword }),
+      body: JSON.stringify({ schoolId: selectedSchool.id, loginId, password: idPassword }),
     });
     const body = await res.json().catch(() => ({}));
     setLoading(false);
@@ -148,16 +185,70 @@ function LoginForm() {
             </form>
           ) : (
             <form onSubmit={handleSubmitId} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">학교 코드</label>
-                <input
-                  type="text"
-                  required
-                  value={schoolJoinCode}
-                  onChange={(e) => setSchoolJoinCode(e.target.value.toUpperCase())}
-                  placeholder="8자리 코드"
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all"
-                />
+              <div ref={schoolBoxRef} className="relative">
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">학교</label>
+                {selectedSchool ? (
+                  <div className="w-full flex items-center justify-between px-3 py-2.5 bg-teal-50 border border-teal-200 rounded-xl text-sm">
+                    <span className="font-semibold text-teal-800 flex items-center gap-1.5">
+                      <School className="w-4 h-4" />
+                      {selectedSchool.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedSchool(null);
+                        setSchoolQuery("");
+                        setSchoolOpen(true);
+                      }}
+                      className="text-xs font-semibold text-teal-700 hover:underline"
+                    >
+                      변경
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setSchoolOpen((v) => !v)}
+                    className="w-full flex items-center justify-between px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all text-left"
+                  >
+                    <span className="text-slate-400">학교를 검색하세요</span>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${schoolOpen ? "rotate-180" : ""}`} />
+                  </button>
+                )}
+
+                {schoolOpen && !selectedSchool && (
+                  <div className="absolute z-20 mt-1.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={schoolQuery}
+                      onChange={(e) => setSchoolQuery(e.target.value)}
+                      placeholder="학교 이름 검색"
+                      className="w-full px-4 py-2.5 border-b border-slate-100 text-sm focus:outline-none"
+                    />
+                    <div className="max-h-48 overflow-y-auto divide-y divide-slate-100">
+                      {schoolLoading ? (
+                        <div className="px-4 py-3 text-sm text-slate-400">검색 중...</div>
+                      ) : schoolResults.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-slate-400">일치하는 학교가 없습니다.</div>
+                      ) : (
+                        schoolResults.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedSchool(s);
+                              setSchoolOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-teal-50 hover:text-teal-800 transition-colors"
+                          >
+                            {s.name}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">아이디</label>
