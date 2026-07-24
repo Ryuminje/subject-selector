@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "@/lib/auth-client";
-import { ArrowLeft, LogOut, Loader2, KeyRound, UserPlus } from "lucide-react";
+import { ArrowLeft, LogOut, Loader2, KeyRound, UserPlus, Repeat } from "lucide-react";
 import CertificatesTabs from "@/features/schedule-helper/components/certificates/CertificatesTabs";
 
 export default function CertificatesPage() {
@@ -29,13 +29,22 @@ export default function CertificatesPage() {
   return (
     <main className="max-w-5xl mx-auto px-2 md:px-6 py-6 w-full">
       <div className="flex items-center justify-between mb-4">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-teal-700 text-sm font-medium rounded-xl border border-teal-100 shadow-sm transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          허브로 돌아가기
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-teal-700 text-sm font-medium rounded-xl border border-teal-100 shadow-sm transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            허브로 돌아가기
+          </Link>
+          <Link
+            href="/apps/schedule-helper"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-slate-500 hover:text-teal-600 text-sm font-medium rounded-xl border border-slate-200 shadow-sm transition-colors"
+          >
+            <Repeat className="w-4 h-4" />
+            수업교체 도우미로 이동
+          </Link>
+        </div>
         <div className="flex items-center gap-2">
           <Link
             href="/apps/schedule-helper/account"
