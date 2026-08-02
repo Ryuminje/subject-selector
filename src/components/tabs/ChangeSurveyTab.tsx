@@ -56,6 +56,11 @@ export function ChangeSurveyTab() {
     electiveChangesArbitrary, setElectiveChangesArbitrary,
     enableOptimization, setEnableOptimization,
     adjustmentLog,
+    confirmedBaseSchedules, setConfirmedBaseSchedules,
+    confirmedLog, setConfirmedLog,
+    canUndoConfirm,
+    handleConfirm,
+    handleUndoConfirm,
   } = useElectiveChanges(changeActiveGrade, parsedSampleData, timetableData, timeSlots, classCols);
 
   const {
@@ -83,7 +88,9 @@ export function ChangeSurveyTab() {
     grade3Sem1HistoryData,
     extraUploads,
     changeUploadNames,
-    sampleRawData
+    sampleRawData,
+    confirmedLog,
+    confirmedBaseSchedules
   });
 
   (window as any).loadChangeBackup = (parsed: any) => {
@@ -98,6 +105,8 @@ export function ChangeSurveyTab() {
     if (parsed.electiveChanges) setElectiveChanges(parsed.electiveChanges);
     if (parsed.timeSlots) setTimeSlots(parsed.timeSlots);
     if (parsed.classCols) setClassCols(parsed.classCols);
+    if (parsed.confirmedLog) setConfirmedLog(parsed.confirmedLog);
+    if (parsed.confirmedBaseSchedules) setConfirmedBaseSchedules(parsed.confirmedBaseSchedules);
     if (parsed.grade2HistoryData) {
       if (parsed.grade2HistoryData.grade2 || parsed.grade2HistoryData.grade3) {
         const trimmed: Record<string, Record<string, string[]>> = { grade2: {}, grade3: {} };
@@ -357,6 +366,14 @@ export function ChangeSurveyTab() {
                       setEnableOptimization={setEnableOptimization}
                       handleExportChanges={handleExportChanges}
                       adjustmentLog={adjustmentLog}
+                      parsedSampleData={parsedSampleData}
+                      timetableData={timetableData}
+                      timeSlots={timeSlots}
+                      classCols={classCols}
+                      confirmedBaseSchedules={confirmedBaseSchedules}
+                      canUndoConfirm={canUndoConfirm}
+                      onConfirm={handleConfirm}
+                      onUndoConfirm={handleUndoConfirm}
                     />
                   )}
 

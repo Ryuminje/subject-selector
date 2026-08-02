@@ -15,6 +15,10 @@ export interface ElectiveChange {
   beforeSubject: string;
   afterSubject: string;
   isNew?: boolean;
+  // User-specified exact target time slot for this change. When set, the
+  // auto-assignment algorithm only attempts this slot (no fallback search)
+  // and applies it before any non-pinned requests for the same student.
+  pinnedSlot?: string;
   [key: string]: string | boolean | undefined;
 }
 
