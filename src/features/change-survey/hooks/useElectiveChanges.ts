@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ChangeGradeKey, GradeStringArrays, TimetableData } from "../types";
+import type { ChangeGradeKey, ElectiveChange, GradeStringArrays, TimetableData } from "../types";
 import type { StudentTimeData } from "../../../types";
 
 const normalizeSubject = (subject: string): string => {
@@ -10,6 +10,22 @@ const normalizeSubject = (subject: string): string => {
     .replace(/Ⅳ/g, 'IV');
 };
 
+export interface ChangeLogEntry {
+  beforeStr: string;
+  afterStr: string;
+  status: 'success' | 'failed';
+  reason?: string;
+  source?: 'applicant' | 'arbitrary';
+  pinned?: boolean;
+}
+
+interface PreConfirmSnapshot {
+  confirmedLog: Record<string, ChangeLogEntry[]>;
+  confirmedBaseSchedules: Record<string, Record<string, string>>;
+  electiveChanges: ElectiveChange[];
+  electiveChangesArbitrary: ElectiveChange[];
+}
+
 export function useElectiveChanges(
   changeActiveGrade: ChangeGradeKey,
   parsedSampleData: { grade2: StudentTimeData[]; grade3: StudentTimeData[] },
@@ -19,11 +35,18 @@ export function useElectiveChanges(
 ) {
   const [electiveChanges, setElectiveChanges] = useState<Record<string, any[]>>({ grade2: [], grade3: [] });
   const [electiveChangesArbitrary, setElectiveChangesArbitrary] = useState<Record<string, any[]>>({ grade2: [], grade3: [] });
-  const [enableOptimization, setEnableOptimization] = useState(false);
+  // 학년별로 독립적으로 켜고 끌 수 있도록 학년별 boolean으로 관리한다.
+  const [enableOptimization, setEnableOptimization] = useState<Record<ChangeGradeKey, boolean>>({ grade2: false, grade3: false });
+
+  // 확정(freeze): 확정된 학생의 최종 스케줄/로그를 얼려두고, 이후 계산은
+  // 이 값을 출발점으로 삼아 확정된 학생을 다시 건드리지 않도록 한다.
+  const [confirmedLog, setConfirmedLog] = useState<Record<ChangeGradeKey, Record<string, ChangeLogEntry[]>>>({ grade2: {}, grade3: {} });
+  const [confirmedBaseSchedules, setConfirmedBaseSchedules] = useState<Record<ChangeGradeKey, Record<string, Record<string, string>>>>({ grade2: {}, grade3: {} });
+  const [preConfirmSnapshot, setPreConfirmSnapshot] = useState<Record<ChangeGradeKey, PreConfirmSnapshot | null>>({ grade2: null, grade3: null });
 
   // --- Global Load Balancer (Auto-Balancing) ---
   useEffect(() => {
-    if (!enableOptimization) {
+    if (!enableOptimization[changeActiveGrade]) {
       setElectiveChangesArbitrary(prev => ({ ...prev, [changeActiveGrade]: [] }));
       return;
     }
@@ -56,11 +79,16 @@ export function useElectiveChanges(
       return false;
     };
 
+    const gradeConfirmedSchedules = confirmedBaseSchedules[changeActiveGrade] || {};
+
     const vSchedules: Record<string, Record<string, string>> = {};
-    const lockedStudents = new Set(manualChanges.map(c => String(c.studentId)));
+    const lockedStudents = new Set([
+      ...manualChanges.map(c => String(c.studentId)),
+      ...Object.keys(gradeConfirmedSchedules),
+    ]);
 
     students.forEach(s => {
-      vSchedules[s.id] = { ...s.timeSlotMap };
+      vSchedules[s.id] = { ...(gradeConfirmedSchedules[s.id] ?? s.timeSlotMap) };
     });
 
     const computeSizes = (schedules: Record<string, Record<string, string>>) => {
@@ -223,13 +251,17 @@ export function useElectiveChanges(
        [changeActiveGrade]: sortedGenerated
     }));
 
-  }, [enableOptimization, electiveChanges, parsedSampleData, timetableData, timeSlots, classCols, changeActiveGrade]);
+  }, [enableOptimization, electiveChanges, parsedSampleData, timetableData, timeSlots, classCols, changeActiveGrade, confirmedBaseSchedules]);
 
-  const adjustmentLog = useMemo(() => {
-    const log: Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary' }[]> = {};
-    if (!parsedSampleData || (!parsedSampleData.grade2.length && !parsedSampleData.grade3.length) || !electiveChanges) return log;
+  const pendingResult = useMemo(() => {
+    const log: Record<string, ChangeLogEntry[]> = {};
+    const finalSchedules: Record<ChangeGradeKey, Record<string, Record<string, string>>> = { grade2: {}, grade3: {} };
+    if (!parsedSampleData || (!parsedSampleData.grade2.length && !parsedSampleData.grade3.length) || !electiveChanges) {
+      return { log, finalSchedules };
+    }
 
     (['grade2', 'grade3'] as ('grade2' | 'grade3')[]).forEach(grade => {
+      const gradeConfirmedSchedules = confirmedBaseSchedules[grade] || {};
       const upperChanges = (electiveChanges[grade] || []).map(c => ({ ...c, source: 'applicant' as const }));
       const lowerChanges = (electiveChangesArbitrary[grade] || []).map(c => ({ ...c, source: 'arbitrary' as const }));
       const changes = [...upperChanges, ...lowerChanges];
@@ -269,11 +301,19 @@ export function useElectiveChanges(
         return slots;
       };
 
-      if (!enableOptimization) {
+      if (!enableOptimization[grade]) {
         // --- 기존 순차 매칭 알고리즘 (Original sequential greedy matching) ---
         const studentSchedules: Record<string, Record<string, string>> = {};
 
-        changes.forEach(c => {
+        // 고정(pinnedSlot)된 요청은 같은 학생의 다른 요청보다 항상 먼저 적용해서
+        // 이후 요청이 실수로 고정된 타임을 건드리지 않도록 한다.
+        const orderedChanges = [...changes].sort((a, b) => {
+          const aPinned = (a.pinnedSlot || a._targetSlot) ? 0 : 1;
+          const bPinned = (b.pinnedSlot || b._targetSlot) ? 0 : 1;
+          return aPinned - bPinned;
+        });
+
+        orderedChanges.forEach(c => {
           if (!c.studentId || !c.beforeSubject || !c.afterSubject) return;
 
           const targetStudent = studentsInGrade.find(s => s.id === c.studentId);
@@ -284,7 +324,7 @@ export function useElectiveChanges(
           }
 
           if (!studentSchedules[c.studentId]) {
-            studentSchedules[c.studentId] = { ...targetStudent.timeSlotMap };
+            studentSchedules[c.studentId] = { ...(gradeConfirmedSchedules[c.studentId] ?? targetStudent.timeSlotMap) };
           }
           const currentSchedule = studentSchedules[c.studentId];
 
@@ -303,25 +343,35 @@ export function useElectiveChanges(
             return;
           }
 
-          if (subjectExistsInSlot(c.afterSubject, beforeSlot)) {
+          const pinnedSlot = c.pinnedSlot || c._targetSlot;
+
+          if ((!pinnedSlot || pinnedSlot === beforeSlot) && subjectExistsInSlot(c.afterSubject, beforeSlot)) {
             if (!log[c.studentId]) log[c.studentId] = [];
             log[c.studentId].push({
               beforeStr: `${c.beforeSubject}(${beforeSlot})`,
               afterStr: `${c.afterSubject}(${beforeSlot})`,
               status: 'success',
-              source: c.source
+              source: c.source,
+              pinned: !!pinnedSlot
             });
             currentSchedule[beforeSlot] = c.afterSubject;
             return;
           }
 
           let afterSlots = findSlotsWithSubject(c.afterSubject);
-          if (c._targetSlot) {
-            afterSlots = afterSlots.filter(s => s === c._targetSlot);
+          if (pinnedSlot) {
+            afterSlots = afterSlots.filter(s => s === pinnedSlot);
           }
           if (afterSlots.length === 0) {
             if (!log[c.studentId]) log[c.studentId] = [];
-            log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목`, source: c.source });
+            log[c.studentId].push({
+              beforeStr: c.beforeSubject,
+              afterStr: c.afterSubject,
+              status: 'failed',
+              reason: pinnedSlot ? `고정한 ${pinnedSlot} 타임에 '${c.afterSubject}' 과목이 개설되지 않음` : `시간표에 개설되지 않은 과목`,
+              source: c.source,
+              pinned: !!pinnedSlot
+            });
             return;
           }
 
@@ -341,13 +391,15 @@ export function useElectiveChanges(
                 beforeStr: `${studentSubjectInAfterSlot}(${afterSlot})`,
                 afterStr: `${studentSubjectInAfterSlot}(${beforeSlot})`,
                 status: 'success',
-                source: c.source
+                source: c.source,
+                pinned: !!pinnedSlot
               });
               log[c.studentId].push({
                 beforeStr: `${c.beforeSubject}(${beforeSlot})`,
                 afterStr: `${c.afterSubject}(${afterSlot})`,
                 status: 'success',
-                source: c.source
+                source: c.source,
+                pinned: !!pinnedSlot
               });
 
               currentSchedule[beforeSlot] = studentSubjectInAfterSlot;
@@ -366,18 +418,26 @@ export function useElectiveChanges(
               beforeStr: c.beforeSubject,
               afterStr: c.afterSubject,
               status: 'failed',
-              reason: afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 2단계 교환 실패` : lastFailedReason,
-              source: c.source
+              reason: pinnedSlot
+                ? `고정한 ${pinnedSlot} 타임으로 변경 불가: ${lastFailedReason}`
+                : (afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 2단계 교환 실패` : lastFailedReason),
+              source: c.source,
+              pinned: !!pinnedSlot
             });
           }
+        });
+
+        Object.entries(studentSchedules).forEach(([sid, sched]) => {
+          finalSchedules[grade][sid] = sched;
         });
       } else {
         // --- 동적 밸런싱 최적화 알고리즘 (Dynamic Balancing Optimization) ---
         const classSizes: Record<string, number> = {};
 
-        // 초기 모든 학생의 반별 인원수 계산
+        // 초기 모든 학생의 반별 인원수 계산 (확정된 학생은 확정된 최종 배정 기준)
         studentsInGrade.forEach(student => {
-          Object.entries(student.timeSlotMap).forEach(([slot, subject]) => {
+          const sched = gradeConfirmedSchedules[student.id] ?? student.timeSlotMap;
+          Object.entries(sched).forEach(([slot, subject]) => {
              const key = `${slot}::${normalizeSubject(subject as string)}`;
              classSizes[key] = (classSizes[key] || 0) + 1;
           });
@@ -390,10 +450,10 @@ export function useElectiveChanges(
         const optimizedSchedules: Record<string, Record<string, string>> = {};
         const optimizedLogs: Record<string, any[]> = {};
 
-        // 1. 초기값: 모든 신청자의 시간표를 원본으로 설정
+        // 1. 초기값: 모든 신청자의 시간표를 원본(또는 확정된 최종 배정)으로 설정
         studentsWithChanges.forEach(id => {
            const student = studentsInGrade.find(s => s.id === id);
-           if (student) optimizedSchedules[id] = { ...student.timeSlotMap };
+           if (student) optimizedSchedules[id] = { ...(gradeConfirmedSchedules[id] ?? student.timeSlotMap) };
         });
 
         let isOptimized = false;
@@ -414,10 +474,16 @@ export function useElectiveChanges(
                if (classSizes[key] > 0) classSizes[key]--;
             });
 
-            // 2. 이 학생의 원래 시간표에서부터 변경 신청을 순차적으로 적용하여 최적의 경로 찾기
-            let newSched = { ...student.timeSlotMap };
+            // 2. 이 학생의 원래(또는 확정된) 시간표에서부터 변경 신청을 순차적으로 적용하여 최적의 경로 찾기
+            const studentBaseSched = gradeConfirmedSchedules[studentId] ?? student.timeSlotMap;
+            let newSched = { ...studentBaseSched };
             const studentLog: any[] = [];
-            const studentChanges = changes.filter(c => c.studentId === studentId);
+            // 고정(pinnedSlot)된 요청을 먼저 반영해서 항상 그 결과가 유지되도록 한다.
+            const studentChanges = changes.filter(c => c.studentId === studentId).sort((a, b) => {
+              const aPinned = (a.pinnedSlot || a._targetSlot) ? 0 : 1;
+              const bPinned = (b.pinnedSlot || b._targetSlot) ? 0 : 1;
+              return aPinned - bPinned;
+            });
 
             let bestSequence: { sched: Record<string, string>, logs: any[], maxCost: number, successCount: number } | null = null;
 
@@ -447,13 +513,22 @@ export function useElectiveChanges(
                 return;
               }
 
+              const pinnedSlot = c.pinnedSlot || c._targetSlot;
+
               let afterSlots = findSlotsWithSubject(c.afterSubject);
-              if (c._targetSlot) {
-                afterSlots = afterSlots.filter(s => s === c._targetSlot);
+              if (pinnedSlot) {
+                afterSlots = afterSlots.filter(s => s === pinnedSlot);
               }
 
               if (afterSlots.length === 0) {
-                dfs(changeIndex + 1, currentSched, [...currentLogs, { beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `시간표에 개설되지 않은 과목`, source: c.source }], currentMaxCost, successCount);
+                dfs(changeIndex + 1, currentSched, [...currentLogs, {
+                  beforeStr: c.beforeSubject,
+                  afterStr: c.afterSubject,
+                  status: 'failed',
+                  reason: pinnedSlot ? `고정한 ${pinnedSlot} 타임에 '${c.afterSubject}' 과목이 개설되지 않음` : `시간표에 개설되지 않은 과목`,
+                  source: c.source,
+                  pinned: !!pinnedSlot
+                }], currentMaxCost, successCount);
                 return;
               }
 
@@ -468,7 +543,7 @@ export function useElectiveChanges(
                    nextSched[beforeSlot] = c.afterSubject;
                    const nextLogs = [...currentLogs];
                    if (c.beforeSubject !== c.afterSubject) {
-                     nextLogs.push({ beforeStr: `${c.beforeSubject}(${beforeSlot})`, afterStr: `${c.afterSubject}(${beforeSlot})`, status: 'success', source: c.source });
+                     nextLogs.push({ beforeStr: `${c.beforeSubject}(${beforeSlot})`, afterStr: `${c.afterSubject}(${beforeSlot})`, status: 'success', source: c.source, pinned: !!pinnedSlot });
                    }
                    validChoiceFound = true;
                    dfs(changeIndex + 1, nextSched, nextLogs, Math.max(currentMaxCost, cost), successCount + 1);
@@ -491,8 +566,8 @@ export function useElectiveChanges(
                    nextSched[afterSlot] = c.afterSubject;
 
                    const nextLogs = [...currentLogs];
-                   nextLogs.push({ beforeStr: `${studentSubjectInAfterSlot}(${afterSlot})`, afterStr: `${studentSubjectInAfterSlot}(${beforeSlot})`, status: 'success', source: c.source });
-                   nextLogs.push({ beforeStr: `${c.beforeSubject}(${beforeSlot})`, afterStr: `${c.afterSubject}(${afterSlot})`, status: 'success', source: c.source });
+                   nextLogs.push({ beforeStr: `${studentSubjectInAfterSlot}(${afterSlot})`, afterStr: `${studentSubjectInAfterSlot}(${beforeSlot})`, status: 'success', source: c.source, pinned: !!pinnedSlot });
+                   nextLogs.push({ beforeStr: `${c.beforeSubject}(${beforeSlot})`, afterStr: `${c.afterSubject}(${afterSlot})`, status: 'success', source: c.source, pinned: !!pinnedSlot });
 
                    validChoiceFound = true;
                    dfs(changeIndex + 1, nextSched, nextLogs, Math.max(currentMaxCost, cost), successCount + 1);
@@ -502,11 +577,20 @@ export function useElectiveChanges(
               }
 
               if (!validChoiceFound) {
-                 dfs(changeIndex + 1, currentSched, [...currentLogs, { beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 교환 실패` : lastFailedReason, source: c.source }], currentMaxCost, successCount);
+                 dfs(changeIndex + 1, currentSched, [...currentLogs, {
+                   beforeStr: c.beforeSubject,
+                   afterStr: c.afterSubject,
+                   status: 'failed',
+                   reason: pinnedSlot
+                     ? `고정한 ${pinnedSlot} 타임으로 변경 불가: ${lastFailedReason}`
+                     : (afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 교환 실패` : lastFailedReason),
+                   source: c.source,
+                   pinned: !!pinnedSlot
+                 }], currentMaxCost, successCount);
               }
             };
 
-            dfs(0, { ...student.timeSlotMap }, [], 0, 0);
+            dfs(0, { ...studentBaseSched }, [], 0, 0);
 
             const finalSeq: any = bestSequence;
             if (finalSeq) {
@@ -538,17 +622,95 @@ export function useElectiveChanges(
           if (optimizedLogs[studentId]) {
             log[studentId].push(...optimizedLogs[studentId]);
           }
+          if (optimizedSchedules[studentId]) {
+            finalSchedules[grade][studentId] = optimizedSchedules[studentId];
+          }
         });
       }
     });
 
-    return log;
-  }, [parsedSampleData, electiveChanges, electiveChangesArbitrary, timetableData, timeSlots, classCols, enableOptimization]);
+    return { log, finalSchedules };
+  }, [parsedSampleData, electiveChanges, electiveChangesArbitrary, timetableData, timeSlots, classCols, enableOptimization, confirmedBaseSchedules]);
+
+  // 확정된(얼려둔) 로그와, 지금 표에 남아있는 신청을 계산한 결과를 합쳐서 보여준다.
+  const adjustmentLog = useMemo(() => {
+    const merged: Record<string, ChangeLogEntry[]> = {};
+    (['grade2', 'grade3'] as ChangeGradeKey[]).forEach(grade => {
+      Object.entries(confirmedLog[grade] || {}).forEach(([sid, entries]) => {
+        merged[sid] = [...(merged[sid] || []), ...entries];
+      });
+    });
+    Object.entries(pendingResult.log).forEach(([sid, entries]) => {
+      merged[sid] = [...(merged[sid] || []), ...entries];
+    });
+    return merged;
+  }, [pendingResult, confirmedLog]);
+
+  const handleConfirm = (grade: ChangeGradeKey) => {
+    const gradeChanges = electiveChanges[grade] || [];
+    const gradeArbitrary = electiveChangesArbitrary[grade] || [];
+    const touchedIds = Array.from(new Set(
+      [...gradeChanges, ...gradeArbitrary].map(c => String(c.studentId)).filter(Boolean)
+    ));
+    if (touchedIds.length === 0) return;
+
+    setPreConfirmSnapshot(prev => ({
+      ...prev,
+      [grade]: {
+        confirmedLog: confirmedLog[grade] || {},
+        confirmedBaseSchedules: confirmedBaseSchedules[grade] || {},
+        electiveChanges: gradeChanges,
+        electiveChangesArbitrary: gradeArbitrary,
+      },
+    }));
+
+    setConfirmedBaseSchedules(prev => {
+      const nextGrade = { ...prev[grade] };
+      touchedIds.forEach(id => {
+        const sched = pendingResult.finalSchedules[grade]?.[id];
+        if (sched) nextGrade[id] = sched;
+      });
+      return { ...prev, [grade]: nextGrade };
+    });
+
+    setConfirmedLog(prev => {
+      const nextGrade = { ...prev[grade] };
+      touchedIds.forEach(id => {
+        const entries = pendingResult.log[id];
+        if (entries && entries.length > 0) {
+          nextGrade[id] = [...(nextGrade[id] || []), ...entries];
+        }
+      });
+      return { ...prev, [grade]: nextGrade };
+    });
+
+    setElectiveChanges(prev => ({ ...prev, [grade]: [] }));
+    setElectiveChangesArbitrary(prev => ({ ...prev, [grade]: [] }));
+  };
+
+  const handleUndoConfirm = (grade: ChangeGradeKey) => {
+    const snap = preConfirmSnapshot[grade];
+    if (!snap) return;
+    // 확정 이후 새로 입력된 신청이 있으면, 되돌리기가 그 내용을 스냅샷 값으로
+    // 덮어써서 조용히 사라지게 만들 수 있으므로 안전하게 거부한다.
+    const hasNewPending = (electiveChanges[grade] || []).length > 0 || (electiveChangesArbitrary[grade] || []).length > 0;
+    if (hasNewPending) return;
+    setConfirmedLog(prev => ({ ...prev, [grade]: snap.confirmedLog }));
+    setConfirmedBaseSchedules(prev => ({ ...prev, [grade]: snap.confirmedBaseSchedules }));
+    setElectiveChanges(prev => ({ ...prev, [grade]: snap.electiveChanges }));
+    setElectiveChangesArbitrary(prev => ({ ...prev, [grade]: snap.electiveChangesArbitrary }));
+    setPreConfirmSnapshot(prev => ({ ...prev, [grade]: null }));
+  };
 
   return {
     electiveChanges, setElectiveChanges,
     electiveChangesArbitrary, setElectiveChangesArbitrary,
     enableOptimization, setEnableOptimization,
     adjustmentLog,
+    confirmedBaseSchedules, setConfirmedBaseSchedules,
+    confirmedLog, setConfirmedLog,
+    canUndoConfirm: { grade2: !!preConfirmSnapshot.grade2, grade3: !!preConfirmSnapshot.grade3 },
+    handleConfirm,
+    handleUndoConfirm,
   };
 }
