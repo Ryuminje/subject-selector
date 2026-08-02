@@ -58,6 +58,7 @@ export function ChangeSurveyTab() {
     adjustmentLog,
     confirmedBaseSchedules, setConfirmedBaseSchedules,
     confirmedLog, setConfirmedLog,
+    preConfirmSnapshot, setPreConfirmSnapshot,
     canUndoConfirm,
     handleConfirm,
     handleUndoConfirm,
@@ -90,7 +91,8 @@ export function ChangeSurveyTab() {
     changeUploadNames,
     sampleRawData,
     confirmedLog,
-    confirmedBaseSchedules
+    confirmedBaseSchedules,
+    preConfirmSnapshot
   });
 
   (window as any).loadChangeBackup = (parsed: any) => {
@@ -105,8 +107,13 @@ export function ChangeSurveyTab() {
     if (parsed.electiveChanges) setElectiveChanges(parsed.electiveChanges);
     if (parsed.timeSlots) setTimeSlots(parsed.timeSlots);
     if (parsed.classCols) setClassCols(parsed.classCols);
-    if (parsed.confirmedLog) setConfirmedLog(parsed.confirmedLog);
-    if (parsed.confirmedBaseSchedules) setConfirmedBaseSchedules(parsed.confirmedBaseSchedules);
+    // 확정 관련 세 필드는 (다른 필드와 달리) 파일에 없으면 메모리에 남은 값을
+    // 그대로 두지 않고 명시적으로 "확정 없음" 상태로 초기화한다 — 그래야 확정
+    // 기능이 없던(또는 확정을 한 번도 안 한) 옛 백업을 불러왔을 때, 방금 전까지
+    // 화면에 떠 있던 확정 상태가 유령처럼 남아있지 않는다.
+    setConfirmedLog(parsed.confirmedLog ?? { grade2: {}, grade3: {} });
+    setConfirmedBaseSchedules(parsed.confirmedBaseSchedules ?? { grade2: {}, grade3: {} });
+    setPreConfirmSnapshot(parsed.preConfirmSnapshot ?? { grade2: null, grade3: null });
     if (parsed.grade2HistoryData) {
       if (parsed.grade2HistoryData.grade2 || parsed.grade2HistoryData.grade3) {
         const trimmed: Record<string, Record<string, string[]>> = { grade2: {}, grade3: {} };
