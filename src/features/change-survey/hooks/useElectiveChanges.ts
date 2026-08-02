@@ -709,6 +709,7 @@ export function useElectiveChanges(
     adjustmentLog,
     confirmedBaseSchedules, setConfirmedBaseSchedules,
     confirmedLog, setConfirmedLog,
+    preConfirmSnapshot, setPreConfirmSnapshot,
     canUndoConfirm: { grade2: !!preConfirmSnapshot.grade2, grade3: !!preConfirmSnapshot.grade3 },
     handleConfirm,
     handleUndoConfirm,
