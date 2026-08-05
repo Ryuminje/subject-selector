@@ -42,7 +42,9 @@ export function useElectiveChanges(
   // 이 값을 출발점으로 삼아 확정된 학생을 다시 건드리지 않도록 한다.
   const [confirmedLog, setConfirmedLog] = useState<Record<ChangeGradeKey, Record<string, ChangeLogEntry[]>>>({ grade2: {}, grade3: {} });
   const [confirmedBaseSchedules, setConfirmedBaseSchedules] = useState<Record<ChangeGradeKey, Record<string, Record<string, string>>>>({ grade2: {}, grade3: {} });
-  const [preConfirmSnapshot, setPreConfirmSnapshot] = useState<Record<ChangeGradeKey, PreConfirmSnapshot | null>>({ grade2: null, grade3: null });
+  // 확정을 여러 번 반복해도(확정→추가→확정→추가…) 매번의 직전 상태를 스택으로
+  // 쌓아두고, 확정 취소를 누를 때마다 한 단계씩 그 이전 상태로 되돌아간다.
+  const [confirmHistory, setConfirmHistory] = useState<Record<ChangeGradeKey, PreConfirmSnapshot[]>>({ grade2: [], grade3: [] });
 
   // --- Global Load Balancer (Auto-Balancing) ---
   useEffect(() => {
@@ -654,14 +656,17 @@ export function useElectiveChanges(
     ));
     if (touchedIds.length === 0) return;
 
-    setPreConfirmSnapshot(prev => ({
+    setConfirmHistory(prev => ({
       ...prev,
-      [grade]: {
-        confirmedLog: confirmedLog[grade] || {},
-        confirmedBaseSchedules: confirmedBaseSchedules[grade] || {},
-        electiveChanges: gradeChanges,
-        electiveChangesArbitrary: gradeArbitrary,
-      },
+      [grade]: [
+        ...prev[grade],
+        {
+          confirmedLog: confirmedLog[grade] || {},
+          confirmedBaseSchedules: confirmedBaseSchedules[grade] || {},
+          electiveChanges: gradeChanges,
+          electiveChangesArbitrary: gradeArbitrary,
+        },
+      ],
     }));
 
     setConfirmedBaseSchedules(prev => {
@@ -689,17 +694,18 @@ export function useElectiveChanges(
   };
 
   const handleUndoConfirm = (grade: ChangeGradeKey) => {
-    const snap = preConfirmSnapshot[grade];
-    if (!snap) return;
+    const stack = confirmHistory[grade];
+    if (!stack || stack.length === 0) return;
     // 확정 이후 새로 입력된 신청이 있으면, 되돌리기가 그 내용을 스냅샷 값으로
     // 덮어써서 조용히 사라지게 만들 수 있으므로 안전하게 거부한다.
     const hasNewPending = (electiveChanges[grade] || []).length > 0 || (electiveChangesArbitrary[grade] || []).length > 0;
     if (hasNewPending) return;
+    const snap = stack[stack.length - 1];
     setConfirmedLog(prev => ({ ...prev, [grade]: snap.confirmedLog }));
     setConfirmedBaseSchedules(prev => ({ ...prev, [grade]: snap.confirmedBaseSchedules }));
     setElectiveChanges(prev => ({ ...prev, [grade]: snap.electiveChanges }));
     setElectiveChangesArbitrary(prev => ({ ...prev, [grade]: snap.electiveChangesArbitrary }));
-    setPreConfirmSnapshot(prev => ({ ...prev, [grade]: null }));
+    setConfirmHistory(prev => ({ ...prev, [grade]: stack.slice(0, -1) }));
   };
 
   return {
@@ -709,8 +715,8 @@ export function useElectiveChanges(
     adjustmentLog,
     confirmedBaseSchedules, setConfirmedBaseSchedules,
     confirmedLog, setConfirmedLog,
-    preConfirmSnapshot, setPreConfirmSnapshot,
-    canUndoConfirm: { grade2: !!preConfirmSnapshot.grade2, grade3: !!preConfirmSnapshot.grade3 },
+    confirmHistory, setConfirmHistory,
+    canUndoConfirm: { grade2: confirmHistory.grade2.length > 0, grade3: confirmHistory.grade3.length > 0 },
     handleConfirm,
     handleUndoConfirm,
   };

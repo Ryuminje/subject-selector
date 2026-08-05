@@ -123,6 +123,11 @@ export function PreviewStep({
                           {v.message}
                         </span>
                       ))}
+                      {row.missingCategories?.map((category) => (
+                        <span key={category} className="text-violet-700 text-xs whitespace-nowrap">
+                          {category} 과목 이수 필요
+                        </span>
+                      ))}
                     </td>
                   </tr>
                 ))}

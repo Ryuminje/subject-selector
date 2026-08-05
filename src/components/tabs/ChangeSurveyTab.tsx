@@ -58,7 +58,7 @@ export function ChangeSurveyTab() {
     adjustmentLog,
     confirmedBaseSchedules, setConfirmedBaseSchedules,
     confirmedLog, setConfirmedLog,
-    preConfirmSnapshot, setPreConfirmSnapshot,
+    confirmHistory, setConfirmHistory,
     canUndoConfirm,
     handleConfirm,
     handleUndoConfirm,
@@ -92,7 +92,7 @@ export function ChangeSurveyTab() {
     sampleRawData,
     confirmedLog,
     confirmedBaseSchedules,
-    preConfirmSnapshot
+    confirmHistory
   });
 
   (window as any).loadChangeBackup = (parsed: any) => {
@@ -113,7 +113,18 @@ export function ChangeSurveyTab() {
     // 화면에 떠 있던 확정 상태가 유령처럼 남아있지 않는다.
     setConfirmedLog(parsed.confirmedLog ?? { grade2: {}, grade3: {} });
     setConfirmedBaseSchedules(parsed.confirmedBaseSchedules ?? { grade2: {}, grade3: {} });
-    setPreConfirmSnapshot(parsed.preConfirmSnapshot ?? { grade2: null, grade3: null });
+    if (parsed.confirmHistory) {
+      // 새 형식: 확정마다 쌓인 스냅샷 스택을 그대로 복원
+      setConfirmHistory(parsed.confirmHistory);
+    } else if (parsed.preConfirmSnapshot) {
+      // 옛 형식(확정 1회분만 저장): 단일 스냅샷을 스택의 1개짜리 항목으로 변환
+      setConfirmHistory({
+        grade2: parsed.preConfirmSnapshot.grade2 ? [parsed.preConfirmSnapshot.grade2] : [],
+        grade3: parsed.preConfirmSnapshot.grade3 ? [parsed.preConfirmSnapshot.grade3] : [],
+      });
+    } else {
+      setConfirmHistory({ grade2: [], grade3: [] });
+    }
     if (parsed.grade2HistoryData) {
       if (parsed.grade2HistoryData.grade2 || parsed.grade2HistoryData.grade3) {
         const trimmed: Record<string, Record<string, string[]>> = { grade2: {}, grade3: {} };

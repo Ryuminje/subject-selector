@@ -255,6 +255,19 @@
 
 ## 📅 개발 히스토리 로그 (최신순)
 
+### 2026-08-05 (2)
+**본조사 탭 4단계에 "사회/과학 과목 이수 필요" 표시 이식:**
+- "선택과목 변경 탭 7단계엔 사회/과학 이수 학점이 0이면 비고란에 표시하는 기능이 있던데, 본조사 탭 4단계에도 똑같이 넣어달라"는 요청. 원본(`useStep6Data.ts`)은 `socialCount`/`scienceCount === 0`이면 `missingCategories`에 담아 보라색(`text-violet-700`) "OO 과목 이수 필요"로 표시하는 단순한 로직이라, 본조사 쪽(`useMainUploads.ts`)의 동일한 카운트 계산 직후에 그대로 이식.
+- 공유 타입 `ProcessedStudent`(`src/types/index.ts`)에 `missingCategories?: ("사회"|"과학")[]`를 옵셔널로 추가 — 같은 타입을 쓰는 수요조사(`useDemandUploads.ts`)는 이 필드를 채우지 않으므로 옵셔널로 둬야 `tsc`가 깨지지 않음(실제로 처음엔 필수로 뒀다가 `useDemandUploads.ts`에서 타입 에러가 나서 옵셔널로 정정). 화면(`PreviewStep.tsx`)과 엑셀 다운로드 비고 열(`useMainClassSummary.ts`) 양쪽에 동일하게 반영해 화면·파일이 어긋나지 않게 함.
+- 합성 데이터(사회+과학 모두 신청한 학생 / 국어만 신청해 둘 다 0인 학생)로 4단계 화면을 직접 렌더링해, 후자에만 "사회 과목 이수 필요"/"과학 과목 이수 필요"가 정확히 뜨는 것을 확인. `tsc --noEmit`/`eslint`는 변경 파일 기존 베이스라인과 동일(신규 이슈 0개).
+
+### 2026-08-05 (1)
+**5단계 "확정" 되돌리기를 1단계 스냅샷 → 스택으로 전환(다단계 확정 취소):**
+- "확정하고 새로 추가하고 확정하고 또 추가해도, 확정 취소를 누르면 계속 그 이전 상태로 돌아가고 싶다"는 요청. 기존 `preConfirmSnapshot`은 학년별로 스냅샷 1개만 저장하는 구조라 확정을 두 번 이상 하면 가장 최근 확정 1건만 되돌릴 수 있었습니다.
+- `useElectiveChanges.ts`의 `preConfirmSnapshot`(단일 객체)을 `confirmHistory`(스냅샷 배열, 스택)로 교체 — `handleConfirm`은 확정 직전 상태를 배열 끝에 push, `handleUndoConfirm`은 배열 끝에서 pop해 그 스냅샷으로 복원. 확정 이후 새 신청이 남아있으면 되돌리기를 거부하는 기존 안전장치(`hasNewPending`)는 그대로 유지. `canUndoConfirm`은 `confirmHistory[grade].length > 0`으로 판단하도록 변경했지만 boolean 타입 자체는 그대로라 `ApplicationStep.tsx` 등 소비 측 코드는 무변경.
+- 백업 저장/불러오기(`ChangeSurveyTab.tsx`)도 `confirmHistory`로 저장하고, **옛 백업 호환**을 위해 `loadChangeBackup`에서 `parsed.confirmHistory`가 없고 `parsed.preConfirmSnapshot`(옛 단일 스냅샷 형식)만 있으면 1개짜리 배열로 자동 변환하도록 마이그레이션 처리.
+- 합성 데이터로 확정→확정 취소만 남기고 새 신청 추가→확정(2건째)→확정 취소(1건째만 되돌아가는지, 되돌아간 자리에 새 신청이 되돌아오는지)→그 신청 삭제→확정 취소(0건째, 즉 최초 미확정 상태까지 완전히 되돌아가는지)까지 브라우저에서 전부 클릭으로 재현해 확인. 옛 형식 백업(`preConfirmSnapshot`만 있고 `confirmHistory` 없음)을 `loadChangeBackup`에 직접 넣어 1개짜리 스택으로 정상 변환되는 것도 확인. `tsc --noEmit`/`eslint`는 관련 파일 기존 베이스라인과 동일.
+
 ### 2026-08-02 (4)
 **확정 관련 백업 저장/불러오기 후속 버그 2건 수정:**
 - **"확정 취소"가 저장→불러오기 후 사라지는 문제**: `preConfirmSnapshot`(확정 취소에 필요한 "확정 직전 상태")이 훅 내부 state로만 있고 `useElectiveChanges.ts`의 반환값에 없어서, `getChangeBackup`/`loadChangeBackup`(`ChangeSurveyTab.tsx`)이 저장/복원할 방법이 아예 없었습니다. `confirmedLog`/`confirmedBaseSchedules`와 동일하게 `preConfirmSnapshot, setPreConfirmSnapshot`을 훅에서 반환하도록 추가하고, 백업 저장/불러오기 양쪽에 필드를 추가. 저장→새로고침(브라우저 재탐색으로 시뮬레이션)→불러오기 후에도 "확정 취소"가 정확히 확정 직전 상태로 복원되는 것까지 확인.

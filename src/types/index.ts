@@ -26,6 +26,7 @@ export interface ProcessedStudent {
   scienceCount: number;
   duplicateSubjects: string[];
   hierarchyViolations: { subject: string; prereq: string; message: string }[];
+  missingCategories?: ("사회" | "과학")[];
   originalRow: any;
   completedBefore?: string[];
 }
