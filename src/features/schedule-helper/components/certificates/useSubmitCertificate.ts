@@ -22,8 +22,8 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export function useSubmitCertificate() {
-  const [trainingTitle, setTrainingTitle] = useState("");
+export function useSubmitCertificate(options: { initialTitle?: string; onSubmitted?: () => void } = {}) {
+  const [trainingTitle, setTrainingTitle] = useState(options.initialTitle ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -106,6 +106,7 @@ export function useSubmitCertificate() {
       setFile(null);
       setPendingBase64(null);
       setAnalyzeResult(null);
+      options.onSubmitted?.();
     } finally {
       setSubmitting(false);
     }

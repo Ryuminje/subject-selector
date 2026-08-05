@@ -2,12 +2,18 @@
 
 import { useSession } from "@/lib/auth-client";
 import { Send, FileUp, Loader2, CheckCircle2, Info } from "lucide-react";
-import GeminiKeySettings from "./GeminiKeySettings";
 import ConfirmModal from "./ConfirmModal";
 import TrainingTitleSelect from "./TrainingTitleSelect";
 import { useSubmitCertificate } from "./useSubmitCertificate";
 
-export default function SubmitTab({ isAdmin }: { isAdmin: boolean }) {
+export default function SubmitTab({
+  initialTitle,
+  onSubmitted,
+}: {
+  /** 연수 카드에서 "지금 제출"로 들어왔을 때 미리 채워지는 연수 제목 */
+  initialTitle?: string;
+  onSubmitted?: () => void;
+}) {
   const { data: session } = useSession();
   const {
     trainingTitle,
@@ -25,12 +31,11 @@ export default function SubmitTab({ isAdmin }: { isAdmin: boolean }) {
     handleAnalyze,
     handleConfirmSubmit,
     handleCancelModal,
-  } = useSubmitCertificate();
+  } = useSubmitCertificate({ initialTitle, onSubmitted });
 
   return (
     <div className="space-y-6">
-      {isAdmin && <GeminiKeySettings />}
-
+      {/* Gemini API 키 설정은 "공통 설정" 탭으로 옮겼습니다 (CommonSettings.tsx). */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
         <h2 className="text-lg font-bold text-teal-700 mb-1 flex items-center gap-2">
           <Send className="w-5 h-5" /> 이수증 제출하기
@@ -43,7 +48,7 @@ export default function SubmitTab({ isAdmin }: { isAdmin: boolean }) {
           <label className="text-sm font-bold text-slate-700 mb-1.5 block">연수 제목</label>
           <TrainingTitleSelect value={trainingTitle} onChange={setTrainingTitle} />
           <p className="text-xs text-slate-400 mt-1.5">
-            목록에 없는 연수라면 &quot;연수목록 관리&quot; 탭에서 새로 등록할 수 있어요.
+            목록에 없는 연수라면 &quot;이수증 수거&quot; 탭의 &quot;새 연수&quot; 버튼으로 먼저 등록해 주세요.
           </p>
         </div>
 
