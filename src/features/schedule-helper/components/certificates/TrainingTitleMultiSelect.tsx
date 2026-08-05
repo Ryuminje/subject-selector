@@ -83,7 +83,7 @@ export default function TrainingTitleMultiSelect({
             {matching.length === 0 ? (
               <div className="px-4 py-3 text-sm text-slate-400">
                 {options.length === 0
-                  ? "등록된 연수가 없습니다. \"연수목록 관리 → 서명 연수 관리\"에서 먼저 등록하세요."
+                  ? "등록된 연수가 없습니다. \"QR 서명\" 탭의 \"새 연수\" 버튼으로 먼저 등록하세요."
                   : "일치하는 연수가 없습니다."}
               </div>
             ) : (

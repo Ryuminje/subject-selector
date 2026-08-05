@@ -137,8 +137,8 @@ export default function RosterPresetManager({
         )}
       </div>
       <p className="text-sm text-slate-500 mt-1 mb-4">
-        용도별로 명단을 저장해두고 재사용하세요. 표에서 드래그로 순서를 바꿀 수 있고, 아래 &quot;QR 서명 세션
-        만들기&quot;에서 저장된 명단을 선택해 세션을 만들 수 있습니다.
+        용도별로 명단을 저장해두고 재사용하세요. 표에서 드래그로 순서를 바꿀 수 있고, 연수를 등록·편집할 때와
+        복수 연수 QR 세션을 만들 때 저장된 명단을 그대로 불러올 수 있습니다.
       </p>
 
       {expanded && (

@@ -104,7 +104,7 @@ export default function TrainingTitleSelect({
           {query.trim() && !isExactMatch && (
             <div className="p-2.5 border-t border-slate-100 text-center">
               <p className="text-[11px] text-slate-400">
-                새 연수는 &quot;연수목록 관리 → 이수증 수거 관리&quot;에서 참여명단과 함께 등록하세요.
+                새 연수는 &quot;이수증 수거&quot; 탭의 &quot;새 연수&quot; 버튼으로 참여명단과 함께 등록하세요.
               </p>
             </div>
           )}
