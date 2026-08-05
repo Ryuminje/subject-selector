@@ -92,6 +92,7 @@ export function useMainClassSummary(
         if (student.basicCount >= 10) remarks.push("기초과목 최대학점 초과");
         if (student.duplicateSubjects?.length) remarks.push(`중복선택: ${student.duplicateSubjects.join(", ")}`);
         if (student.hierarchyViolations?.length) remarks.push(student.hierarchyViolations.map(v => v.message).join(", "));
+        if (student.missingCategories?.length) remarks.push(student.missingCategories.map((c) => `${c} 과목 이수 필요`).join(", "));
 
         row.push(student.basicCount || 0, student.socialCount || 0, student.scienceCount || 0, remarks.join(" / "));
 

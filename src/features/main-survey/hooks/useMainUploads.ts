@@ -559,6 +559,10 @@ export function useMainUploads(
         }
       });
 
+      const missingCategories: ("사회" | "과학")[] = [];
+      if (socialCount === 0) missingCategories.push("사회");
+      if (scienceCount === 0) missingCategories.push("과학");
+
       processed.push({
         originalIndex: index + 1,
         studentId,
@@ -574,6 +578,7 @@ export function useMainUploads(
         scienceCount,
         duplicateSubjects,
         hierarchyViolations,
+        missingCategories,
         originalRow: row,
         completedBefore
       });
