@@ -9,8 +9,10 @@ import { getCertificateRoster } from "@/features/schedule-helper/lib/getCertific
 // 이수증(certificate)은 TrainingCertificate 제출로, 서명(sign)은 그 연수의 가장 최근
 // SignSession에 들어온 서명으로 완료 여부를 판정합니다.
 //
-// 이름 목록(done/missing)은 기존 bulk-check와 같은 권한 경계를 유지해서 관리자 또는
-// 그 연수를 등록한 담당자에게만 내려보내고, 그 외에는 인원수와 "내 상태"만 내려보냅니다.
+// 이름 목록(done/missing)은 관리자 또는 그 연수를 등록한 담당자에게만 내려보내고,
+// 그 외에는 인원수와 "내 상태"만 내려보냅니다. 이 권한 경계는 예전 일괄확인 화면과
+// 동일한 규칙이며, 이제 그 판정 로직이 존재하는 유일한 곳입니다 —
+// 명단 결정 규칙(연수 전용 명단 → 없으면 전체 기본 명단)을 바꿀 때는 여기만 고치면 됩니다.
 export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) {
