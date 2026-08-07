@@ -1,4 +1,4 @@
-import { ArrowLeftRight, FileText, GraduationCap, HeartHandshake, ScrollText, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Bot, FileText, GraduationCap, HeartHandshake, ScrollText, type LucideIcon } from "lucide-react";
 
 export interface HubApp {
   title: string;
@@ -47,6 +47,12 @@ export const departments: HubDepartment[] = [
         description: "연수 이수증 제출, 조회, QR 서명 수거를 한 곳에서 관리합니다.",
         href: "/apps/schedule-helper/certificates",
         icon: ScrollText,
+      },
+      {
+        title: "업무 AI 파트너",
+        description: "업무 자료를 올려두면 그 자료만 근거로 답하는 나만의 챗봇을 만듭니다.",
+        href: "/apps/schedule-helper/assistant",
+        icon: Bot,
       },
     ],
   },

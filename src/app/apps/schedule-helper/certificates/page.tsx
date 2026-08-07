@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession, signOut } from "@/lib/auth-client";
-import { ArrowLeft, LogOut, Loader2, KeyRound, UserPlus, Repeat } from "lucide-react";
+import { ArrowLeft, LogOut, Loader2, KeyRound, UserPlus } from "lucide-react";
+import AppSwitcher from "@/features/schedule-helper/components/AppSwitcher";
 import CertificatesTabs from "@/features/schedule-helper/components/certificates/CertificatesTabs";
 
 export default function CertificatesPage() {
@@ -37,13 +38,7 @@ export default function CertificatesPage() {
             <ArrowLeft className="w-4 h-4" />
             허브로 돌아가기
           </Link>
-          <Link
-            href="/apps/schedule-helper"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-slate-500 hover:text-teal-600 text-sm font-medium rounded-xl border border-slate-200 shadow-sm transition-colors"
-          >
-            <Repeat className="w-4 h-4" />
-            수업교체 도우미로 이동
-          </Link>
+          <AppSwitcher tone="teal" />
         </div>
         <div className="flex items-center gap-2">
           <Link

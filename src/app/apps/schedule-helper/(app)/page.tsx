@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useSchedule } from "@/features/schedule-helper/lib/ScheduleContext";
 import { useSession, signOut } from "@/lib/auth-client";
-import { ArrowLeft, ArrowLeftRight, Users, Ban, Loader2, Upload, LogOut, UserCog, KeyRound, Copy, Check, UserPlus, Repeat } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Users, Ban, Loader2, Upload, LogOut, UserCog, KeyRound, Copy, Check, UserPlus } from "lucide-react";
+import AppSwitcher from "@/features/schedule-helper/components/AppSwitcher";
 import SwapTab from "@/features/schedule-helper/components/SwapTab";
 import MeetingTab from "@/features/schedule-helper/components/MeetingTab";
 import BlockTab from "@/features/schedule-helper/components/BlockTab";
@@ -64,13 +65,7 @@ export default function ScheduleHelperPage() {
             <ArrowLeft className="w-4 h-4" />
             허브로 돌아가기
           </Link>
-          <Link
-            href="/apps/schedule-helper/certificates"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-slate-500 hover:text-teal-600 text-sm font-medium rounded-xl border border-slate-200 shadow-sm transition-colors"
-          >
-            <Repeat className="w-4 h-4" />
-            연수 이수증 수거로 이동
-          </Link>
+          <AppSwitcher tone="teal" />
         </div>
         <div className="flex items-center gap-2">
           <Link

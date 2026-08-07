@@ -44,6 +44,7 @@ model School {
   signSessions             SignSession[]
   certificateRosterExtras  CertificateRosterExtra[]
   certificateRosterPresets CertificateRosterPreset[]
+  assistantBots            AssistantBot[]
 }
 
 // 시간표에 등장하는 교사 한 명 (로그인 계정 유무와 무관하게 존재 — 업로드 시 이름으로 자동 upsert)
@@ -177,6 +178,125 @@ model CertificateRosterPreset {
 
   @@unique([schoolId, name])
   @@index([schoolId, updatedAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 업무 AI 파트너 — 선생님이 자기 업무 자료를 올려두고 그 자료만 근거로 답하는 챗봇.
+// "업무 하나 = 챗봇 하나 = 자료함 하나"가 원칙이라, 한 계정이 챗봇을 여러 개 만들고
+// 각 챗봇은 자기 자료함(AssistantDocument)만 검색합니다 — 예산 자료가 학적 질문에
+// 섞여 들어오지 않게 하는 것이 답변 정확도의 핵심입니다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AssistantBot {
+  id       String @id @default(cuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // 만든 사람이 곧 관리자 — 이수증 수거의 canManage 규칙과 같은 모델입니다.
+  ownerUserId String
+  ownerName   String
+
+  name    String
+  tagline String? // 목록/헤더에 한 줄로 붙는 소개
+  emoji   String  @default("🤖")
+  accent  String  @default("amber") // 아바타 색 — 허브 palette와 같은 이름(amber/rose/emerald/sky/violet)
+  persona String? // 역할·말투에 대한 추가 지시. 근거 규칙은 서버가 항상 덧붙이므로 여기서 못 덮어씁니다.
+
+  starters String @default("[]") // JSON string[] — 대화창 아래 추천 질문 칩
+
+  // "private" = 만든 사람만, "school" = 같은 학교 전원이 대화 가능(편집은 여전히 만든 사람만).
+  // 1단계에서는 서버가 항상 "private"으로 고정하고, 2단계에 값만 열어주면 됩니다.
+  visibility String @default("private")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents AssistantDocument[]
+  threads   AssistantThread[]
+
+  @@index([schoolId, ownerUserId])
+}
+
+// 챗봇 자료함에 올라간 파일 1개. 원본 바이트는 TrainingCertificate와 같은 방식으로 보관합니다
+// (Postgres bytea) — 나중에 "원문 열어보기"를 붙일 수 있도록.
+
+model AssistantDocument {
+  id    String       @id @default(cuid())
+  botId String
+  bot   AssistantBot @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  fileName  String
+  mimeType  String
+  byteSize  Int
+  fileBytes Bytes
+
+  // 분석 파이프라인 상태. Vercel 함수가 60초에서 끊기므로 한 번에 다 끝내지 않고
+  // /ingest를 여러 번 호출해 조금씩 진행합니다 — 그 진행 상황이 그대로 화면에 표시됩니다.
+  status        String  @default("pending") // pending | processing | ready | failed
+  error         String? // 실패 사유를 그대로 사용자에게 보여줍니다(예: 스캔본이라 글자 없음)
+  pageCount     Int?
+  chunkCount    Int     @default(0)
+  embeddedCount Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  chunks AssistantChunk[]
+
+  @@index([botId])
+}
+
+// 문서를 검색 단위로 쪼갠 조각. embedding은 pgvector 타입이라 Prisma가 직접 다루지 못해
+// Unsupported로 선언하고, 넣고 빼는 건 assistant/search.ts의 raw SQL만 담당합니다.
+
+model AssistantChunk {
+  id         String            @id @default(cuid())
+  documentId String
+  document   AssistantDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // 검색할 때 챗봇 단위로 바로 거르기 위한 비정규화 컬럼 (join 한 번을 아낍니다 —
+  // DB가 NAS 원격이라 왕복/작업량을 줄이는 게 중요합니다)
+  botId String
+
+  ordinal Int // 문서 안에서의 순서
+  page    Int? // 근거 표시에 쓰는 페이지 번호 (없으면 null)
+  content String
+
+  embedding Unsupported("vector(768)")?
+
+  @@index([botId])
+  @@index([documentId])
+}
+
+// 대화 1건. 참고 이미지처럼 이어지는 대화를 유지하려면 스레드가 있어야 합니다.
+
+model AssistantThread {
+  id    String       @id @default(cuid())
+  botId String
+  bot   AssistantBot @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  userId String // better-auth User.id — 공개 챗봇이어도 대화는 사람마다 따로입니다
+  title  String @default("새 대화")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages AssistantMessage[]
+
+  @@index([botId, userId, updatedAt])
+}
+
+model AssistantMessage {
+  id       String          @id @default(cuid())
+  threadId String
+  thread   AssistantThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  role      String // "user" | "model"
+  content   String
+  citations String @default("[]") // JSON [{documentId, fileName, page}] — 답변 아래 근거 칩
+
+  createdAt DateTime @default(now())
+
+  @@index([threadId, createdAt])
 }
 
 // 로그인 계정(user/session/account/verification)은 better-auth CLI(`npx auth generate`)가
