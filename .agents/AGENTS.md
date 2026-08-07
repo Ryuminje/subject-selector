@@ -20,6 +20,8 @@
   - **`enrollment-helper`** (교육과정부) — 기존 수요조사/선택과목변경/본조사 3탭 도구. 자세한 내부 구조는 바로 아래 "코드 아키텍처 개요" 섹션 참고.
   - **`schedule-helper`** (쌤스 헬퍼) — 별도 저장소(`Ryuminje/Myunshinh-schedule-app`, Next.js)에서 통째로 포팅해온 수업교체/협의회 시간 도우미. 자세한 내용은 아래 "🧩 별도 앱 통합(schedule-helper) 참고 메모" 섹션 참고.
 
+**`AppSwitcher` — 같은 부서 앱 사이를 오가는 헤더 드롭다운 (2026-08-06 추가)**: `src/features/schedule-helper/components/AppSwitcher.tsx`. 예전에는 각 앱 헤더에 "○○로 이동" 링크를 손으로 하나씩 넣었는데, 앱이 3개가 되자 헤더가 길어지고 **한 화면에만 링크를 빠뜨리는 일**이 실제로 생겼습니다(시간표 교체 도우미에 "업무 AI 파트너" 링크가 없었음). 지금은 현재 앱 이름이 적힌 버튼 하나에 마우스를 올리면 같은 부서 앱 전체가 펼쳐집니다. **목록은 `src/config/hub.ts`에서 직접 읽으므로, 새 앱을 허브에 등록하면 모든 화면의 드롭다운에 자동으로 나타납니다 — 헤더를 손볼 필요가 없습니다.** 현재 앱은 `usePathname()`과 가장 길게 겹치는 `href`로 판정합니다(`/apps/schedule-helper`와 `/apps/schedule-helper/certificates`가 둘 다 걸리므로 최장 일치가 필요). 호버뿐 아니라 클릭으로도 열리고(터치 기기), 바깥 클릭·Esc로 닫힙니다. `tone` prop으로 teal(시간표·이수증) / amber(업무 AI 파트너) 배색을 맞춥니다.
+
 ---
 
 ## 🏗️ 코드 아키텍처 개요 (2026-07-19 리팩터링 이후 기준, `enrollment-helper` 앱 내부 구조)
@@ -129,10 +131,19 @@
 
 ### NAS (DB만)
 
-- Postgres는 `~/docker/subject-selector-db/docker-compose.yml`(`postgres:16-alpine`)로 별도 컨테이너로 띄워져 있습니다. **NAS 전체 앱(`~/docker/my-webapp/`, `Dockerfile`/`docker-compose.yml`/`deploy.sh`)은 2026-07-21부로 잠정 중단 상태** — 코드는 남아있지만 실제로 그 경로에 최신 앱을 배포해서 쓰고 있진 않습니다. 나중에 다시 쓰게 되면 NAS 앱과 NAS DB가 같은 머신에 있으니 `DATABASE_URL`을 `postgresql://...@192.168.0.21:55432/...`처럼 로컬 LAN IP로 바로 잡으면 되고, 외부 도메인/포트포워딩은 필요 없습니다.
+- Postgres는 `~/docker/subject-selector-db/docker-compose.yml`(**`pgvector/pgvector:pg16`, 2026-08-06에 `postgres:16-alpine`에서 교체**)로 별도 컨테이너로 띄워져 있습니다. 교체 이유와 절차는 아래 "pgvector 전환" 항목 참고. **NAS 전체 앱(`~/docker/my-webapp/`, `Dockerfile`/`docker-compose.yml`/`deploy.sh`)은 2026-07-21부로 잠정 중단 상태** — 코드는 남아있지만 실제로 그 경로에 최신 앱을 배포해서 쓰고 있진 않습니다. 나중에 다시 쓰게 되면 NAS 앱과 NAS DB가 같은 머신에 있으니 `DATABASE_URL`을 `postgresql://...@192.168.0.21:55432/...`처럼 로컬 LAN IP로 바로 잡으면 되고, 외부 도메인/포트포워딩은 필요 없습니다.
 - **포트 포워딩**: 라우터에서 외부 TCP `55432` → `192.168.0.21:55432`. 도메인은 DuckDNS(`fbalswp.duckdns.org`)를 씁니다. Vercel의 `DATABASE_URL`은 이 외부 주소(`fbalswp.duckdns.org:55432`)를 가리키고, **로컬 개발 환경의 `DATABASE_URL`은 같은 LAN이므로 포트포워딩을 거치지 않고 `192.168.0.21:55432`로 직접 접속**합니다 — 두 값이 다른 게 정상입니다.
 - DB 비밀번호는 `openssl rand -hex 20`으로 생성했고, NAS의 `docker-compose.yml`(POSTGRES_PASSWORD)과 로컬 `.env`, Vercel의 `DATABASE_URL` 세 곳에 각각 반영되어 있어야 동기화가 맞습니다. 바꿀 일이 있으면 이 세 곳을 다 갱신하세요.
 - 데이터 영속화: `~/docker/subject-selector-db/data`가 Postgres의 실제 데이터 디렉토리(볼륨 마운트) — 컨테이너를 지우고 다시 만들어도 이 폴더만 살아있으면 데이터는 유지됩니다.
+
+### pgvector 전환 — 2026-08-06
+
+"업무 AI 파트너"의 자료 검색이 벡터 유사도에 의존해서 Postgres 이미지를 `postgres:16-alpine` → `pgvector/pgvector:pg16`으로 바꿨습니다. **이미지만 바꿔 끼우지 않고 반드시 덤프 → 복원으로 갔습니다.**
+
+- **이유(중요)**: 기존 클러스터는 alpine(musl) 위에서 `en_US.utf8`로 initdb됐는데, musl은 로케일을 사실상 구현하지 않아 정렬이 C와 같게 동작합니다. pgvector 이미지는 Debian(glibc)이라 같은 이름의 로케일이 진짜 언어별 정렬로 바뀝니다. 데이터 디렉터리를 그대로 물려주면 기존 텍스트 인덱스가 실제 정렬 순서와 어긋나 조회가 조용히 틀릴 수 있습니다. **앞으로도 alpine ↔ debian 사이로 Postgres 이미지를 옮길 때는 무조건 `pg_dump` → 새 볼륨 → 복원 순서를 지키세요.**
+- 실제로 밟은 순서: `pg_dump`(평문) → `docker compose down` → `mv data data.alpine-backup`(지우지 않고 보관) → 이미지 교체 → `up -d` → `psql < 덤프` → `CREATE EXTENSION vector;`. 되돌리려면 이미지를 되돌리고 `data.alpine-backup`을 `data`로 되돌리면 됩니다.
+- **복원 시 `| tail -N`으로 출력을 자르지 마세요.** 이번에 그것 때문에 에러가 가려져 "복원 실패"로 오판했습니다. `psql -v ON_ERROR_STOP=1`을 붙이고 출력을 그대로 보세요. 경로도 상대경로 대신 절대경로를 쓰는 게 안전합니다.
+- 확장 설치는 마이그레이션에도 들어 있습니다(`20260806105107_add_assistant_models/migration.sql` 첫 줄 `CREATE EXTENSION IF NOT EXISTS vector;`) — 새 환경에 배포할 때 확장이 없어 `vector(768)` 컬럼 생성이 실패하는 걸 막기 위한 것입니다.
 
 ### NAS SSH 작업 시 알아둘 것
 
@@ -162,6 +173,27 @@
 - **스키마**: `School.geminiApiKey`, `TrainingTitle`(`id/schoolId/title/registeredByName/rosterSnapshot/category/createdAt`), `TrainingCertificate`(`teacherName/trainingTitle/number/institution/certDate/fileName/mimeType/fileBytes`), `SignSession`(`trainingTitles`/`rosterSnapshot`는 JSON string[], `titleRosters`는 JSON Record, `rosterPresetName`, `locked`), `SignSessionSignature`(`sessionId+teacherName` unique), `CertificateRosterExtra`(아래 항목 참고), `CertificateRosterPreset`(아래 항목 참고). 관련 마이그레이션 7개: `add_training_certificates`, `simplify_sign_session_signature`(그룹서명 스키마 교정), `add_training_title_registry`, `add_certificate_roster_extra`, `add_certificate_roster_preset`, `add_training_title_and_session_roster_split`, `add_training_title_category`.
 - **`CertificateRosterExtra` — 시간표에 없는 인원 보충 명단 (2026-07-22 추가)**: 일괄확인/서명 세션의 "전체 대상자" 명단은 원래 `Teacher` 테이블(=시간표 업로드 시 자동 upsert된 이름)만 봤는데, 행정직원처럼 애초에 시간표가 없는 사람을 넣을 방법이 없다는 문제가 나와서 추가했습니다. `Teacher` 테이블에 직접 끼워 넣는 대신 **완전히 별도의 명단**으로 분리한 이유: 시간표 교체 도우미(SwapTab)의 교사 목록은 `Teacher` 테이블이 아니라 `School.scheduleData.teachers`(파싱된 시간표 JSON)를 기준으로 하므로, `Teacher`에 시간표 없는 사람을 추가해도 스왑 화면에는 안 나타나 실질적으로는 안전하지만, 사용자가 "연수 이수증 기능 전용 별도 명단"을 명시적으로 선택했습니다(교사 목록 관리 화면에 뒤섞이지 않게). `src/features/schedule-helper/lib/getCertificateRoster.ts`가 `Teacher.name`과 `CertificateRosterExtra.name`을 합쳐 정렬된 전체 명단을 반환하는 단일 창구 — 새로운 "전체 대상자" 조회가 필요해지면 `prisma.teacher.findMany`를 직접 쓰지 말고 이 헬퍼를 재사용하세요. 관리 UI는 `ExtraRosterSettings.tsx`(관리자 전용, `BulkCheckTab.tsx` 상단에 렌더링) — 추가/삭제 모두 admin-only, `Teacher`/기존 `CertificateRosterExtra`와 이름이 겹치면 400.
 - **`CertificateRosterPreset` — 용도별로 저장해 재사용하는 이름 붙은 명단 (2026-07-23 추가)**: `CertificateRosterExtra`(항상 기본 명단에 합산되는 flat 목록)와는 별개로, "전체 교직원", "부장단만" 같은 **이름 붙인 순서 있는 명단**을 저장해두고 QR 세션 생성 시 재사용하는 기능입니다. `names: String`(JSON string[], **재정렬 안 함 — 저장된 순서가 곧 서명부 순서**), `@@unique([schoolId, name])`, `createdBy: String`(생성자 이름, `resolveTeacherName`). CRUD는 `api/.../certificates/roster-presets/{route.ts, [id]/route.ts, base/route.ts}` — **처음엔 전부 admin-only였다가, "일반 교사도 프리셋을 만들 수 있어야 한다"는 요청으로 2026-07-23에 완화**: 조회(GET)/생성(POST)/`base`(기본 명단 조회)는 로그인한 아무나 가능, 수정(PATCH)/삭제(DELETE)는 관리자 또는 그 프리셋을 만든 본인(`createdBy` 일치)만 가능(`TrainingTitle`의 등록자 전용 수정/삭제와 동일한 패턴). UI는 `RosterPresetManager.tsx`(`isAdmin` prop + `useSession()`으로 본인 이름을 확인해 `canEdit = isAdmin || preset.createdBy === myName`일 때만 편집/삭제 버튼 노출) + `useRosterPresets.ts`. **위치 변경(2026-07-23 재정정)**: 처음엔 "서명받기" 탭에 뒀다가, 사용자가 "프리셋 만들기도 연수목록 관리에 있는 메뉴여야 해" + "서명받기 탭에서는 삭제하자"고 정정해서 지금은 `TrainingListManager.tsx`("연수목록 관리"의 "명단 프리셋 관리" 서브 탭)에만 관리 UI가 있습니다. `SignTab.tsx`엔 `useRosterPresets()`로 읽어온 `presets` 목록을 "참여 명단" 셀렉트 옵션으로만 쓰는 코드가 남아있고(세션 생성 시 override 용도), 프리셋 CRUD 자체는 없습니다 — 새로 손댈 때 이 둘(관리 vs 선택)을 다시 합치지 마세요. **`RosterTable.tsx`**가 이 프리셋과 `TrainingTitleManager`(연수 전용 명단) 양쪽에서 재사용되는 공용 표 컴포넌트로, 인쇄 페이지(`sessions/[id]/print/page.tsx`)와 동일한 남색 헤더·번호/성명/서명 2단 분할 스타일을 유지하면서 `mode="edit"`일 때 네이티브 HTML5 드래그 앤 드롭 재정렬(신규 npm 패키지 없음 — 좌우 2단 분할과 무관하게 항상 flat 배열 인덱스 기준으로 재배치)을 지원합니다. 새 프리셋/연수 명단을 만들 때 시작값은 `roster-presets/base`(=`getCertificateRoster()`)에서 받아옵니다.
+
+---
+
+## 🤖 업무 AI 파트너(assistant) 참고 메모 — 2026-08-06 추가
+
+`/apps/schedule-helper/assistant`. 선생님이 자기 업무 자료(PDF·DOCX·엑셀·텍스트)를 올려두면 **그 자료만 근거로** 답하는 챗봇을 만드는 기능입니다. 한 계정이 챗봇을 여러 개 만들 수 있고, **챗봇마다 자기 자료함만 검색**합니다("업무 하나 = 챗봇 하나 = 자료함 하나"). 색은 이수증 수거(teal)와 구분되도록 수강신청 도우미와 같은 크림/앰버 톤을 씁니다.
+
+- **설계의 축은 "환각 방지"입니다.** 기재요령 같은 문서는 틀린 답이 곧 업무 사고입니다. 그래서 (1) 답변마다 근거 자료·쪽수를 칩으로 붙이고, (2) 자료에서 못 찾으면 "올려주신 자료에서는 확인할 수 없습니다"라고 답하도록 강제하며, (3) 그렇게 답한 경우 근거 칩을 자동으로 비웁니다(근거 없다는 답 옆에 근거가 붙으면 오해를 부름). 이 규칙은 `lib/assistant/chat.ts`의 `GROUNDING_RULES`에 있고, **사용자가 정한 말투(`persona`)보다 항상 뒤에 붙여** 덮어쓰지 못하게 합니다 — 순서를 바꾸지 마세요.
+- **검색은 RAG**입니다. 전체 문서를 매번 프롬프트에 넣는 방식은 200쪽 PDF 기준 질문당 수백 원이 들고 느려서 배제했습니다. 업로드 → 텍스트 추출(쪽수 보존) → 조각 → 임베딩 → 질문 시 상위 8조각만 사용.
+- **`lib/assistant/search.ts`가 pgvector를 만지는 유일한 파일입니다.** Prisma는 vector 타입을 못 다뤄 스키마에서 `Unsupported("vector(768)")`로 선언했고, 삽입·임베딩 채우기·유사도 검색 모두 이 파일의 raw SQL이 담당합니다. 검색 방식을 바꾸게 되면 여기만 갈아끼우면 됩니다. 조각 id는 Prisma를 거치지 않으므로 DB의 `gen_random_uuid()::text`로 만듭니다. **DB가 NAS 원격이라 항상 한 문장에 여러 행을 몰아 처리**합니다(루프 안 개별 INSERT 금지 — 위 2026-07-21 upload 타임아웃 교훈과 같은 이유).
+- **분석은 잘라서 진행합니다.** Vercel 함수 60초 제한 때문에 `/documents/[docId]/ingest`가 호출 한 번에 "텍스트 추출+조각 저장" 또는 "임베딩 60개 채우기"만 하고 진행률을 돌려주며, 화면이 `ready`/`failed`가 될 때까지 반복 호출합니다. 큐 서버가 없는 대신 진행률 표시가 공짜로 따라옵니다. 새 문서 형식을 추가할 때도 이 구조를 유지하세요.
+- **Gemini 키는 새로 만들지 않고 `School.geminiApiKey`를 그대로 재사용**합니다(이수증 수거와 동일). 채팅 `gemini-2.5-flash`, 임베딩 `gemini-embedding-001`(`outputDimensionality: 768`).
+- **실측으로 알아낸 것 두 가지 (재현 확인함, 다시 밟지 마세요)**:
+  1. **Gemini의 SSE는 이벤트 구분자로 CRLF(`\r\n\r\n`)를 씁니다.** `"\n\n"`으로 split하면 이벤트가 하나도 안 나뉘어 답변이 통째로 버퍼에 갇히고 빈 응답이 됩니다. `chat.ts`는 버퍼 전체를 매번 `\r\n → \n`으로 정규화한 뒤 자릅니다.
+  2. **Gemini 임베딩은 유사도 기준선이 매우 높습니다** — 전혀 무관한 두 문장("학교폭력 조치사항 삭제 시기" ↔ "오늘 점심 메뉴")도 코사인 0.73이 나옵니다. 그래서 근거 칩 선별에 **절대 임계값을 쓰면 안 되고**, "가장 잘 맞은 조각과의 차이"라는 상대 기준(`CITATION_MARGIN`)을 씁니다.
+- **일시적 오류와 영구 실패를 반드시 구분하세요 (2026-08-06 후속 수정)**: 처음엔 임베딩 중 어떤 오류든 자료를 `failed`로 못 박았는데, 사용자가 PDF 4개를 연달아 올리자 4번째가 Gemini 속도 제한(429)에 걸려 영구 실패로 남았습니다(파일을 지우고 다시 올리는 것 말고 방법이 없었음). 지금 구조는 (1) `embed.ts`가 429를 `RateLimitError`로 따로 던지고 서버 안에서 2·5·12초 백오프로 재시도, (2) 그래도 안 되면 ingest가 `failed`가 아니라 `status: "processing"` + `waitMs`를 돌려주고 화면이 그만큼 쉬었다 이어서 호출, (3) 모든 `failed` 자료에 "다시 분석"(`POST .../ingest?retry=1`) 버튼 — 조각이 이미 있으면 임베딩 단계부터, 없으면 추출부터 재개. **새 외부 API 호출을 추가할 때도 이 세 가지를 같이 갖추세요.**
+- **Gemini 오류 메시지는 반드시 `geminiError.ts`의 `describeGeminiError()`를 통과시켜 한국어로 바꿔 보여주세요.** 원문을 그대로 노출하면 선생님 화면에 "You exceeded your current quota, please check your plan and billing details..." 같은 영어가 그대로 뜹니다(실제로 그렇게 나갔던 이력).
+- **권한**은 이수증 수거와 같은 모델(만든 사람이 곧 관리자)이고 `lib/assistant/access.ts`의 `loadBotAccess()` 한 곳에서만 판정합니다. `visibility`(`private`/`school`) 필드는 스키마에 미리 넣어두고 **1단계에서는 서버가 항상 `private`으로 고정**합니다 — 학교 공개 기능을 열 때 마이그레이션 없이 값만 열면 됩니다.
+- **HWP는 지원하지 않습니다.** 자바스크립트로 한글 파일을 안정적으로 읽을 방법이 사실상 없어서, 업로드 시 "PDF로 저장한 뒤 올려주세요"라는 실패 사유를 그대로 화면에 띄웁니다. 스캔본 PDF(글자 없는 이미지)도 같은 방식으로 실패 처리합니다.
+- **개인정보 경고는 설정 화면에 고정 노출**입니다(올린 파일 내용이 Google로 전송되므로). 지우지 마세요.
+- **스키마**: `AssistantBot` / `AssistantDocument`(원본 bytea + 분석 상태·진행률) / `AssistantChunk`(`botId` 비정규화 + `vector(768)`) / `AssistantThread` / `AssistantMessage`(`citations` JSON). 마이그레이션 `20260806105107_add_assistant_models` — 첫 줄의 `CREATE EXTENSION IF NOT EXISTS vector;`와 마지막 줄의 HNSW 인덱스(`vector_cosine_ops`)는 **Prisma가 생성해주지 않아 손으로 넣은 것**이라, 마이그레이션을 다시 만들면 빠뜨리기 쉽습니다.
 
 ---
 
@@ -254,6 +286,18 @@
 ---
 
 ## 📅 개발 히스토리 로그 (최신순)
+
+### 2026-08-06
+
+**"업무 AI 파트너"(assistant) 신규 앱 1단계 + Postgres를 pgvector로 전환:**
+- 사용자가 카카오톡 형태의 참고 이미지를 주며 "쌤스 헬퍼 하위에, 아이디별로 자료를 올려 그 자료로 답하는 챗봇을, 한 계정이 여러 개 만들 수 있게" 요청했습니다. 색은 수강신청 자료 정리 도우미의 톤앤매너를 지정받았습니다. 계획 단계에서 **클릭 가능한 HTML 목업 3화면(목록/대화/설정)** 을 먼저 보여주고 승인받은 뒤 구현했습니다(이수증 재설계 때와 같은 방식 — 글로만 설명하지 말고 화면을 보여주는 게 훨씬 빨랐습니다).
+- 사용자가 고른 결정 두 가지: 검색은 **pgvector 설치**(설치 없이 JS 계산하는 대안 대비 장기적으로 맞음), 1단계 범위는 **"나만 쓰는 챗봇"까지**(학교 공개는 2단계).
+- 인프라: NAS Postgres를 `postgres:16-alpine` → `pgvector/pgvector:pg16`으로 교체. **musl↔glibc 로케일 차이 때문에 데이터 디렉터리를 물려주지 않고 덤프→복원으로 진행**했습니다(위 "pgvector 전환" 항목에 이유와 절차 정리). 이 세션에서는 SSH 쓰기 작업이 안전 분류기에 막혀 사용자가 직접 명령을 실행했고, 복원 출력을 `tail`로 자르는 바람에 에러가 가려져 한 번 "복원 실패"로 오판했다가 재확인으로 정정했습니다(행 수 13개 테이블 전부 원본과 일치, FK 9개·인덱스 31개·마이그레이션 이력 보존 확인).
+- 구현: 스키마 5개 모델 + 마이그레이션, `lib/assistant/` 6개 파일(config·extractText·chunk·embed·search·chat·access), API 라우트 7개, UI 컴포넌트 8개, 허브 카드 등록. 의존성 `unpdf`(PDF 텍스트, 쪽수 보존)·`mammoth`(DOCX) 추가.
+- **UI를 짓기 전에 가장 불확실한 부분(임베딩 API 형식, 검색, 답변)을 먼저 실물로 검증한 것이 크게 도움이 됐습니다.** 그 과정에서 위 참고 메모에 적은 두 버그(SSE CRLF 구분자, 임베딩 유사도 기준선)를 잡았습니다 — 특히 CRLF 문제는 UI까지 다 만든 뒤였다면 원인 찾기가 훨씬 어려웠을 것입니다.
+- **같은 날 후속 수정(앱 이동 드롭다운)**: 앱이 3개가 되면서 헤더의 "○○로 이동" 링크가 늘어나는 문제를 사용자가 지적해, 현재 앱 이름 버튼에 호버하면 같은 부서 앱이 펼쳐지는 `AppSwitcher`로 교체했습니다. 세 화면(시간표 교체 도우미·연수 이수증 수거·업무 AI 파트너)에 모두 적용. **목록은 `src/config/hub.ts`가 단일 소스**라 앞으로 앱을 추가할 때 헤더는 건드릴 필요가 없습니다 — 자세한 내용은 위 "허브 라우팅 구조" 섹션의 `AppSwitcher` 항목 참고.
+- **같은 날 후속 수정(속도 제한 대응)**: 사용자가 실제 PDF 4개를 연달아 올리자 마지막 파일이 Gemini 429로 실패하고 영어 원문 오류가 화면에 그대로 노출됐습니다. 429 백오프 재시도 + `failed` 대신 대기 후 재개 + "다시 분석" 버튼 + 오류 한국어화(`geminiError.ts`)를 추가했습니다. 자세한 규칙은 위 참고 메모 참고. 검증은 **일부러 잘못된 API 키를 등록해 실패시킨 뒤 키를 고치고 "다시 분석"으로 완전히 복구되는지**까지 확인했습니다(실패 메시지 한국어 확인, 재시도 없이는 failed 유지되는 것도 확인).
+- 검증: 일회용 테스트 학교에 **세상에 없는 가짜 규정**("교외체험학습 연간 17일, 3학년 9일")을 올려 그대로 답하는지 확인 → 정확히 답함(모델의 사전 지식이 아니라 자료를 읽었다는 증거). 자료에 없는 질문("급식비")에는 "확인할 수 없습니다"라고 답하고 근거 칩이 빈 배열로 내려오는 것까지 확인. 브라우저에서 로그인→목록→대화(스트리밍·근거 칩)→설정(자료함 상태)까지 콘솔 에러 없이 동작 확인 후 테스트 학교 4개 전부 삭제(실제 학교 데이터 무영향, 계정 수 원복 확인). `tsc --noEmit`/`eslint` 클린.
 
 ### 2026-08-05 (4)
 **연수 교직원 등록부 인쇄 시 서명이 안 나오는 버그 수정 — 서명을 data URI로 함께 내려보내도록 변경:**
