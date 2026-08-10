@@ -202,7 +202,7 @@
 
 `/apps/exam-scheduler`("교육평가부" 부서의 "시험 시간표 작성 도우미")는 schedule-helper와 같은 방식으로 **별도 로컬 Next.js 프로젝트(`Documents/dev/exam-scheduler`, GitHub 원격 저장소 없이 로컬에만 존재)의 소스를 통째로 이 저장소 안으로 포팅**한 것입니다. 명단 업로드 → 시험 시간표 입력 → 시험실 배정(+분반) → 자습 배정 → 결과·엑셀 출력까지 5단계로 진행하는 마법사형 도구이며, DB/로그인 없이 완전히 브라우저 안에서만 동작합니다(업로드한 명단이 서버로 전송되지 않음).
 
-- **파일 매핑:** 원본의 `src/lib/{domain,excel,io,scheduling,store}/*` → `src/features/exam-scheduler/lib/*`(구조 그대로, 파일 내용도 로직 변경 없이 그대로), 원본의 `src/components/*.tsx`(+ barrel `index.ts`) → `src/features/exam-scheduler/components/*`, 원본의 `src/app/page.tsx` → `src/app/apps/exam-scheduler/page.tsx`(헤더에 "허브로 돌아가기" `next/link`만 추가, 나머지 동일). **원본 `public/sample-roster-1.xlsx`/`sample-roster-2.xlsx`도 반드시 같이 복사해야 합니다** — "표본 명단으로 둘러보기" 버튼이 `fetch('/sample-roster-N.xlsx')`로 이 파일들을 직접 읽는데, 처음 포팅 때 이걸 빠뜨려서 "Can't find end of central directory" 파싱 에러가 났었습니다(404 응답 HTML을 zip으로 파싱하려다 실패).
+- **파일 매핑:** 원본의 `src/lib/{domain,excel,io,scheduling,store}/*` → `src/features/exam-scheduler/lib/*`(구조 그대로, 파일 내용도 로직 변경 없이 그대로), 원본의 `src/components/*.tsx`(+ barrel `index.ts`) → `src/features/exam-scheduler/components/*`, 원본의 `src/app/page.tsx` → `src/app/apps/exam-scheduler/page.tsx`(헤더에 "허브로 돌아가기" `next/link`만 추가, 나머지 동일). `layout.tsx`는 metadata(브라우저 탭 제목)와 배경색만 담당합니다 — 원본은 `body` 배경이 옅은 회색(`--color-surface-muted`)이라 흰 카드가 떠 보였는데 허브의 `body`는 흰색이라, 이 앱 라우트에서만 `bg-surface-muted`를 다시 씌워 원본 모양을 복원합니다(schedule-helper 계열이 각자 layout에서 폰트·배경을 잡는 것과 같은 패턴). **원본 `public/sample-roster-1.xlsx`/`sample-roster-2.xlsx`도 반드시 같이 복사해야 합니다** — "표본 명단으로 둘러보기" 버튼이 `fetch('/sample-roster-N.xlsx')`로 이 파일들을 직접 읽는데, 처음 포팅 때 이걸 빠뜨려서 "Can't find end of central directory" 파싱 에러가 났었습니다(404 응답 HTML을 zip으로 파싱하려다 실패).
 - **import 경로:** `src/features/exam-scheduler/components/*.tsx`에서만 `@/lib/...` → `@/features/exam-scheduler/lib/...`로 고치면 됩니다. `lib` 폴더 내부 파일들은 전부 상대경로(`../domain/...` 등)로 서로를 참조하고 있어 손댈 필요가 없었습니다.
 - **의존성:** `zustand@^5.0.14` 신규 추가(원본 상태관리, 허브엔 없었음). **`xlsx`를 npm 무료판(`^0.18.5`) → SheetJS CDN 풀빌드(`https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`, 원본과 동일 tarball)로 교체** — 결과 화면의 "시험지 봉투 표지(.xls)" 출력이 BIFF8(Excel 97-2003) 쓰기를 쓰는데, 이건 npm 무료판엔 없고 CDN 풀빌드에만 있는 기능입니다(`src/features/exam-scheduler/lib/excel/exportEnvelope.ts` 주석 참고). 허브에서 기존에 `xlsx`를 직접 쓰던 3곳(`schedule-helper`의 `extractText.ts`/`parseAccountsWorkbook.ts`/`sheetData.ts`)은 전부 **읽기 전용** 파싱이라 버전 교체로 인한 회귀는 없는 것으로 확인했습니다(쓰기는 전부 `xlsx-js-style`이나 `exceljs`를 따로 씀 — 이쪽은 안 건드림). `lucide-react`도 `^1.21.0` → `^1.28.0`으로 소폭 올렸습니다(원본이 요구하는 아이콘 세트 호환용, breaking change 없음).
 - **CSS 병합:** `globals.css`에 원본의 `--color-surface`/`--color-surface-muted`/`--color-line`/`--color-ink`/`--color-ink-muted`/`--color-brand`/`--color-brand-soft` 색상 토큰과 `grid-table` `@utility`를 그대로 추가했습니다. **`--font-sans`/`--font-mono`는 의도적으로 가져오지 않았습니다** — 원본은 학교 PC 오프라인 대응으로 시스템 한글 폰트(Pretendard/맑은 고딕 등) 스택을 썼는데, 이걸 그대로 병합하면 허브의 `@theme inline` 블록이 이미 정의한 `--font-sans`(Geist)를 전역으로 덮어써 버려 허브의 다른 모든 페이지 폰트가 바뀌는 부작용이 생깁니다. exam-scheduler 화면은 이제 허브의 폰트를 그대로 상속받습니다(한글은 시스템 폴백으로 정상 렌더링, 기능상 문제 없음 — 순수 코스메틱 트레이드오프).
@@ -302,6 +302,30 @@
 ---
 
 ## 📅 개발 히스토리 로그 (최신순)
+
+### 2026-08-10 (2)
+
+**저장소 정리 — 죽은 파일 제거, 온보딩 문서 최신화:**
+
+exam-scheduler 통합 직후, 저장소에 오래 쌓여 있던 잔재를 걷어냈습니다. **삭제한 것은 전부 "어디서도 import/참조되지 않음"을 먼저 확인한 뒤 지웠고**(`Dockerfile`/`deploy.sh`/`docker-compose.yml`/`package.json` 스크립트까지 grep으로 확인), 정리 전후로 `npm run build`를 돌려 라우트 목록이 동일한지 대조했습니다. git 이력에는 그대로 남아 있으니 필요하면 언제든 복구할 수 있습니다.
+
+- **삭제(약 800KB):**
+  - `app.tar.gz`(433KB) — NAS 배포 시절 만든 **저장소 자신의 스냅샷 tarball**. 저장소 안에 저장소 사본이 통째로 들어있던 셈이라 가장 큰 파일이었습니다. 내용물을 열어 비밀정보가 없음을 확인한 뒤 삭제했습니다.
+  - 루트 `page.tsx`(65KB, 1304줄) — 2026-07-19 리팩터링 **이전**의 통짜 페이지. GitHub 웹 UI에서 "Add files via upload"로 올라온 뒤 방치돼 있었고 어디서도 import되지 않습니다.
+  - `extract_context.js` / `extract_hooks.js` / `replace.py` / `update.py` — 넷 다 **옛 `src/app/page.tsx`(통짜 파일)를 문자열 치환**하던 1회용 리팩터링 스크립트입니다. 지금의 `src/app/page.tsx`는 허브 화면(159줄)이라 이 스크립트들을 실행하면 무의미하거나 오작동합니다.
+- **추적 해제(파일은 디스크에 남김):** `tsconfig.tsbuildinfo`(296KB), `next-env.d.ts` — 둘 다 빌드할 때 자동 생성되는 산출물이고 **create-next-app 기본 `.gitignore`에 원래 들어있는 항목**인데 빠져 있었습니다. 그래서 빌드할 때마다 무의미한 diff가 생기고 실제로 커밋에 딸려 들어가고 있었습니다. `.gitignore`에 `*.tsbuildinfo`/`next-env.d.ts`를 추가하고 `git rm --cached`로 추적만 끊었습니다.
+- **`samples/` 폴더 신설:** 루트에 흩어져 있던 `sample.xlsx`~`sample7.xlsx`(7개, 233KB)를 `samples/`로 옮기고 설명 README를 붙였습니다. **지우지 않은 이유**: 화면 안내 문구에 `학생 선택 데이터 파일 (sample3) 업로드`처럼 파일 이름이 그대로 박혀 있어, 개발 중 손으로 올려 검증하는 실제 표본입니다. **`public/sample-roster-*.xlsx`와 혼동하지 마세요** — 그쪽은 코드가 `fetch('/sample-roster-1.xlsx')`로 URL을 직접 읽으므로 반드시 `public/`에 있어야 하고, `samples/`로 옮기면 즉시 깨집니다.
+- **`.env.example`이 SQLite로 남아 있던 문제 수정 (중요):** 2026-07-21에 Postgres로 이전했는데 예시 파일만 `DATABASE_URL="file:./dev.db"`(SQLite) 그대로였습니다. **새 컴퓨터에서 이 파일을 복사해 시작하면 즉시 실패하는 상태**였습니다. postgresql 형식으로 고치고, 랜 내부/외부 주소가 왜 다른지, 그리고 "허브·수강신청·시험 시간표 도우미만 볼 거면 접속 안 되는 더미 값이어도 `next dev`가 뜬다(단 값이 아예 없으면 부팅 실패)"는 점을 주석으로 적어 두었습니다.
+- **`README.md`** — create-next-app 보일러플레이트를 지우고 부서·앱 목록 표, 셋업 순서, 폴더 구조, `.agents/AGENTS.md`로 가는 안내로 교체했습니다.
+- **검증:** 정리 전/후 `npm run build` 라우트 목록 동일, `npx tsc --noEmit` 클린, 브라우저에서 허브 → 수강신청 도우미 → 시험 시간표 도우미 5단계 전체(표본 명단 78명 로드, 국어 29명 분반 대상·수학 7명 합반 추천 판정, 시간표 과목 필터, 분반 대화상자) → 쌤스 헬퍼 로그인 리다이렉트(`?next=` 포함)까지 확인했습니다.
+
+**`xlsx`를 CDN 풀빌드로 바꾼 것이 안전한지 실측 확인:** exam-scheduler 통합 때 `xlsx`를 npm 무료판 `^0.18.5` → SheetJS CDN `0.20.3`으로 올렸는데, 허브가 원래 쓰던 3곳(`extractText.ts`/`parseAccountsWorkbook.ts`/`sheetData.ts`)이 실제로 호출하는 API는 `XLSX.read`/`utils.sheet_to_csv`/`utils.sheet_to_json` 셋뿐이고 전부 **읽기 전용**임을 확인했습니다(쓰기는 전부 `xlsx-js-style`·`exceljs`가 따로 담당 — 그쪽은 손대지 않았습니다). 0.20.3에서 이 셋이 모두 존재하는 것과, 봉투 표지가 요구하는 BIFF8(`.xls`) 쓰기→읽기 왕복이 한글 문자열까지 정상인 것을 node로 직접 돌려 확인했습니다.
+
+**아직 정리하지 않은 것 (일부러 남겨둔 것들 — 다음에 손댈 사람 참고):**
+- `src/components/tabs/*.tsx`(enrollment-helper의 3개 탭 컨테이너)와 `src/components/ui/SearchableSelect.tsx`는 다른 앱들이 `src/features/<이름>/` 아래에 모여 있는 것과 달리 혼자 `features/` 밖에 있습니다. 옮기면 import 경로가 여러 파일에서 연쇄로 바뀌는데 **동작상 이득이 전혀 없어** 이번엔 두었습니다.
+- `AppSwitcher`는 허브 전역 개념(`src/config/hub.ts`를 읽음)인데 `src/features/schedule-helper/components/`에 있습니다. 같은 이유로 두었습니다.
+- `Dockerfile`/`docker-compose.yml`/`deploy.sh` — NAS 앱 배포는 2026-07-21부로 중단 상태지만 나중에 다시 쓸 수 있다고 기록돼 있어 **삭제하지 않았습니다**.
+- `.agents/AGENTS.md`가 163KB(약 5만 토큰)라 매 세션 컨텍스트를 크게 차지합니다. 히스토리 로그를 별도 파일로 빼는 안을 검토했지만, 잘못 자르면 맥락이 유실되어 이번엔 손대지 않기로 했습니다.
 
 ### 2026-08-10
 
