@@ -24,3 +24,32 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 시험 시간표 작성 도우미(exam-scheduler)에서 쓰는 색상 토큰. */
+@theme {
+  --color-surface: #ffffff;
+  --color-surface-muted: #f6f8fa;
+  --color-line: #e3e8ef;
+  --color-ink: #16202c;
+  --color-ink-muted: #5b6b7d;
+  --color-brand: #1f6feb;
+  --color-brand-soft: #e8f1ff;
+}
+
+/* 시험 시간표·명단 표는 셀이 많아 기본 테두리 스타일을 한곳에서 정합니다. */
+@utility grid-table {
+  border-collapse: collapse;
+
+  & th,
+  & td {
+    border: 1px solid var(--color-line);
+    padding: 0.375rem 0.5rem;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  & th {
+    background: var(--color-brand-soft);
+    font-weight: 600;
+  }
+}

@@ -19,6 +19,7 @@
   3. 각 개별 앱 페이지는 상단에 `/`(허브)로 돌아가는 `next/link`를 넣어, 사용자가 다시 허브로 돌아갈 수 있게 하세요 (`enrollment-helper/page.tsx`의 로고 링크, `schedule-helper/page.tsx`의 "허브로 돌아가기" 링크 참고).
   - **`enrollment-helper`** (교육과정부) — 기존 수요조사/선택과목변경/본조사 3탭 도구. 자세한 내부 구조는 바로 아래 "코드 아키텍처 개요" 섹션 참고.
   - **`schedule-helper`** (쌤스 헬퍼) — 별도 저장소(`Ryuminje/Myunshinh-schedule-app`, Next.js)에서 통째로 포팅해온 수업교체/협의회 시간 도우미. 자세한 내용은 아래 "🧩 별도 앱 통합(schedule-helper) 참고 메모" 섹션 참고.
+  - **`exam-scheduler`** (교육평가부) — 시험 시간표 작성 도우미. 명단→시간표→시험실 배정→분반→자습 배정→결과 출력 5단계 마법사. 별도 로컬 Next.js 프로젝트(`Documents/dev/exam-scheduler`, DB/인증 없음)를 통째로 이 저장소 안에 포팅한 것 — schedule-helper와 같은 패턴입니다. 자세한 내용은 아래 "🎓 별도 앱 통합(exam-scheduler) 참고 메모" 섹션 참고.
 
 **`AppSwitcher` — 같은 부서 앱 사이를 오가는 헤더 드롭다운 (2026-08-06 추가)**: `src/features/schedule-helper/components/AppSwitcher.tsx`. 예전에는 각 앱 헤더에 "○○로 이동" 링크를 손으로 하나씩 넣었는데, 앱이 3개가 되자 헤더가 길어지고 **한 화면에만 링크를 빠뜨리는 일**이 실제로 생겼습니다(시간표 교체 도우미에 "업무 AI 파트너" 링크가 없었음). 지금은 현재 앱 이름이 적힌 버튼 하나에 마우스를 올리면 같은 부서 앱 전체가 펼쳐집니다. **목록은 `src/config/hub.ts`에서 직접 읽으므로, 새 앱을 허브에 등록하면 모든 화면의 드롭다운에 자동으로 나타납니다 — 헤더를 손볼 필요가 없습니다.** 현재 앱은 `usePathname()`과 가장 길게 겹치는 `href`로 판정합니다(`/apps/schedule-helper`와 `/apps/schedule-helper/certificates`가 둘 다 걸리므로 최장 일치가 필요). 호버뿐 아니라 클릭으로도 열리고(터치 기기), 바깥 클릭·Esc로 닫힙니다. `tone` prop으로 teal(시간표·이수증) / amber(업무 AI 파트너) 배색을 맞춥니다.
 
@@ -197,6 +198,21 @@
 
 ---
 
+## 🎓 별도 앱 통합(exam-scheduler) 참고 메모 — 2026-08-10 추가
+
+`/apps/exam-scheduler`("교육평가부" 부서의 "시험 시간표 작성 도우미")는 schedule-helper와 같은 방식으로 **별도 로컬 Next.js 프로젝트(`Documents/dev/exam-scheduler`, GitHub 원격 저장소 없이 로컬에만 존재)의 소스를 통째로 이 저장소 안으로 포팅**한 것입니다. 명단 업로드 → 시험 시간표 입력 → 시험실 배정(+분반) → 자습 배정 → 결과·엑셀 출력까지 5단계로 진행하는 마법사형 도구이며, DB/로그인 없이 완전히 브라우저 안에서만 동작합니다(업로드한 명단이 서버로 전송되지 않음).
+
+- **파일 매핑:** 원본의 `src/lib/{domain,excel,io,scheduling,store}/*` → `src/features/exam-scheduler/lib/*`(구조 그대로, 파일 내용도 로직 변경 없이 그대로), 원본의 `src/components/*.tsx`(+ barrel `index.ts`) → `src/features/exam-scheduler/components/*`, 원본의 `src/app/page.tsx` → `src/app/apps/exam-scheduler/page.tsx`(헤더에 "허브로 돌아가기" `next/link`만 추가, 나머지 동일). **원본 `public/sample-roster-1.xlsx`/`sample-roster-2.xlsx`도 반드시 같이 복사해야 합니다** — "표본 명단으로 둘러보기" 버튼이 `fetch('/sample-roster-N.xlsx')`로 이 파일들을 직접 읽는데, 처음 포팅 때 이걸 빠뜨려서 "Can't find end of central directory" 파싱 에러가 났었습니다(404 응답 HTML을 zip으로 파싱하려다 실패).
+- **import 경로:** `src/features/exam-scheduler/components/*.tsx`에서만 `@/lib/...` → `@/features/exam-scheduler/lib/...`로 고치면 됩니다. `lib` 폴더 내부 파일들은 전부 상대경로(`../domain/...` 등)로 서로를 참조하고 있어 손댈 필요가 없었습니다.
+- **의존성:** `zustand@^5.0.14` 신규 추가(원본 상태관리, 허브엔 없었음). **`xlsx`를 npm 무료판(`^0.18.5`) → SheetJS CDN 풀빌드(`https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`, 원본과 동일 tarball)로 교체** — 결과 화면의 "시험지 봉투 표지(.xls)" 출력이 BIFF8(Excel 97-2003) 쓰기를 쓰는데, 이건 npm 무료판엔 없고 CDN 풀빌드에만 있는 기능입니다(`src/features/exam-scheduler/lib/excel/exportEnvelope.ts` 주석 참고). 허브에서 기존에 `xlsx`를 직접 쓰던 3곳(`schedule-helper`의 `extractText.ts`/`parseAccountsWorkbook.ts`/`sheetData.ts`)은 전부 **읽기 전용** 파싱이라 버전 교체로 인한 회귀는 없는 것으로 확인했습니다(쓰기는 전부 `xlsx-js-style`이나 `exceljs`를 따로 씀 — 이쪽은 안 건드림). `lucide-react`도 `^1.21.0` → `^1.28.0`으로 소폭 올렸습니다(원본이 요구하는 아이콘 세트 호환용, breaking change 없음).
+- **CSS 병합:** `globals.css`에 원본의 `--color-surface`/`--color-surface-muted`/`--color-line`/`--color-ink`/`--color-ink-muted`/`--color-brand`/`--color-brand-soft` 색상 토큰과 `grid-table` `@utility`를 그대로 추가했습니다. **`--font-sans`/`--font-mono`는 의도적으로 가져오지 않았습니다** — 원본은 학교 PC 오프라인 대응으로 시스템 한글 폰트(Pretendard/맑은 고딕 등) 스택을 썼는데, 이걸 그대로 병합하면 허브의 `@theme inline` 블록이 이미 정의한 `--font-sans`(Geist)를 전역으로 덮어써 버려 허브의 다른 모든 페이지 폰트가 바뀌는 부작용이 생깁니다. exam-scheduler 화면은 이제 허브의 폰트를 그대로 상속받습니다(한글은 시스템 폴백으로 정상 렌더링, 기능상 문제 없음 — 순수 코스메틱 트레이드오프).
+- **로컬 개발 시 `.env.local` 필요 (DB를 쓰지 않는데도):** exam-scheduler 자체는 Prisma/Postgres/better-auth를 전혀 안 쓰지만, **허브 프로젝트 전체가 `postinstall: prisma generate`와 `datasource db { provider = "postgresql" }`를 물고 있어서** `DATABASE_URL`이 유효한(문법상) postgres URL로라도 채워져 있지 않으면 `npm install`/`next dev`가 아예 안 뜹니다. 로컬 전용 더미 값(`.env.local`, gitignore됨)으로 `DATABASE_URL="postgresql://user:pass@localhost:5432/dev"` + 임의의 `BETTER_AUTH_SECRET`/`BETTER_AUTH_URL="http://localhost:3000"`을 채워두면 부팅됩니다. exam-scheduler·enrollment-helper 화면은 이 값이 가짜여도 정상 동작하고, 진짜 DB가 필요한 건 로그인이 걸린 schedule-helper 계열뿐입니다.
+- **인증 게이트 영향 없음:** `src/proxy.ts`의 `matcher`가 `/apps/schedule-helper/:path*`만 잡으므로 `/apps/exam-scheduler`는 enrollment-helper와 마찬가지로 로그인 없이 완전히 열려 있습니다. 새로 손댈 일 없습니다.
+- **원본과의 동기화는 수동입니다 — git 이력이 이어져 있지 않은 단순 파일 복사(스냅샷)입니다.** `Documents/dev/exam-scheduler`는 계속 별도 프로젝트로 남아있고(구 버전 Python/Eel 데스크톱 앱 대조용 golden-file 테스트, vitest 스위트 등은 이 원본에만 있고 허브 쪽엔 포팅하지 않았습니다), 앞으로 그 원본에서 버그를 고치거나 기능을 추가하면 **이 저장소의 `src/features/exam-scheduler/`와 `src/app/apps/exam-scheduler/page.tsx`에 수동으로 다시 반영해야 합니다.** 자동 동기화(symlink/submodule/워크스페이스)는 없습니다 — "다른 저장소 앱을 허브에 합쳐달라"는 요청이 또 오면 이 문서의 schedule-helper 섹션과 이 섹션에서 쓴 방식(파일 매핑 → import 경로 정리 → 의존성 선별 → CSS 토큰 병합 → 인증 matcher 확인 → tsc/lint 클린 확인 → 브라우저로 전 화면 클릭 검증)을 그대로 재사용하세요.
+- **검증한 것:** `npx tsc --noEmit` 클린, `npm run lint`도 새로 추가한 코드엔 에러 없음(허브의 기존 다른 기능들에 남아있던 오래된 lint 에러 162개는 이 작업과 무관하게 그대로 있음 — 손대지 않았습니다). 브라우저에서 허브 → 교육평가부 카드 → 시험 시간표 작성 도우미 → 5단계 전부 클릭 이동, "표본 명단으로 둘러보기"로 샘플 데이터 로드, `1반 1번 학생001` 형식(반 중복 표기 없음) 정상 렌더링, 콘솔 에러 없음까지 확인했습니다.
+
+---
+
 ## 🛠️ 주요 구현 히스토리 (기능별)
 
 **1단계: 기초 자료 입력 (교육과정 및 위계)**
@@ -286,6 +302,15 @@
 ---
 
 ## 📅 개발 히스토리 로그 (최신순)
+
+### 2026-08-10
+
+**"교육평가부" 부서 신설 및 별도 프로젝트 앱(exam-scheduler) 통합:**
+- 사용자가 메인 허브 화면의 "큰 목록"(왼쪽 부서 pill)에 교육과정부 바로 아래로 "교육평가부" 부서를 추가하고, "작은 목록"(오른쪽 앱 카드)에 "시험 시간표 작성 도우미"를 연결해달라고 요청했습니다.
+- 이 도구는 사용자가 이 저장소와는 별도로 로컬에서 개발해 온 Next.js 프로젝트(`Documents/dev/exam-scheduler`, 구 Python/Eel 데스크톱 앱을 이식하던 중이던 프로젝트, GitHub 원격 없음)로 이미 완성되어 있었습니다. 처음엔 사용자가 말한 "메인 화면"의 정체(어느 저장소인지)가 로컬 어디에도 없어 GitHub의 `Ryuminje` 계정 공개 저장소 목록을 뒤져 `subject-selector`(바로 이 저장소)가 맞다는 걸 확인하는 과정이 있었습니다 — 앞으로 비슷하게 "저장소를 못 찾겠다"는 상황이 오면 이 방식(GitHub 계정의 공개 저장소 목록 조회)을 참고하세요.
+- 스택 호환성(Next 16 / React 19 완전 동일, Tailwind v4 동일)을 먼저 확인한 뒤 schedule-helper 때와 같은 패턴으로 소스를 이 저장소 안으로 포팅해 `/apps/exam-scheduler`로 합쳤습니다. 자세한 포팅 방식(파일 매핑, 의존성 교체 이유, CSS 병합, 원본과의 수동 동기화 방식)은 위 "🎓 별도 앱 통합(exam-scheduler) 참고 메모" 섹션에 정리했습니다.
+- `src/config/hub.ts`에 `HubDepartment` 두 번째 항목(교육과정부와 쌤스 헬퍼 사이)으로 "교육평가부" 부서를 추가했고, 왼쪽 pill 색상 순환(`palette` 배열) 세 번째 색(emerald)이 자동으로 적용됩니다.
+- 브라우저에서 허브 → 교육평가부 카드 → 시험 시간표 작성 도우미 진입, 5단계 마법사 전체 클릭 이동, 표본 명단 로드까지 수동 검증했습니다. tsc/eslint(새 파일 기준) 클린, 기존 다른 부서 앱 회귀 없음 확인.
 
 ### 2026-08-06
 
