@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Bot, FileText, GraduationCap, HeartHandshake, ScrollText, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Bot, CalendarClock, ClipboardCheck, FileText, GraduationCap, HeartHandshake, ScrollText, type LucideIcon } from "lucide-react";
 
 export interface HubApp {
   title: string;
@@ -28,6 +28,19 @@ export const departments: HubDepartment[] = [
         description: "수요조사 · 선택과목 변경 · 수강신청(본조사) 자료를 한 번에 정리합니다.",
         href: "/apps/enrollment-helper",
         icon: FileText,
+      },
+    ],
+  },
+  {
+    name: "교육평가부",
+    description: "시험 운영 및 평가 관련 업무 프로그램",
+    icon: ClipboardCheck,
+    apps: [
+      {
+        title: "시험 시간표 작성 도우미",
+        description: "명단 · 시간표를 바탕으로 시험실 배정, 분반, 결과표를 한 번에 만듭니다.",
+        href: "/apps/exam-scheduler",
+        icon: CalendarClock,
       },
     ],
   },
