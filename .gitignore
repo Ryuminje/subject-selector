@@ -2,6 +2,10 @@ node_modules
 .next
 .DS_Store
 
+# TypeScript / Next.js 자동 생성물 (빌드할 때마다 새로 만들어지므로 커밋하지 않습니다)
+*.tsbuildinfo
+next-env.d.ts
+
 /src/generated/prisma
 
 # Prisma / DB
