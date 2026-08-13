@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useSchedule } from "@/features/schedule-helper/lib/ScheduleContext";
 import { useSession } from "@/lib/auth-client";
 import { parseClassInfo, cn } from "@/features/schedule-helper/lib/utils";
-import { Search, X, Check, ArrowRightLeft, Star, Pin } from "lucide-react";
+import { Search, X, Check, ArrowRightLeft, Star, Pin, FilePlus2 } from "lucide-react";
+import MakeupTray from "@/features/schedule-helper/components/makeup/MakeupTray";
+import { useMakeupTray } from "@/features/schedule-helper/components/makeup/useMakeupTray";
+import type { ClassSlot, MakeupKind } from "@/features/schedule-helper/lib/makeup/types";
 
 interface SearchResult {
   teacher: string;
@@ -32,6 +35,9 @@ export default function SwapTab() {
   const [selectedChainIdx, setSelectedChainIdx] = useState<number | null>(null);
   const theadRef = useRef<HTMLTableSectionElement>(null);
   const [stickyTop, setStickyTop] = useState(0);
+  // 보강원 작성 트레이 — 후보를 여러 건 담아 한 장으로 만듭니다.
+  // (조기 return보다 위에 있어야 훅 순서가 어긋나지 않습니다.)
+  const tray = useMakeupTray();
 
   // 로그인한 계정 이름과 일치하는 교사 행을 "내 시간표"로 맨 위에 고정하기 위해,
   // 헤더(sticky) 높이만큼 아래로 sticky 위치를 잡아줍니다.
@@ -174,6 +180,69 @@ export default function SwapTab() {
   const selectedClassStr = selectedCell ? data.tableData.find((r) => r.teacher === selectedCell.teacher)?.[selectedCell.day + selectedCell.period] : null;
   const myInfo = parseClassInfo(selectedClassStr);
 
+  // 지금 선택한 시간에 이미 담긴 항목 (한 시간에 한 사람만 들어갑니다)
+  const pickedForCell = selectedCell
+    ? tray.entryFor(selectedCell.teacher, selectedCell.day, selectedCell.period)
+    : undefined;
+
+  /**
+   * 후보를 보강원 트레이에 담습니다.
+   * 교체 후보는 나와 **같은 반**을 다른 시간에 가르치는 사람이라(검색 조건이 그렇습니다),
+   * 내가 대신 갈 수업의 학년·반은 내 수업과 같습니다.
+   */
+  const addToTray = (kind: MakeupKind, partnerTeacher: string, exchangeSlot?: { day: string; period: number; subject: string }) => {
+    if (!selectedCell || !myInfo) return;
+    const absent: ClassSlot = {
+      day: selectedCell.day,
+      period: selectedCell.period,
+      grade: myInfo.grade,
+      classNum: myInfo.classNum,
+      subject: myInfo.subject,
+    };
+    tray.add({
+      kind,
+      absentTeacher: selectedCell.teacher,
+      absent,
+      partnerTeacher,
+      exchange: exchangeSlot
+        ? { ...exchangeSlot, grade: myInfo.grade, classNum: myInfo.classNum }
+        : undefined,
+    });
+  };
+
+  /** 후보 한 줄에 붙는 [교체]/[보강] 버튼. 이미 담긴 시간이면 상태만 보여줍니다. */
+  const renderPickButtons = (partnerTeacher: string, exchangeSlot?: { day: string; period: number; subject: string }) => {
+    if (pickedForCell) {
+      return pickedForCell.partnerTeacher === partnerTeacher ? (
+        <span className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-lg bg-amber-100 text-amber-800">
+          담김 · {pickedForCell.kind === "swap" ? "교체" : "보강"}
+        </span>
+      ) : (
+        <span className="shrink-0 text-[11px] text-slate-400" title="이 시간은 이미 다른 분으로 담겨 있습니다.">
+          —
+        </span>
+      );
+    }
+    return (
+      <div className="shrink-0 flex gap-1">
+        {exchangeSlot && (
+          <button
+            onClick={() => addToTray("swap", partnerTeacher, exchangeSlot)}
+            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded-lg bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+          >
+            <FilePlus2 className="w-3 h-3" /> 교체
+          </button>
+        )}
+        <button
+          onClick={() => addToTray("sub", partnerTeacher)}
+          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+        >
+          <FilePlus2 className="w-3 h-3" /> 보강
+        </button>
+      </div>
+    );
+  };
+
   const renderRow = (row: typeof data.tableData[number], pinned: boolean) => (
     <tr
       key={row.teacher}
@@ -285,9 +354,11 @@ export default function SwapTab() {
       </div>
     </div>
 
-      {/* Docked Panel */}
+      {/* Docked Panel + 보강원 트레이 — 결과 패널을 닫아도 담아둔 건 남아야 하므로 같은 열에 둡니다. */}
+      {(modalOpen || tray.entries.length > 0) && (
+      <div className="w-full lg:w-[380px] shrink-0 lg:sticky lg:top-24 space-y-4">
       {modalOpen && (
-        <div className="w-full lg:w-[380px] shrink-0 lg:sticky lg:top-24 bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] border border-teal-200 overflow-hidden animate-in fade-in duration-200">
+        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] border border-teal-200 overflow-hidden animate-in fade-in duration-200">
           <div className="bg-teal-600 p-3 md:p-4 flex justify-between items-center text-white">
             <h2 className="text-base md:text-lg font-bold flex items-center gap-2">
               <Search className="w-4 h-4 md:w-5 md:h-5" /> 수업 매칭 결과
@@ -333,10 +404,12 @@ export default function SwapTab() {
                               <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
                                 <Check className="w-4 h-4 font-bold" />
                               </div>
-                              <div>
+                              <div className="flex-1 min-w-0">
                                 <div className="font-bold text-emerald-800 text-sm">{res.teacher} 선생님</div>
                                 <div className="text-xs text-slate-600">해당 시간({selectedCell?.day} {selectedCell?.period}교시) <b>공강</b> · 대강 가능</div>
                               </div>
+                              {/* 동과 대강은 상대의 수업을 내가 대신 갈 시간이 없어 교체가 성립하지 않습니다. */}
+                              {renderPickButtons(res.teacher)}
                             </div>
                           ))}
                         </div>
@@ -369,10 +442,11 @@ export default function SwapTab() {
                           <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center shrink-0 text-xs font-bold">
                             {i + 1}
                           </div>
-                          <div>
+                          <div className="flex-1 min-w-0">
                             <div className="font-bold text-slate-800 text-sm">{res.teacher} 선생님</div>
                             <div className="text-xs text-slate-600"><b>{res.day}요일 {res.period}교시</b> · {res.subject}</div>
                           </div>
+                          {renderPickButtons(res.teacher, { day: res.day!, period: res.period!, subject: res.subject! })}
                         </div>
                       ))}
                     </div>
@@ -416,6 +490,16 @@ export default function SwapTab() {
               )}
           </div>
         </div>
+      )}
+
+        <MakeupTray
+          entries={tray.entries}
+          schoolName={data.schoolName}
+          onRemove={tray.remove}
+          onClear={tray.clear}
+          onDateOverride={tray.setDateOverride}
+        />
+      </div>
       )}
     </div>
   );

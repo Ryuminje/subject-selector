@@ -14,6 +14,7 @@ interface BlockSettings {
 // School의 globalMeetingBlocks를 합친 것입니다. sheetData.ts의 파싱 전용 ScheduleData와는
 // 다른, API 응답 전용 타입입니다.
 export interface ScheduleData {
+  schoolName: string;
   teachers: string[];
   days: string[];
   periods: number[];
