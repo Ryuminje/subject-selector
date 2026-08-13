@@ -37,6 +37,9 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     ...core,
+    // 보강원 문서 머리에 찍히는 학교 이름 — 허브의 config/hub.ts에도 학교명이 있지만
+    // 그건 이 학교 전용 하드코딩이라 멀티테넌트에서 쓰면 안 됩니다.
+    schoolName: school.name,
     defaultBlockSettings,
     tempBlockSettings,
     globalMeetingBlocks: JSON.parse(school.globalMeetingBlocks) as Record<string, number[]>,
