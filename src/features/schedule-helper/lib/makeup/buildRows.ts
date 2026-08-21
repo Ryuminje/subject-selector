@@ -1,11 +1,13 @@
-// 트레이에 담긴 항목들을 보강원 문서의 줄로 바꿉니다.
+// 트레이에 담긴 항목들을 보강원 서식의 줄로 바꿉니다.
 //
 // 여기서 하는 일이 두 가지입니다.
 //  1) 요일 → 실제 날짜 계산. 시간표에는 "화요일 2교시"만 있고 달력 날짜가 없는데,
 //     날짜 없는 보강원은 결재가 안 나므로 사용자가 고른 기준일이 속한 주에서 뽑아냅니다.
-//  2) 교체를 두 줄로 펼치기. 교체는 서로 맞바꾸는 것이라 문서에 두 줄이 나가야 합니다.
+//  2) 결강일별로 장 나누기. 서식에 "하루에 한 장씩 기재해 주십시오"라고 적혀 있습니다.
+//
+// 교체를 어떻게 적는지는 `types.ts`의 표 그림을 보세요 — **한 줄**입니다.
 
-import type { ClassSlot, MakeupDoc, MakeupEntry, MakeupRow } from "./types";
+import type { ClassSlot, MakeupDoc, MakeupEntry, MakeupRow, MakeupSheet } from "./types";
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -68,38 +70,51 @@ export function exchangeDateOf(entry: MakeupEntry, baseDate: string): string {
 const className = (slot: ClassSlot) => `${slot.grade}-${slot.classNum}`;
 
 /**
- * 트레이 항목 하나를 문서 줄로. 보강은 1줄, 교체는 2줄입니다.
+ * 트레이 항목 하나를 서식의 한 줄로.
  *
- * 교체의 두 번째 줄은 방향이 반대입니다 — 상대의 수업에 내가 들어가는 것이므로
- * from/to가 뒤집힙니다. 이걸 뒤집지 않으면 문서에 같은 사람이 두 번 들어가는
- * 것처럼 찍혀서 결재 단계에서 반려됩니다.
+ * 왼쪽 세 칸은 결강하는 내 수업이고, 교체라면 "교체대상" 칸에 내가 대신 갈 상대 수업이
+ * 들어갑니다. 보강은 맞바꿈이 없으므로 교체대상 칸을 비웁니다("수업 교체의 경우만 기재").
  */
-export function rowsForEntry(entry: MakeupEntry, baseDate: string): MakeupRow[] {
-  const absentDate = absentDateOf(entry, baseDate);
-  const first: MakeupRow = {
-    kindLabel: entry.kind === "swap" ? "교체" : "보강",
-    date: absentDate,
-    weekday: entry.absent.day,
-    period: entry.absent.period,
-    className: className(entry.absent),
+export function rowForEntry(entry: MakeupEntry, baseDate: string): MakeupRow {
+  const row: MakeupRow = {
+    kind: entry.kind,
     subject: entry.absent.subject,
-    fromTeacher: entry.absentTeacher,
-    toTeacher: entry.partnerTeacher,
+    className: className(entry.absent),
+    period: entry.absent.period,
+    partnerTeacher: entry.partnerTeacher,
   };
 
-  if (entry.kind !== "swap" || !entry.exchange) return [first];
+  if (entry.kind === "swap" && entry.exchange) {
+    row.exchangeDate = exchangeDateOf(entry, baseDate);
+    row.exchangePeriod = entry.exchange.period;
+    row.exchangeSubject = entry.exchange.subject;
+  }
+  return row;
+}
 
-  const second: MakeupRow = {
-    kindLabel: "교체",
-    date: exchangeDateOf(entry, baseDate),
-    weekday: entry.exchange.day,
-    period: entry.exchange.period,
-    className: className(entry.exchange),
-    subject: entry.exchange.subject,
-    fromTeacher: entry.partnerTeacher,
-    toTeacher: entry.absentTeacher,
-  };
-  return [first, second];
+/**
+ * 트레이를 결강일별로 나눠 장을 만듭니다. 서식이 하루 한 장이기 때문입니다.
+ * 장은 날짜순, 장 안의 줄은 교시순으로 정렬해야 결재자가 읽기 좋습니다.
+ */
+export function buildSheets(entries: MakeupEntry[], baseDate: string): MakeupSheet[] {
+  const byDate = new Map<string, { entry: MakeupEntry; period: number }[]>();
+
+  for (const entry of entries) {
+    const date = absentDateOf(entry, baseDate);
+    const bucket = byDate.get(date);
+    const item = { entry, period: entry.absent.period };
+    if (bucket) bucket.push(item);
+    else byDate.set(date, [item]);
+  }
+
+  return [...byDate.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, items]) => ({
+      date,
+      rows: items
+        .sort((a, b) => a.period - b.period)
+        .map(({ entry }) => rowForEntry(entry, baseDate)),
+    }));
 }
 
 export function buildDoc(params: {
@@ -107,18 +122,15 @@ export function buildDoc(params: {
   writerTeacher: string;
   baseDate: string;
   reason: string;
+  reasonDetail?: string;
   entries: MakeupEntry[];
 }): MakeupDoc {
-  const rows = params.entries.flatMap((entry) => rowsForEntry(entry, params.baseDate));
-  // 날짜 → 교시 순으로 정렬해야 결재자가 읽기 좋습니다.
-  rows.sort((a, b) => (a.date === b.date ? a.period - b.period : a.date.localeCompare(b.date)));
-
   return {
     schoolName: params.schoolName,
     writerTeacher: params.writerTeacher,
-    baseDate: params.baseDate,
     reason: params.reason,
-    rows,
+    reasonDetail: params.reasonDetail,
+    sheets: buildSheets(params.entries, params.baseDate),
     createdAt: new Date().toISOString(),
   };
 }

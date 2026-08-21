@@ -2,17 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
-import { koreanDate } from "@/features/schedule-helper/lib/makeup/buildRows";
+import MakeupSheet from "@/features/schedule-helper/components/makeup/MakeupSheet";
 import { MAKEUP_DOC_KEY, type MakeupDoc } from "@/features/schedule-helper/lib/makeup/types";
 
-// 보강원 인쇄 페이지 (A4 1장).
+// 보강원 인쇄 페이지. 문서 **모양**은 여기가 아니라 `MakeupSheet.tsx`에 있습니다 —
+// 이 파일은 데이터를 넘겨받아 장 수만큼 늘어놓고 인쇄창을 여는 일만 합니다.
 //
-// ⚠️ 문서 모양은 **이 파일에만** 있습니다. 학교 한글(.hwp) 서식을 받으면 아래 <article> 안의
-// 표와 머리말만 그 모양대로 바꾸면 되고, 담기·날짜 계산·데이터 전달은 손댈 필요가 없습니다.
-// 한글 파일 자체를 채워 내보내는 건 자바스크립트로 불가능해서(AI 파트너가 hwp 업로드를
-// 막아둔 것과 같은 이유), 같은 모양을 화면으로 재현해 인쇄·PDF로 뽑는 방식입니다.
-//
-// 문서는 서버에 저장하지 않기로 한 기능이라 sessionStorage로 넘겨받습니다.
+// 문서는 서버에 저장하지 않는 기능이라 sessionStorage로 넘겨받습니다.
 
 export default function MakeupPrintPage() {
   const [doc, setDoc] = useState<MakeupDoc | null>(null);
@@ -20,7 +16,17 @@ export default function MakeupPrintPage() {
 
   useEffect(() => {
     Promise.resolve().then(() => {
-      const raw = sessionStorage.getItem(MAKEUP_DOC_KEY);
+      // 트레이는 localStorage로 넘겨줍니다(탭이 달라도 확실히 전달되는 유일한 방법 —
+      // 자세한 이유는 MakeupTray의 주석 참고). 받자마자 localStorage에서는 지우고
+      // 이 탭의 sessionStorage로 옮겨, 사유 같은 내용이 브라우저에 남지 않으면서도
+      // 이 탭에서 새로고침은 되도록 합니다.
+      const handoff = localStorage.getItem(MAKEUP_DOC_KEY);
+      if (handoff) {
+        localStorage.removeItem(MAKEUP_DOC_KEY);
+        sessionStorage.setItem(MAKEUP_DOC_KEY, handoff);
+      }
+
+      const raw = handoff ?? sessionStorage.getItem(MAKEUP_DOC_KEY);
       if (!raw) {
         setMissing(true);
         return;
@@ -34,8 +40,12 @@ export default function MakeupPrintPage() {
   }, []);
 
   // 내용이 그려진 다음 프레임에 인쇄창을 엽니다. 이미지가 없어 기다릴 것이 없습니다.
+  //
+  // ⚠️ 브라우저 자동화로 이 페이지를 열면 인쇄 대화상자가 렌더러를 막아 페이지 읽기가
+  // 타임아웃됩니다. 내용만 확인할 때는 주소에 ?noprint=1 을 붙이세요.
   useEffect(() => {
     if (!doc) return;
+    if (new URLSearchParams(window.location.search).has("noprint")) return;
     const timer = window.setTimeout(() => window.print(), 300);
     return () => window.clearTimeout(timer);
   }, [doc]);
@@ -54,103 +64,32 @@ export default function MakeupPrintPage() {
   return (
     <div className="bg-slate-100 print:bg-white min-h-screen py-8 print:py-0">
       <style>{`
-        @page { size: A4 portrait; margin: 15mm; }
+        /* 좌우 22mm면 본문 폭이 166mm — 원본 서식의 표 너비(472pt)와 같습니다. */
+        @page { size: A4 portrait; margin: 18mm 22mm; }
         @media print {
           .no-print { display: none !important; }
           html, body { background: #fff; }
+          .sheet { break-after: page; }
+          .sheet:last-child { break-after: auto; }
         }
       `}</style>
 
-      <div className="no-print max-w-[210mm] mx-auto mb-4 flex justify-end px-4">
+      <div className="no-print max-w-[210mm] mx-auto mb-4 flex items-center justify-between gap-4 px-4">
+        <p className="text-sm text-slate-500">
+          {doc.writerTeacher} 선생님 · 총 {doc.sheets.length}장
+          {doc.sheets.length > 1 && " (하루에 한 장씩)"}
+        </p>
         <button
           onClick={() => window.print()}
           className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-sm font-semibold rounded-xl transition-colors"
         >
-          <Printer className="w-4 h-4" /> 다시 인쇄
+          <Printer className="w-4 h-4" /> 인쇄
         </button>
       </div>
 
-      <article className="max-w-[210mm] mx-auto bg-white p-[15mm] print:p-0 shadow-sm print:shadow-none text-slate-900">
-        <header className="mb-6">
-          <div className="flex items-start justify-between gap-6">
-            <div className="pt-2">
-              <p className="text-sm text-slate-600">{doc.schoolName}</p>
-            </div>
-            {/* 결재란 — 서식에 맞춰 칸 이름을 바꾸면 됩니다. */}
-            <table className="border-collapse text-[11px] text-center">
-              <tbody>
-                <tr>
-                  <td rowSpan={2} className="border border-slate-400 px-2 py-1 w-7 align-middle leading-tight">
-                    결<br />재
-                  </td>
-                  {["담당", "부장", "교감", "교장"].map((label) => (
-                    <td key={label} className="border border-slate-400 px-3 py-1 w-16 bg-slate-50">
-                      {label}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  {["담당", "부장", "교감", "교장"].map((label) => (
-                    <td key={label} className="border border-slate-400 h-12" />
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <h1 className="text-center text-2xl font-bold tracking-[0.4em] mt-4 mb-6">수업교체·보강원</h1>
-
-          <table className="w-full border-collapse text-sm">
-            <tbody>
-              <tr>
-                <th className="border border-slate-400 bg-slate-50 py-1.5 w-24 font-semibold">신청인</th>
-                <td className="border border-slate-400 py-1.5 px-3">{doc.writerTeacher}</td>
-                <th className="border border-slate-400 bg-slate-50 py-1.5 w-24 font-semibold">결강 사유</th>
-                <td className="border border-slate-400 py-1.5 px-3">{doc.reason}</td>
-              </tr>
-            </tbody>
-          </table>
-        </header>
-
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr>
-              {["번호", "일자", "요일", "교시", "학급", "과목", "구분", "결강 교사", "대체 교사"].map((h) => (
-                <th key={h} className="border border-slate-400 bg-slate-100 py-1.5 px-1 font-semibold whitespace-nowrap">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {doc.rows.map((row, i) => (
-              <tr key={`${row.date}-${row.period}-${row.toTeacher}-${i}`}>
-                <td className="border border-slate-400 text-center py-1.5">{i + 1}</td>
-                <td className="border border-slate-400 text-center py-1.5 whitespace-nowrap">{row.date}</td>
-                <td className="border border-slate-400 text-center py-1.5">{row.weekday}</td>
-                <td className="border border-slate-400 text-center py-1.5">{row.period}</td>
-                <td className="border border-slate-400 text-center py-1.5">{row.className}</td>
-                <td className="border border-slate-400 text-center py-1.5">{row.subject}</td>
-                <td className="border border-slate-400 text-center py-1.5">{row.kindLabel}</td>
-                <td className="border border-slate-400 text-center py-1.5">{row.fromTeacher}</td>
-                <td className="border border-slate-400 text-center py-1.5 font-semibold">{row.toTeacher}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <p className="text-center text-sm mt-10">위와 같이 수업 교체 및 보강을 신청합니다.</p>
-
-        <div className="text-center mt-8 text-sm">
-          <p>{koreanDate(doc.createdAt.slice(0, 10))}</p>
-          <p className="mt-4">
-            신청인 : <span className="font-semibold">{doc.writerTeacher}</span>
-            <span className="ml-2 text-slate-400">(서명)</span>
-          </p>
-        </div>
-
-        <p className="text-center text-base font-bold tracking-[0.3em] mt-12">{doc.schoolName}장 귀하</p>
-      </article>
+      {doc.sheets.map((sheet) => (
+        <MakeupSheet key={sheet.date} doc={doc} sheet={sheet} />
+      ))}
     </div>
   );
 }
