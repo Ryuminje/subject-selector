@@ -1,9 +1,20 @@
-// 보강원(수업 교체·보강 신청서) 작성에 쓰는 타입들.
+// 보강원("수업 교체 및 동과 보강 계획서") 작성에 쓰는 타입들.
 //
-// 용어를 먼저 맞춰둡니다 — 이 둘은 문서에 다르게 적힙니다.
-//   교체(swap) : 서로 시간을 맞바꿉니다. 두 사람 시수가 그대로라 문서에 **두 줄**이 나갑니다.
-//                ① 내 수업을 상대가  ② 상대 수업을 내가
-//   보강(sub)  : 상대가 내 수업을 대신 들어갑니다. 맞바꿈이 없어 **한 줄**입니다.
+// **모양의 기준은 학교에서 받은 실제 서식입니다.** 서식을 먼저 읽고 나서 이 파일을 보세요.
+// 표 한 줄이 무엇을 뜻하는지가 서식에서 정해지고, 그게 이 타입들을 그대로 결정합니다.
+//
+//   ┌────────┬───────┬──────┬──────────────────────────┬──────────────┐
+//   │ 교과명 │ 학 반 │ 교 시│  수업 교체의 경우만 기재  │ 교체 및 동과 │
+//   │        │       │      ├─────────────┬────────────┤ 보강 교사명  │
+//   │        │       │      │교체대상 교시│교체대상 교과│              │
+//   └────────┴───────┴──────┴─────────────┴────────────┴──────────────┘
+//
+// 왼쪽 세 칸이 **내가 못 하는 수업**, 가운데 두 칸이 **교체라면 내가 대신 갈 상대 수업**,
+// 오른쪽이 **대신 들어와 주는 선생님**입니다.
+//
+// ⚠️ 그래서 **교체도 한 줄입니다.** 예전에는 교체를 두 줄(① 내 수업을 상대가 ② 상대 수업을
+// 내가)로 펼쳤는데, 이 서식에는 "교체대상" 칸이 따로 있어 맞바꿈이 같은 줄에서 표현됩니다.
+// 두 줄로 적으면 교체대상 칸이 비고 같은 건이 중복돼 보입니다. 되돌리지 마세요.
 
 export type MakeupKind = "swap" | "sub";
 
@@ -39,32 +50,53 @@ export interface MakeupEntry {
   exchangeDateOverride?: string;
 }
 
-/** 문서에 실제로 한 줄로 찍히는 내용 */
+/** 서식 표의 한 줄 = 결강 수업 하나 */
 export interface MakeupRow {
-  kindLabel: "교체" | "보강";
-  date: string;
-  weekday: string;
-  period: number;
-  className: string;
+  kind: MakeupKind;
+  /** 교과명 — 결강하는 수업의 과목 */
   subject: string;
-  /** 원래 그 수업을 맡은 교사 */
-  fromTeacher: string;
-  /** 그 시간에 실제로 들어가는 교사 */
-  toTeacher: string;
+  /** 학 반 */
+  className: string;
+  /** 교 시 */
+  period: number;
+  /** 교체대상 교시 — 교체일 때만. 서식이 "( )월( )일 ( )교시"라 날짜까지 필요합니다. */
+  exchangeDate?: string;
+  exchangePeriod?: number;
+  /** 교체대상 교과 — 교체일 때만 */
+  exchangeSubject?: string;
+  /** 교체 및 동과보강 교사명 */
+  partnerTeacher: string;
 }
 
-/** 인쇄 페이지로 넘기는 문서 한 장 */
+/**
+ * 문서 한 장 = 하루치.
+ *
+ * 서식 하단에 "하루에 한 장씩 기재해 주십시오"라고 적혀 있고 머리말의 `일 시`도 날짜
+ * 하나뿐이라, 트레이에 여러 날이 섞이면 날짜별로 장을 나눕니다.
+ */
+export interface MakeupSheet {
+  /** 일 시 = 결강일 (YYYY-MM-DD) */
+  date: string;
+  rows: MakeupRow[];
+}
+
+/** 인쇄 페이지로 넘기는 문서 (여러 장일 수 있음) */
 export interface MakeupDoc {
   schoolName: string;
-  /** 작성자 = 결강 교사 */
+  /** 교 사 = 결강 교사 */
   writerTeacher: string;
-  /** 결강 주간의 기준일 (YYYY-MM-DD) */
-  baseDate: string;
+  /** 사 유 — 서식에 인쇄된 보기 중 하나 (출장·연가·병가·조퇴·특별휴가·기타) */
   reason: string;
-  rows: MakeupRow[];
+  /** 사유가 "기타"일 때 괄호 안에 들어갈 내용 */
+  reasonDetail?: string;
+  /** 하루에 한 장 */
+  sheets: MakeupSheet[];
   /** 문서를 만든 시각 (ISO) */
   createdAt: string;
 }
+
+/** 서식 `사 유` 줄에 인쇄돼 있는 보기. 순서까지 서식 그대로입니다. */
+export const MAKEUP_REASONS = ["출장", "연가", "병가", "조퇴", "특별휴가", "기타"] as const;
 
 /** 인쇄 페이지에 문서를 넘길 때 쓰는 sessionStorage 키 */
 export const MAKEUP_DOC_KEY = "schedule-helper:makeup-doc";

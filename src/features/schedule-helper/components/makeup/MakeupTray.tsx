@@ -5,13 +5,16 @@ import { FileText, Trash2, X, AlertTriangle } from "lucide-react";
 import {
   absentDateOf,
   buildDoc,
+  buildSheets,
   exchangeDateOf,
   formatDate,
   koreanDate,
 } from "@/features/schedule-helper/lib/makeup/buildRows";
-import { MAKEUP_DOC_KEY, type MakeupEntry } from "@/features/schedule-helper/lib/makeup/types";
-
-const REASONS = ["출장", "병가", "연가", "공가", "특별휴가", "기타"];
+import {
+  MAKEUP_DOC_KEY,
+  MAKEUP_REASONS,
+  type MakeupEntry,
+} from "@/features/schedule-helper/lib/makeup/types";
 
 interface Props {
   entries: MakeupEntry[];
@@ -23,7 +26,7 @@ interface Props {
 
 export default function MakeupTray({ entries, schoolName, onRemove, onClear, onDateOverride }: Props) {
   const [baseDate, setBaseDate] = useState("");
-  const [reason, setReason] = useState(REASONS[0]);
+  const [reason, setReason] = useState<string>(MAKEUP_REASONS[0]);
   const [reasonDetail, setReasonDetail] = useState("");
 
   // 기본값을 오늘로. 렌더 중에 new Date()를 부르면 서버 렌더와 값이 어긋날 수 있어
@@ -38,13 +41,31 @@ export default function MakeupTray({ entries, schoolName, onRemove, onClear, onD
   // 트레이는 한 사람의 결강을 모으는 곳입니다. 시간표에서 다른 교사 칸을 눌러 담으면
   // 한 장에 두 사람이 섞여 결재가 안 되므로 미리 알려줍니다.
   const mixedTeachers = entries.some((e) => e.absentTeacher !== writerTeacher);
-  const finalReason = reason === "기타" ? reasonDetail.trim() : reason;
-  const canSubmit = !!baseDate && !!finalReason && !mixedTeachers;
+  // 사유는 서식에 인쇄된 보기 중 하나를 고르는 것이라 값 자체는 항상 있습니다.
+  // "기타"만 괄호 안에 적을 내용을 따로 받습니다.
+  const needsDetail = reason === "기타" && !reasonDetail.trim();
+  const canSubmit = !!baseDate && !needsDetail && !mixedTeachers;
+
+  // 서식이 하루 한 장이라 결강일이 여러 날이면 그만큼 장이 나옵니다. 미리 알려줍니다.
+  const sheetCount = baseDate ? buildSheets(entries, baseDate).length : 0;
 
   const handleCreate = () => {
-    const doc = buildDoc({ schoolName, writerTeacher, baseDate, reason: finalReason, entries });
-    // 서버에 저장하지 않는 기능이라, 인쇄 페이지로는 sessionStorage로 넘깁니다.
-    sessionStorage.setItem(MAKEUP_DOC_KEY, JSON.stringify(doc));
+    const doc = buildDoc({
+      schoolName,
+      writerTeacher,
+      baseDate,
+      reason,
+      reasonDetail: reasonDetail.trim() || undefined,
+      entries,
+    });
+    // 서버에 저장하지 않는 기능이라 인쇄 페이지로는 브라우저 저장소로 넘깁니다.
+    //
+    // ⚠️ **sessionStorage를 쓰면 안 됩니다.** sessionStorage는 탭마다 따로이고, 새 탭이
+    // 그 사본을 물려받는 건 opener 관계가 있을 때뿐입니다 — 아래 `noopener` 때문에 그 관계가
+    // 끊겨서 인쇄 탭에서는 "보강원 데이터가 없습니다"만 나왔습니다(실제로 겪은 버그).
+    // localStorage는 같은 출처의 모든 탭이 공유하므로 확실히 넘어갑니다.
+    // 넘겨받은 쪽에서 바로 지우므로 사유(병가 등)가 브라우저에 남지 않습니다.
+    localStorage.setItem(MAKEUP_DOC_KEY, JSON.stringify(doc));
     window.open("/apps/schedule-helper/makeup/print", "_blank", "noopener");
   };
 
@@ -153,7 +174,7 @@ export default function MakeupTray({ entries, schoolName, onRemove, onClear, onD
               onChange={(e) => setReason(e.target.value)}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white"
             >
-              {REASONS.map((r) => (
+              {MAKEUP_REASONS.map((r) => (
                 <option key={r} value={r}>
                   {r}
                 </option>
@@ -166,7 +187,7 @@ export default function MakeupTray({ entries, schoolName, onRemove, onClear, onD
               type="text"
               value={reasonDetail}
               onChange={(e) => setReasonDetail(e.target.value)}
-              placeholder="사유를 입력하세요"
+              placeholder="괄호 안에 적을 사유"
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm"
             />
           )}
@@ -185,6 +206,7 @@ export default function MakeupTray({ entries, schoolName, onRemove, onClear, onD
         {baseDate && canSubmit && (
           <p className="text-[11px] text-slate-400 mt-2 text-center">
             {koreanDate(baseDate)} 주간 · {writerTeacher} 선생님
+            {sheetCount > 1 && ` · 결강일이 ${sheetCount}일이라 ${sheetCount}장으로 나옵니다`}
           </p>
         )}
       </div>
