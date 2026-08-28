@@ -406,6 +406,16 @@ DATABASE_URL="postgresql://..." npx prisma migrate deploy
 
 ## 📅 개발 히스토리 로그 (최신순)
 
+### 2026-08-29
+
+**협의회 프리셋 운영 반영 + 저장소 정리 (앱 기능 변경 없음):**
+- 8/28에 다른 컴퓨터에서 만든 `feature/meeting-presets`를 운영에 반영했습니다. 순서는 **마이그레이션 먼저, 병합·푸시 나중** — 새 테이블 하나만 추가하는 순수 additive 마이그레이션이라 그때까지 돌던 운영 코드에 영향이 없기 때문입니다. `prisma migrate deploy` → main에 fast-forward 병합(`a536f36`).
+- **적용 전후로 HNSW 인덱스(`AssistantChunk_embedding_idx`)가 살아있는지 직접 확인**했습니다. 마이그레이션 파일에서 `DROP INDEX` 줄을 뺐다는 주석만 믿지 말고, 운영 DB에 적용할 때마다 `pg_indexes`로 실제 존재를 보세요. 행 수(School/Teacher/user/AssistantChunk/AssistantBot)도 전후 대조했습니다.
+- **`user` 테이블의 고아 계정 3개를 정리했습니다(53 → 50).** 8/13에 발견해두고 확인을 기다리던 항목입니다. 소속 School이 삭제돼 로그인도 데이터 접근도 불가능한 테스트 계정들이었고, `session`/`account`는 Cascade로 함께 지워졌습니다. 찾는 쿼리: `SELECT ... FROM "user" WHERE "schoolId" NOT IN (SELECT id FROM "School")`.
+- **`graphify-out/`을 `.gitignore`에 넣었습니다.** 코드에서 언제든 다시 만들 수 있는 파생물인데 `graph.json`이 1.5MB라 커밋마다 diff를 오염시킵니다. 함께 생성돼 있던 `.gitattributes`(`graphify-out/graph.json merge=graphify` 한 줄)도 지웠습니다 — 이제 그 파일이 추적되지 않아 아무 일도 못 하는 설정이고, 커밋되면 graphify가 없는 다른 컴퓨터에서 "merge driver를 못 찾겠다" 경고만 냅니다.
+- **⚠️ graphify를 쓸 때 알아둘 것 (실제로 조용히 틀린 결과가 나오고 있었음)**: 이 컴퓨터에 graphify가 **pipx와 pip 두 벌** 깔려 있고, 커밋 훅은 pipx 쪽을 씁니다. 그런데 pipx 쪽에만 `tree_sitter_sql`이 없어서 **커밋할 때마다 `prisma/migrations/*.sql` 14개가 그래프에서 조용히 빠지고 있었습니다.** 양쪽에 `graphifyy[sql]`을 맞춰 넣어 해결했습니다. 도구를 여러 방식으로 설치했을 때는 "내가 방금 쓴 것"과 "훅이 쓰는 것"이 다를 수 있다는 걸 항상 의심하세요.
+- 이번 정리는 앱 동작에 영향이 없습니다(소스 코드 변경 없음, `.gitignore`만 수정).
+
 ### 2026-08-28
 
 **협의회 시간 찾기에 계정별 교사 프리셋 추가:**
