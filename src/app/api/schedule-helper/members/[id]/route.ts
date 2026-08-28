@@ -27,6 +27,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     }
   }
 
+  // 협의회 프리셋은 User에 @relation을 걸지 않아(better-auth CLI가 User 블록을 다시 쓰기 때문)
+  // cascade가 걸리지 않습니다. 계정을 지울 때 여기서 직접 지워야 고아 행이 남지 않습니다.
+  await prisma.meetingPreset.deleteMany({ where: { userId: id } });
+
   // Session/Account는 스키마에서 User onDelete: Cascade로 연결되어 있어 함께 삭제됩니다.
   await prisma.user.delete({ where: { id } });
 

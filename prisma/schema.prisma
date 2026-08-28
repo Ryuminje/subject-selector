@@ -45,6 +45,35 @@ model School {
   certificateRosterExtras  CertificateRosterExtra[]
   certificateRosterPresets CertificateRosterPreset[]
   assistantBots            AssistantBot[]
+  meetingPresets           MeetingPreset[]
+}
+
+// 협의회 시간 찾기에서 자주 함께 잡는 교사 묶음("2학년부", "과학과" 같은).
+//
+// 연수 이수증의 CertificateRosterPreset과 달리 **학교 공용이 아니라 계정별**입니다 —
+// 협의회 상대는 사람마다 다르므로 사용자가 "개개인이 설정"으로 요구했습니다.
+// 그래서 조회·수정·삭제 모두 세션의 userId로만 걸러집니다.
+model MeetingPreset {
+  id String @id @default(cuid())
+
+  // better-auth가 관리하는 User.id. **일부러 @relation을 걸지 않았습니다** —
+  // User 모델은 `npx auth generate`가 통째로 다시 쓰기 때문에 관계 필드를 달면
+  // 다음 생성 때 사라집니다(User.schoolId/teacherId와 같은 이유).
+  // 계정을 지울 때 이 행도 같이 지우는 일은 members DELETE 라우트가 직접 합니다.
+  userId String
+
+  // 교사 이름은 학교 안에서만 뜻이 있으므로 학교로도 묶어둡니다.
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  name     String
+  teachers String // JSON string[] — 고른 순서를 그대로 보존
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId, updatedAt])
 }
 
 // 시간표에 등장하는 교사 한 명 (로그인 계정 유무와 무관하게 존재 — 업로드 시 이름으로 자동 upsert)
