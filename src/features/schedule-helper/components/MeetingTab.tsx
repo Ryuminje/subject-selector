@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useSchedule } from "@/features/schedule-helper/lib/ScheduleContext";
 import { Filter, Users, CalendarCheck, Search, Undo, Calendar, Check } from "lucide-react";
 import { cn } from "@/features/schedule-helper/lib/utils";
+import MeetingPresetBar from "@/features/schedule-helper/components/meeting/MeetingPresetBar";
 
 export default function MeetingTab() {
   const { data } = useSchedule();
@@ -148,6 +149,17 @@ export default function MeetingTab() {
             </span>
           )}
         </div>
+
+        {/* 프리셋은 계정별로 서버에 저장됩니다 — 목록보다 위에 두어야 "고르기 전에 한 번에 불러오는 것"으로 읽힙니다. */}
+        <MeetingPresetBar
+          selected={Array.from(selectedTeachers)}
+          onApply={(teachers) => {
+            // 프리셋은 더하는 게 아니라 갈아끼웁니다. 시간표에 없는 이름(교사가 바뀐 뒤 남은 프리셋)은
+            // 걸러내야 계산에서 "아무 시간도 안 됨"으로 조용히 빠지는 일을 막을 수 있습니다.
+            const known = teachers.filter((t) => data.teachers.includes(t));
+            setSelectedTeachers(new Set(known));
+          }}
+        />
 
         <div className="flex-1 overflow-y-auto pr-2 space-y-2">
           {filteredTeachers.map((teacher) => {

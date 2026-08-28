@@ -1,5 +1,27 @@
 # AI 에이전트 작업 히스토리 및 규칙 (AGENTS.md)
 
+> ## 🚧 지금 진행 중인 일 (2026-08-28)
+>
+> **협의회 교사 프리셋** 기능을 `feature/meeting-presets` 브랜치에 올려두었습니다. 코드는 다 됐고
+> 로컬에서 검증까지 끝냈지만, **아직 `main`에 합치지 않았습니다.**
+>
+> 이유: 이 기능은 DB에 새 표(`MeetingPreset`)가 필요한데 **운영 DB에는 아직 그 표가 없습니다.**
+> `main`에 합치면 Vercel이 자동 배포하면서 없는 표를 찾게 됩니다. 그래서 순서가 있습니다.
+>
+> 1. NAS DB에 마이그레이션 적용 — 위 "다른 컴퓨터에서 이어받기 → 운영 DB에 마이그레이션 적용하기" 참고.
+>    적용해야 할 것은 `20260821120000_add_meeting_preset` 하나입니다(빈 표를 새로 만들 뿐이라
+>    지금 돌아가는 서비스에는 영향 없음).
+> 2. 그 다음에 `feature/meeting-presets`를 `main`에 합치고 푸시.
+>
+> 막힌 지점은 **운영 DB 비밀번호**였습니다. Vercel의 `DATABASE_URL`은 Secret이라 다시 볼 수 없고,
+> 학교 PC에서는 NAS의 SSH(22)가 막혀 있었습니다(DB 55432와 웹 9443만 열림). 집 네트워크나
+> 개발 컴퓨터의 `.env`에서 찾으면 됩니다.
+>
+> 사용자에게 확인받을 것 두 가지가 남아 있습니다 — **보강원 서식의 칸 비율이 실제 종이와 맞는지**,
+> **교체를 한 줄로 적는 게 결재 관행과 맞는지**. 그리고 `물리학II` 같은 로마숫자 과목이
+> 이동수업("I블록")으로 잘못 인식되는 기존 버그를 고칠지도 답을 기다리는 중입니다.
+
+
 이 문서는 이전 AI 에이전트들이 작업하며 남긴 중요한 아키텍처 결정사항, 구현 방식, 그리고 향후 개발을 이어갈 에이전트를 위한 가이드라인(Rules)을 담고 있습니다. 새로운 기능을 추가하거나 버그를 수정할 때 반드시 이 문서를 먼저 읽고 기존 시스템의 철학과 규칙을 준수해야 합니다.
 
 ---
@@ -213,6 +235,65 @@
 
 ---
 
+## 💻 다른 컴퓨터에서 이어받기 (로컬 개발환경 만들기) — 2026-08-28 추가
+
+이 저장소는 학교 PC와 집 PC를 오가며 개발합니다. 새 컴퓨터에서 처음 받았을 때 순서입니다.
+
+```bash
+git clone https://github.com/Ryuminje/subject-selector.git
+cd subject-selector
+npm install          # postinstall이 prisma generate까지 함
+```
+
+**`.env.local`이 없으면 `next dev`가 아예 뜨지 않습니다.** `DATABASE_URL`이 없으면 부팅이 실패하기 때문입니다(`.env.example` 참고). 어떤 DB를 물릴지는 목적에 따라 다릅니다.
+
+- **허브 · 수강신청 도우미 · 시험 시간표 도우미만 볼 것이라면** DB를 안 쓰므로 형식만 맞는 가짜 값이면 됩니다: `DATABASE_URL="postgresql://user:pass@localhost:5432/dev"`.
+- **쌤스 헬퍼(로그인 필요)를 볼 것이라면** 진짜 DB가 필요합니다. **운영(NAS) DB에 직접 붙어 테스트하지 마세요** — 실제 학교 데이터가 들어 있습니다. 대신 Prisma에 딸려오는 로컬 DB를 씁니다(설치할 것 없음):
+
+```bash
+npx prisma dev -n local -d          # 로컬 전용 Postgres 띄우기 (백그라운드)
+npx prisma dev ls                   # 접속 주소(TCP postgres://...) 확인
+# 그 주소를 .env.local의 DATABASE_URL에 넣고
+DATABASE_URL="<그 주소>" npx prisma migrate deploy    # 표 만들기
+npm run dev
+curl -X POST http://localhost:3000/api/dev-seed       # 표본 데이터 심기
+```
+
+- `npx prisma dev start <이름>` / `stop <이름>` / `rm <이름>`으로 껐다 켜고 지웁니다. **`start`는 이름을 `-n` 없이 그대로** 붙입니다(`stop`/`rm`도 동일).
+- **`/api/dev-seed`**(`src/app/api/dev-seed/route.ts`)가 가상의 학교·교사 5명·시간표와 로그인 계정 **`test` / `test1234`**(관리자)를 만들어 줍니다. 여러 번 돌려도 안전하고, `NODE_ENV === "production"`이면 404를 돌려주므로 운영에 배포돼도 실행되지 않습니다. 시간표는 **교체 후보**(상대가 나와 같은 학반을 다른 시간에 가르쳐야 잡힘)와 **동과 대강 후보**(그 수업이 이동수업이어야 뜸)가 둘 다 나오도록 일부러 맞춰 짠 것이라, 조건을 모르고 고치면 후보가 하나도 안 잡힙니다.
+- `prisma.config.ts`는 `.env.local`이 아니라 **`.env`** 를 읽습니다(Next.js와 다름). 그래서 prisma CLI를 쓸 때는 위처럼 `DATABASE_URL=...`을 명령 앞에 붙이는 게 확실합니다.
+- 로컬에서 `npx prisma migrate dev`는 섀도 DB 때문에 실패합니다. 마이그레이션을 새로 만들 때는 `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`로 SQL을 뽑아 폴더를 직접 만들고 `migrate deploy`로 적용하세요(**그 SQL에 섞여 나오는 `DROP INDEX "AssistantChunk_embedding_idx"`는 반드시 지우고** — 위 pgvector 항목 참고).
+
+### 운영 DB에 마이그레이션 적용하기
+
+앱은 Vercel, DB는 NAS라 **스키마를 바꿨으면 사람이 직접 한 번 적용해야 합니다**(Vercel 자동 적용은 아직 안 걸려 있음). NAS 앞에 갈 필요는 없고 DB에 네트워크로 닿는 컴퓨터면 됩니다.
+
+- 같은 랜 안: `192.168.0.21:55432` / 밖에서: `fbalswp.duckdns.org:55432` (라우터 포트포워딩)
+- **비밀번호는 Vercel에서 다시 볼 수 없습니다** — `DATABASE_URL`이 Secret 타입이라 저장 후 열람 불가입니다. NAS의 `~/docker/subject-selector-db/docker-compose.yml`(`POSTGRES_PASSWORD`)이나 개발 컴퓨터의 `.env`에서 찾으세요. Vercel 환경변수 편집 화면에서 값 칸이 비어 보이는 건 정상이며, **거기서 Save를 누르면 운영 주소가 지워집니다.**
+- 적용 순서는 **마이그레이션 먼저, 코드 푸시 나중**입니다. 반대로 하면 새 코드가 없는 표를 찾습니다.
+
+```bash
+DATABASE_URL="postgresql://..." npx prisma migrate status   # 뭐가 밀렸는지 먼저 확인
+DATABASE_URL="postgresql://..." npx prisma migrate deploy
+```
+
+---
+
+## 👥 협의회 교사 프리셋(meeting-presets) 참고 메모 — 2026-08-28 추가
+
+협의회 시간 찾기에서 자주 함께 잡는 사람들을 이름 붙여 저장해 두고 한 번에 고르는 기능입니다.
+
+- **이 프로젝트에서 유일하게 "계정별"로 저장되는 데이터입니다.** 다른 저장물(연수 명단 프리셋, 연수 목록 등)은 전부 학교 공용인데, 협의회 상대는 사람마다 다르므로 사용자가 개인별로 요구했습니다. 그래서 `MeetingPreset`은 `schoolId`가 아니라 **`userId`로 갈라지고**, 조회·수정·삭제 라우트가 전부 `session.user.id`로만 거릅니다. 남의 프리셋은 id를 알아도 404입니다(존재 자체를 숨기려고 403이 아니라 404를 씁니다).
+- **`userId`에 `@relation`을 걸지 않았습니다.** `User` 모델은 `npx auth generate`가 통째로 다시 쓰기 때문에 관계 필드를 달면 다음 생성 때 사라집니다(`User.schoolId`/`teacherId`와 같은 이유). 대신 **cascade가 없으므로 계정 삭제 시 고아 행이 남습니다** — `DELETE /api/schedule-helper/members/[id]`에 `meetingPreset.deleteMany`를 넣어 직접 지웁니다. **User에 매달리는 테이블을 새로 만들 때는 그 라우트도 같이 손봐야 합니다.**
+- **⚠️ 마이그레이션을 만들 때 `prisma migrate diff`가 뱉는 `DROP INDEX "AssistantChunk_embedding_idx"`를 반드시 지우고 쓰세요.** 그 HNSW 인덱스는 Prisma 스키마로 표현할 수 없어 손으로 넣은 것이라 Prisma가 "없어야 할 인덱스"로 오해합니다. 그대로 두면 **AI 파트너의 벡터 검색 인덱스가 삭제됩니다.** 이번에도 실제로 섞여 나와서 빼고 작성했습니다(`20260821120000_add_meeting_preset`).
+  - 참고로 이 로컬 환경에서는 `prisma migrate dev`가 섀도 DB 때문에 실패합니다. `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`로 SQL을 뽑아 마이그레이션 폴더를 직접 만들고 `migrate deploy`로 적용했습니다.
+- **프리셋을 누르면 현재 선택을 덮어씁니다**(더하지 않습니다). "저 묶음으로 바꾼다"가 원하는 동작이고, 이전 선택에 얹히는 건 대개 실수이기 때문입니다. 적용할 때 **지금 시간표에 없는 이름은 걸러냅니다** — 교사가 바뀐 뒤 남은 옛 프리셋을 그대로 넣으면 "아무 시간도 안 됨"으로 조용히 빠져 원인을 찾기 어렵습니다.
+- 저장은 2명 이상일 때만 됩니다(협의회 계산 자체가 2명부터입니다). 이름은 30자, 계정당 50개까지.
+- 파일: 모델 `prisma/schema.prisma`의 `MeetingPreset`, 라우트 `api/schedule-helper/meeting-presets/{route.ts,[id]/route.ts}`, 훅·UI `features/schedule-helper/components/meeting/{useMeetingPresets.ts,MeetingPresetBar.tsx}`, 붙는 곳은 `MeetingTab.tsx`의 교사 선택 패널 위.
+- 이름 목록 정리는 연수 명단과 규칙이 같아 `lib/sanitizeRosterNames.ts`를 그대로 재사용합니다(공백 제거·중복 제거·**순서 보존**). 새로 만들지 마세요.
+
+---
+
 ## 📝 보강원 작성(makeup) 참고 메모 — 2026-08-13 추가
 
 수업교체 도우미(`SwapTab`)에서 찾은 교체·대강 후보를 **골라 담아 보강원 문서로 뽑는** 기능입니다. 예전엔 후보를 보여주기만 하고 서류는 손으로 썼습니다.
@@ -324,6 +405,16 @@
 ---
 
 ## 📅 개발 히스토리 로그 (최신순)
+
+### 2026-08-28
+
+**협의회 시간 찾기에 계정별 교사 프리셋 추가:**
+- 사용자 요청: "원하는 사람을 쉽고 빠르게 한 번에 선택할 수 있는 프리셋. **계정별**로 설정하고, 로그아웃 후 다시 로그인해도 남아야 함."
+- "로그아웃해도 남아야 한다"가 곧 **서버 저장**이라는 뜻이라 localStorage는 후보에서 제외했습니다(기기를 옮기면 사라지고, 같은 PC를 여러 선생님이 쓰면 섞입니다). `MeetingPreset` 테이블을 새로 만들고 세션의 userId로 갈랐습니다. 설계 이유와 주의점은 위 "👥 협의회 교사 프리셋" 섹션 참고.
+- **이 프로젝트에서 처음으로 학교 공용이 아닌 계정별 데이터**라, `User`에 관계를 걸지 않는 기존 규칙 때문에 cascade가 안 걸립니다 — 계정 삭제 라우트에 정리 코드를 같이 넣었습니다.
+- **하마터면 벡터 인덱스를 지울 뻔했습니다.** `prisma migrate diff`가 만들어 준 SQL 첫 줄에 `DROP INDEX "AssistantChunk_embedding_idx"`가 섞여 있었습니다(AGENTS.md에 경고돼 있던 그 항목). 빼고 마이그레이션을 직접 작성했습니다.
+- **검증**: 표본 학교(로컬 전용 DB)에서 2명 선택 → 저장 → 칩 클릭으로 복원 → 결과 계산까지 확인. **로그아웃 후 재로그인해도 프리셋 유지**(요구사항의 핵심)를 실제로 로그아웃 버튼을 눌러 확인했고, 로그아웃 상태에서는 조회가 401로 막히는 것도 확인했습니다. **다른 계정(test2)으로 갈아타면 빈 목록이고, 남의 프리셋 id로 삭제를 시도하면 404**로 막히는 것까지 확인했습니다. `tsc`·eslint 클린, `npm run build` 43페이지 정상.
+- 처음 훅을 마운트 이펙트에서 `refresh()`를 부르는 방식으로 짰다가 `react-hooks/set-state-in-effect`에 걸려, 기존 `useRosterPresets`와 같은 방식(이펙트 안에서는 fetch 체인의 `.then()`에서만 setState)으로 맞췄습니다.
 
 ### 2026-08-21
 
