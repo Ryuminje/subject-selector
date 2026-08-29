@@ -8,6 +8,8 @@ export interface RosterPreset {
   names: string[];
   createdBy: string;
   updatedAt: string;
+  /** 관리자가 만든 "공통" 명단이면 true, 개인이 만든 "개인" 명단이면 false. */
+  isShared: boolean;
 }
 
 type MutationResult = { ok: true; preset: RosterPreset } | { ok: false; error: string };

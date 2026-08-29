@@ -3,14 +3,12 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCertificateRoster } from "@/features/schedule-helper/lib/getCertificateRoster";
 import { sanitizeRosterNames } from "@/features/schedule-helper/lib/sanitizeRosterNames";
+import { resolveTeacherName } from "@/features/schedule-helper/lib/resolveTeacherName";
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
-  }
-  if (session.user.role !== "ADMIN") {
-    return NextResponse.json({ error: "관리자만 세션을 만들 수 있습니다." }, { status: 403 });
   }
 
   const body = await request.json().catch(() => null);
@@ -21,6 +19,30 @@ export async function POST(request: Request) {
 
   if (titles.length === 0) {
     return NextResponse.json({ error: "연수 제목을 입력해 주세요." }, { status: 400 });
+  }
+
+  // 세션 개설: 관리자는 항상 가능. 관리자가 아니면 "자기가 등록한 연수 하나"에 대해서만 열 수
+  // 있습니다(overview/route.ts의 canManage와 같은 규칙 — registeredByName 비교).
+  // 여러 연수를 묶는 세션은 등록자가 서로 달라 소유권이 애매해지므로 계속 관리자 전용입니다.
+  const isAdmin = session.user.role === "ADMIN";
+  if (!isAdmin) {
+    if (titles.length !== 1) {
+      return NextResponse.json(
+        { error: "여러 연수를 한 번에 묶은 세션은 관리자만 만들 수 있습니다." },
+        { status: 403 }
+      );
+    }
+    const myName = await resolveTeacherName(session.user);
+    const trainingTitle = await prisma.trainingTitle.findUnique({
+      where: { schoolId_title: { schoolId: session.user.schoolId, title: titles[0] as string } },
+      select: { registeredByName: true },
+    });
+    if (!trainingTitle || trainingTitle.registeredByName !== myName) {
+      return NextResponse.json(
+        { error: "관리자 또는 이 연수를 등록한 사람만 세션을 만들 수 있습니다." },
+        { status: 403 }
+      );
+    }
   }
 
   const explicitRoster = sanitizeRosterNames(body?.roster);

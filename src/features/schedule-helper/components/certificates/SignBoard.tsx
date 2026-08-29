@@ -140,7 +140,6 @@ export default function SignBoard({
         {selected ? (
           <SignDetail
             item={selected}
-            isAdmin={isAdmin}
             creating={creating}
             onOpenSession={() => handleOpenSession(selected)}
             onEdit={() => setView({ kind: "edit", id: selected.id })}

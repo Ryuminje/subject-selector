@@ -8,14 +8,12 @@ import type { OverviewItem } from "./useCertificateOverview";
 // 수집 도구인 QR 세션 열기/이어보기만 다릅니다.
 export default function SignDetail({
   item,
-  isAdmin,
   creating,
   onOpenSession,
   onEdit,
   onDelete,
 }: {
   item: OverviewItem;
-  isAdmin: boolean;
   creating: boolean;
   onOpenSession: () => void;
   onEdit: () => void;
@@ -95,7 +93,7 @@ export default function SignDetail({
               <QrCode className="w-4 h-4" /> QR 코드 · 서명 현황 열기
             </button>
           </>
-        ) : isAdmin ? (
+        ) : item.canManage ? (
           <>
             <p className="text-xs text-slate-500">
               아직 QR 세션을 열지 않았습니다. 세션을 열면 이 연수의 참여 명단으로 서명을 받습니다.
@@ -111,7 +109,10 @@ export default function SignDetail({
             </button>
           </>
         ) : (
-          <p className="text-xs text-slate-500">아직 QR 세션이 열리지 않았습니다. 관리자가 세션을 열면 서명할 수 있습니다.</p>
+          <p className="text-xs text-slate-500">
+            아직 QR 세션이 열리지 않았습니다. 관리자 또는 이 연수를 등록한 담당 선생님이 세션을 열면 서명할 수
+            있습니다.
+          </p>
         )}
       </div>
 
