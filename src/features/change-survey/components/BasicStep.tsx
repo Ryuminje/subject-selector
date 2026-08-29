@@ -31,17 +31,19 @@ export function BasicStep({
 }: BasicStepProps) {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
-          <Settings className="w-6 h-6 text-amber-600" />
+      {/* 제목이 길고 학년 탭도 옆에 있어서, 좁은 화면에서 둘 다 한 줄에 욱여넣으면 학년 탭 글자가
+          한 자씩 세로로 쪼개졌습니다(실제로 겪은 버그). flex-wrap으로 안 들어가면 학년 탭이
+          다음 줄로 내려가게 하고, break-keep으로 제목은 최소한 낱말 단위로만 끊기게 합니다. */}
+      <div className="flex justify-between items-center gap-3 flex-wrap mb-6">
+        <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2 break-keep">
+          <Settings className="w-6 h-6 text-amber-600 shrink-0" />
           선택과목 변경 기초자료 입력 (교육과정 및 위계)
         </h2>
 
-
-        <div className="flex bg-stone-100 p-1 rounded-xl">
+        <div className="flex bg-stone-100 p-1 rounded-xl shrink-0">
           <button
             onClick={() => setChangeActiveGrade("grade2")}
-            className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
+            className={`px-6 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${changeActiveGrade === "grade2"
                 ? "bg-amber-500 text-stone-900 shadow-md"
                 : "text-stone-900 hover:text-stone-900"
               }`}
@@ -50,7 +52,7 @@ export function BasicStep({
           </button>
           <button
             onClick={() => setChangeActiveGrade("grade3")}
-            className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
+            className={`px-6 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${changeActiveGrade === "grade3"
                 ? "bg-amber-500 text-stone-900 shadow-md"
                 : "text-stone-900 hover:text-stone-900"
               }`}

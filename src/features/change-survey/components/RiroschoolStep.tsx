@@ -15,9 +15,9 @@ export function RiroschoolStep({
 }: RiroschoolStepProps) {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
-          <Download className="w-6 h-6 text-amber-600" />
+      <div className="flex justify-between items-center gap-3 flex-wrap mb-6">
+        <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2 break-keep">
+          <Download className="w-6 h-6 text-amber-600 shrink-0" />
           리로스쿨 업로드용 파일 다운로드
         </h2>
       </div>

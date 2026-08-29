@@ -82,7 +82,10 @@ export default function SignBoard({
   return (
     <div className="space-y-4">
       {error && <p className="text-sm text-rose-600">{error}</p>}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+      {/* 목록 칸이 화면 폭에 비례해서만 줄어들면 카드 안 글자가 감당 못 할 만큼 좁아져 한 글자씩
+          세로로 쪼개지는 문제가 있었습니다(minmax 없이 1fr이면 바닥이 없음). 220px 밑으로는 안
+          줄어들게 못 박아 두고, 그보다 넓을 땐 1:3 비율 그대로 갑니다. */}
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(220px,1fr)_minmax(0,3fr)] gap-5 items-start">
         <div>
           <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
             <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">

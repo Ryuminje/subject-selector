@@ -1,8 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { AlertCircle, CheckCircle2, Loader2, Lock, Pencil, QrCode, Trash2 } from "lucide-react";
 import type { OverviewItem } from "./useCertificateOverview";
+import SignSessionMini from "./SignSessionMini";
 
 // 선택한 서명 연수의 상세 — 이수증 상세와 같은 모양(진행률 + 미완료/완료 명단)이고,
 // 수집 도구인 QR 세션 열기/이어보기만 다릅니다.
@@ -19,8 +19,6 @@ export default function SignDetail({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const router = useRouter();
-
   return (
     <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -71,27 +69,10 @@ export default function SignDetail({
       <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3">
         {item.session ? (
           <>
-            <div className="flex items-center gap-2 text-sm font-bold">
-              {item.session.locked ? (
-                <span className="inline-flex items-center gap-1.5 text-slate-500">
-                  <Lock className="w-4 h-4" /> 마감된 세션입니다
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-emerald-600">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> 서명 수집 중
-                </span>
-              )}
-              <span className="text-xs font-medium text-slate-400">
-                {new Date(item.session.createdAt).toLocaleDateString("ko-KR")} 개설
-              </span>
+            <div className="text-xs font-medium text-slate-400">
+              {new Date(item.session.createdAt).toLocaleDateString("ko-KR")} 개설
             </div>
-            <button
-              type="button"
-              onClick={() => router.push(`/apps/schedule-helper/certificates/sessions/${item.session!.id}`)}
-              className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-500 transition-colors text-sm"
-            >
-              <QrCode className="w-4 h-4" /> QR 코드 · 서명 현황 열기
-            </button>
+            <SignSessionMini sessionId={item.session.id} trainingTitle={item.title} />
           </>
         ) : item.canManage ? (
           <>

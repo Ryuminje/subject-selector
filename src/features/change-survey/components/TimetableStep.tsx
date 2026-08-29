@@ -35,16 +35,17 @@ export function TimetableStep({
 }: TimetableStepProps) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
-          <Settings className="w-6 h-6 text-amber-600" />
+      {/* BasicStep.tsx와 같은 이유로 flex-wrap·break-keep을 둡니다 — 자세한 설명은 그쪽 주석 참고. */}
+      <div className="flex justify-between items-center gap-3 flex-wrap mb-2">
+        <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2 break-keep">
+          <Settings className="w-6 h-6 text-amber-600 shrink-0" />
           타임별 시간표 입력
         </h2>
 
-        <div className="flex bg-stone-100 p-1 rounded-xl">
+        <div className="flex bg-stone-100 p-1 rounded-xl shrink-0">
           <button
             onClick={() => setChangeActiveGrade("grade2")}
-            className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
+            className={`px-6 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${changeActiveGrade === "grade2"
                 ? "bg-amber-500 text-stone-900 shadow-md"
                 : "text-stone-900 hover:text-stone-900"
               }`}
@@ -53,7 +54,7 @@ export function TimetableStep({
           </button>
           <button
             onClick={() => setChangeActiveGrade("grade3")}
-            className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
+            className={`px-6 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${changeActiveGrade === "grade3"
                 ? "bg-amber-500 text-stone-900 shadow-md"
                 : "text-stone-900 hover:text-stone-900"
               }`}

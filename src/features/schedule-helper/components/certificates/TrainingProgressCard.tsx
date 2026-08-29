@@ -34,7 +34,10 @@ export default function TrainingProgressCard({
         className="w-full text-left p-4 flex flex-col gap-2.5"
         aria-current={selected}
       >
-        <div className="flex items-start justify-between gap-3">
+        {/* 배지(진행 중·완료 등)가 shrink-0이라 자리를 안 비켜주면, min-w-0인 제목/부제 칸이
+            극단적으로 눌려서 한글이 한 글자씩 세로로 쪼개졌습니다(실제로 겪음). flex-wrap을 두면
+            좁을 때 배지가 아래 줄로 내려가고 제목/부제는 카드 폭 그대로를 씁니다. */}
+        <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
             <div className="font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
               <span className="break-keep">{item.title}</span>
@@ -44,7 +47,7 @@ export default function TrainingProgressCard({
                 </span>
               )}
             </div>
-            <div className="text-xs text-slate-400 mt-0.5">
+            <div className="text-xs text-slate-400 mt-0.5 break-keep">
               등록 {item.registeredByName} · 명단 {item.hasOwnRoster ? "전용" : "전체 기본"} {item.total}명
             </div>
           </div>

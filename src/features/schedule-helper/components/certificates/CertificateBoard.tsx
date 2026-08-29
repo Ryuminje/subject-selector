@@ -76,8 +76,9 @@ export default function CertificateBoard({
     );
   }
 
+  // SignBoard.tsx와 같은 이유로 minmax 바닥을 둡니다 — 자세한 설명은 그쪽 주석 참고.
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+    <div className="grid grid-cols-1 md:grid-cols-[minmax(220px,1fr)_minmax(0,3fr)] gap-5 items-start">
       <div>
         <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
           <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
