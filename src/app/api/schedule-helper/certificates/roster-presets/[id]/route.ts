@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { resolveTeacherName } from "@/features/schedule-helper/lib/resolveTeacherName";
 import { sanitizeRosterNames } from "@/features/schedule-helper/lib/sanitizeRosterNames";
+import { getAdminNames } from "@/features/schedule-helper/lib/getAdminNames";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -56,6 +57,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     select: { id: true, name: true, names: true, createdBy: true, updatedAt: true },
   });
 
+  // 편집한 사람이 아니라 "원래 만든 사람"(createdBy, 이 update로도 안 바뀜) 기준입니다 —
+  // 관리자가 남의 개인 명단을 고쳐도 그걸로 공통이 되진 않습니다.
+  const adminNames = await getAdminNames(session.user.schoolId);
+
   return NextResponse.json({
     preset: {
       id: updated.id,
@@ -63,6 +68,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       names: JSON.parse(updated.names) as string[],
       createdBy: updated.createdBy,
       updatedAt: updated.updatedAt,
+      isShared: adminNames.has(updated.createdBy),
     },
   });
 }

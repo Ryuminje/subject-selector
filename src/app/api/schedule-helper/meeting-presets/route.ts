@@ -1,7 +1,8 @@
 // 협의회 시간 찾기의 교사 프리셋 — 목록 조회 / 만들기.
 //
-// **계정별 기능입니다.** 학교 공용인 연수 명단 프리셋(certificates/roster-presets)과 달리,
-// 조회·수정·삭제 모두 세션의 userId로만 걸러집니다. 남의 프리셋은 어떤 경로로도 보이지 않습니다.
+// **계정별 기능입니다.** 연수 명단 프리셋(certificates/roster-presets)은 관리자가 만든 것만 학교
+// 전체에 공개되고 일반 계정이 만든 것은 본인에게만 보이는 것과 달리, 여기는 관리자 여부와
+// 무관하게 조회·수정·삭제 모두 세션의 userId로만 걸러집니다. 남의 프리셋은 어떤 경로로도 보이지 않습니다.
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
