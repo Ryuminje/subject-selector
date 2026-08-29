@@ -40,10 +40,11 @@ export function RosterAfterStep({
 }: RosterAfterStepProps) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex justify-between items-center mb-2">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
-            <Users className="w-6 h-6 text-amber-600" />
+      {/* BasicStep.tsx와 같은 이유로 flex-wrap·break-keep을 둡니다 — 자세한 설명은 그쪽 주석 참고. */}
+      <div className="flex justify-between items-center gap-3 flex-wrap mb-2">
+        <div className="flex items-center gap-4 flex-wrap">
+          <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2 break-keep">
+            <Users className="w-6 h-6 text-amber-600 shrink-0" />
             타임별 선택과목 명단(변경 후)
           </h2>
           <div className="flex items-center gap-3 bg-stone-100 px-3 py-1.5 rounded-lg border border-stone-300 text-xs font-medium">
@@ -58,25 +59,25 @@ export function RosterAfterStep({
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <button
             onClick={handleExportAttendanceRoster}
-            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg shadow-md transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg shadow-md transition-all whitespace-nowrap"
           >
             <Download className="w-4 h-4" />
             출석부용 엑셀 다운로드
           </button>
           <button
             onClick={() => handleExportRoster(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg shadow-md transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg shadow-md transition-all whitespace-nowrap"
           >
             <Download className="w-4 h-4" />
             엑셀 다운로드
           </button>
-          <div className="flex bg-stone-100 p-1 rounded-xl">
+          <div className="flex bg-stone-100 p-1 rounded-xl shrink-0">
             <button
               onClick={() => setChangeActiveGrade("grade2")}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
+              className={`px-6 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${changeActiveGrade === "grade2"
                   ? "bg-amber-500 text-stone-900 shadow-md"
                   : "text-stone-900 hover:text-stone-900"
                 }`}
@@ -85,7 +86,7 @@ export function RosterAfterStep({
             </button>
             <button
               onClick={() => setChangeActiveGrade("grade3")}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
+              className={`px-6 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${changeActiveGrade === "grade3"
                   ? "bg-amber-500 text-stone-900 shadow-md"
                   : "text-stone-900 hover:text-stone-900"
                 }`}

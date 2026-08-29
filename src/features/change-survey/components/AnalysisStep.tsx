@@ -29,11 +29,12 @@ export function AnalysisStep({
 }: AnalysisStepProps) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex justify-between items-center mb-2">
+      {/* BasicStep.tsx와 같은 이유로 flex-wrap·break-keep을 둡니다 — 자세한 설명은 그쪽 주석 참고. */}
+      <div className="flex justify-between items-center gap-3 flex-wrap mb-2">
         <div>
-          <div className="flex items-center gap-4">
-            <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
-              <FileText className="w-6 h-6 text-amber-600" />
+          <div className="flex items-center gap-4 flex-wrap">
+            <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2 break-keep">
+              <FileText className="w-6 h-6 text-amber-600 shrink-0" />
               다년도 수강 내역 위계 및 분석
             </h2>
             <div className="flex items-center gap-2 bg-stone-100 px-3 py-1.5 rounded-lg border border-stone-300 text-xs font-medium mt-1">
@@ -46,10 +47,10 @@ export function AnalysisStep({
           </p>
         </div>
 
-        <div className="flex items-center gap-4 -mt-4">
+        <div className="flex items-center gap-4 flex-wrap -mt-4">
           <button
             onClick={handleExportStep6}
-            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-500/25 flex items-center gap-2"
+            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-500/25 flex items-center gap-2 whitespace-nowrap"
             disabled={step6Data.length === 0}
           >
             <Download className="w-4 h-4" />
@@ -57,7 +58,7 @@ export function AnalysisStep({
           </button>
           <button
             onClick={() => setShowOnlyApplicants(!showOnlyApplicants)}
-            className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors flex items-center gap-2 ${
+            className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors flex items-center gap-2 whitespace-nowrap ${
               showOnlyApplicants
                 ? "bg-amber-500/20 border-amber-500/50 text-amber-700"
                 : "bg-stone-100 border-stone-300 text-stone-900 hover:text-stone-900"
@@ -65,10 +66,10 @@ export function AnalysisStep({
           >
             직접 변경자만 보기
           </button>
-          <div className="flex bg-stone-100 p-1 rounded-xl">
+          <div className="flex bg-stone-100 p-1 rounded-xl shrink-0">
             <button
               onClick={() => setChangeActiveGrade("grade2")}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade2"
+              className={`px-6 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${changeActiveGrade === "grade2"
                   ? "bg-amber-500 text-stone-900 shadow-md"
                   : "text-stone-900 hover:text-stone-900"
                 }`}
@@ -77,7 +78,7 @@ export function AnalysisStep({
             </button>
             <button
               onClick={() => setChangeActiveGrade("grade3")}
-              className={`px-6 py-2 rounded-lg font-medium transition-all ${changeActiveGrade === "grade3"
+              className={`px-6 py-2 rounded-lg font-medium transition-all whitespace-nowrap ${changeActiveGrade === "grade3"
                   ? "bg-amber-500 text-stone-900 shadow-md"
                   : "text-stone-900 hover:text-stone-900"
                 }`}
