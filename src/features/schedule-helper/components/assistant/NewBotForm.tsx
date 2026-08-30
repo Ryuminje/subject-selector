@@ -43,11 +43,11 @@ export default function NewBotForm({
   };
 
   return (
-    <form onSubmit={submit} className="bg-white border border-stone-200 rounded-3xl p-5 sm:p-6">
+    <form onSubmit={submit} className="bg-white border border-stone-200 rounded-[14px] p-5 sm:p-6">
       <button
         type="button"
         onClick={onCancel}
-        className="inline-flex items-center gap-1.5 text-sm font-bold text-stone-500 hover:text-amber-700 transition-colors mb-4"
+        className="inline-flex items-center gap-1.5 text-sm font-bold text-stone-500 hover:text-assist transition-colors mb-4"
       >
         <ArrowLeft className="w-4 h-4" /> 목록으로
       </button>
@@ -63,13 +63,13 @@ export default function NewBotForm({
           onChange={(e) => setName(e.target.value)}
           placeholder="챗봇 이름 (예: 학적 파트너)"
           autoFocus
-          className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-200"
+          className="w-full bg-stone-50 border border-stone-200 rounded-[10px] px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-assist/30"
         />
         <input
           value={tagline}
           onChange={(e) => setTagline(e.target.value)}
           placeholder="한 줄 소개 (선택)"
-          className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-amber-200"
+          className="w-full bg-stone-50 border border-stone-200 rounded-[10px] px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-assist/30"
         />
       </div>
 
@@ -77,7 +77,7 @@ export default function NewBotForm({
         <input
           value={emoji}
           onChange={(e) => setEmoji(e.target.value.slice(0, 2))}
-          className={`w-12 h-12 shrink-0 text-center text-xl rounded-xl outline-none ${style.avatar}`}
+          className={`w-12 h-12 shrink-0 text-center text-xl rounded-[10px] outline-none ${style.avatar}`}
           aria-label="아바타 이모지"
         />
         <div className="flex gap-2">
@@ -100,7 +100,7 @@ export default function NewBotForm({
       <button
         type="submit"
         disabled={busy || !name.trim()}
-        className="w-full mt-5 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-colors"
+        className="w-full mt-5 py-2.5 bg-assist hover:opacity-90 disabled:opacity-50 text-white text-sm font-bold rounded-[10px] transition-opacity"
       >
         {busy ? "만드는 중…" : "만들고 자료 올리기"}
       </button>

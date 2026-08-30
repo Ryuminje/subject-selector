@@ -13,9 +13,9 @@ export default function CommonSettings({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <div className="space-y-5">
-      <div className="bg-teal-50 border border-teal-200 rounded-2xl px-4 py-3 flex items-start gap-2.5">
-        <Users className="w-4 h-4 text-teal-600 shrink-0 mt-0.5" />
-        <p className="text-sm text-teal-800">
+      <div className="bg-cert/8 border border-cert/20 rounded-[10px] px-4 py-3 flex items-start gap-2.5">
+        <Users className="w-4 h-4 text-cert shrink-0 mt-0.5" />
+        <p className="text-sm text-cert">
           여기서 만든 <strong className="font-bold">명단 프리셋은 이수증 연수와 서명 연수 양쪽에서 공통</strong>으로
           쓰입니다. 연수를 등록하거나 편집할 때 프리셋 버튼을 눌러 명단을 그대로 불러올 수 있습니다.
         </p>

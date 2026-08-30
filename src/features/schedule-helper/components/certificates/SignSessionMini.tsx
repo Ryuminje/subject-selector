@@ -83,7 +83,7 @@ export default function SignSessionMini({ sessionId, trainingTitle }: { sessionI
       <button
         type="button"
         onClick={() => setShowQr(true)}
-        className="shrink-0 border border-slate-200 rounded-xl p-1 bg-white hover:border-teal-300 transition-colors"
+        className="shrink-0 border border-stone-200 rounded-[10px] p-1 bg-white hover:border-cert/40 transition-colors"
         title="QR 코드 크게 보기"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -101,7 +101,7 @@ export default function SignSessionMini({ sessionId, trainingTitle }: { sessionI
         {info ? (
           <div className="flex items-center gap-2 text-xs">
             {info.locked ? (
-              <span className="inline-flex items-center gap-1 font-bold text-slate-500">
+              <span className="inline-flex items-center gap-1 font-bold text-stone-500">
                 <Lock className="w-3.5 h-3.5" /> 마감됨
               </span>
             ) : (
@@ -109,12 +109,12 @@ export default function SignSessionMini({ sessionId, trainingTitle }: { sessionI
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> 수집 중
               </span>
             )}
-            <span className="text-slate-400 tabular-nums">
+            <span className="text-stone-400 tabular-nums">
               {info.signedCount} / {info.totalCount}명
             </span>
           </div>
         ) : (
-          <div className="text-xs text-slate-400">불러오는 중...</div>
+          <div className="text-xs text-stone-400">불러오는 중...</div>
         )}
 
         <div className="flex flex-wrap gap-1.5">
@@ -138,7 +138,7 @@ export default function SignSessionMini({ sessionId, trainingTitle }: { sessionI
               href={`/apps/schedule-helper/certificates/sessions/${sessionId}/print?title=${idx}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-bold text-slate-600 bg-white border border-slate-200 hover:border-teal-300 hover:text-teal-700 transition-colors"
+              className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg font-bold text-stone-600 bg-white border border-stone-200 hover:border-cert/40 hover:text-cert transition-colors"
             >
               <Printer className="w-3.5 h-3.5" /> {titles.length > 1 ? `${t} 인쇄` : "등록부 인쇄"}
             </a>
@@ -152,13 +152,13 @@ export default function SignSessionMini({ sessionId, trainingTitle }: { sessionI
           onClick={() => setShowQr(false)}
         >
           <div
-            className="relative bg-white rounded-3xl shadow-xl w-full max-w-xs p-6 text-center"
+            className="relative bg-white rounded-[14px] border border-stone-200 w-full max-w-xs p-6 text-center"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
               onClick={() => setShowQr(false)}
-              className="absolute top-3 right-3 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              className="absolute top-3 right-3 p-1 rounded-full text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition-colors"
               aria-label="닫기"
             >
               <X className="w-5 h-5" />
@@ -167,12 +167,12 @@ export default function SignSessionMini({ sessionId, trainingTitle }: { sessionI
             <img
               src={qrImgUrl(280)}
               alt="QR 코드"
-              className="w-[280px] h-[280px] border border-slate-200 rounded-xl mx-auto mb-3 bg-slate-50"
+              className="w-[280px] h-[280px] border border-stone-200 rounded-[10px] mx-auto mb-3 bg-stone-50"
             />
-            <p className="text-xs text-slate-500 mb-2">스마트폰으로 QR 코드를 스캔하세요</p>
-            <div className="inline-flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-3 py-1.5 max-w-full">
-              <span className="text-xs text-teal-800 font-mono break-all">{signUrl}</span>
-              <button onClick={handleCopy} className="shrink-0 text-teal-700 hover:text-teal-900">
+            <p className="text-xs text-stone-500 mb-2">스마트폰으로 QR 코드를 스캔하세요</p>
+            <div className="inline-flex items-center gap-2 bg-cert/8 border border-cert/20 rounded-[10px] px-3 py-1.5 max-w-full">
+              <span className="text-xs text-cert font-mono break-all">{signUrl}</span>
+              <button onClick={handleCopy} className="shrink-0 text-cert hover:opacity-80">
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>

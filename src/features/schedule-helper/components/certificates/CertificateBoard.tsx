@@ -48,7 +48,7 @@ export default function CertificateBoard({
         <button
           type="button"
           onClick={backToBoard}
-          className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-500 hover:text-teal-700 transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm font-bold text-stone-500 hover:text-cert transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> 연수 현황으로 돌아가기
         </button>
@@ -81,21 +81,21 @@ export default function CertificateBoard({
     <div className="grid grid-cols-1 md:grid-cols-[minmax(220px,1fr)_minmax(0,3fr)] gap-5 items-start">
       <div>
         <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-          <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+          <span className="text-[11px] font-bold tracking-wider text-stone-400 uppercase">
             이수증 연수 {items.length}개
           </span>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setView({ kind: "history" })}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-lg transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-stone-200 hover:bg-stone-50 text-stone-600 text-xs font-bold rounded-lg transition-colors"
             >
               <History className="w-3.5 h-3.5" /> 내 제출 내역
             </button>
             <button
               type="button"
               onClick={() => setView({ kind: "edit", id: "new" })}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cert hover:opacity-90 text-white text-xs font-bold rounded-lg transition-opacity"
             >
               <Plus className="w-3.5 h-3.5" /> 새 연수
             </button>
@@ -103,11 +103,11 @@ export default function CertificateBoard({
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-12 text-teal-600">
+          <div className="flex justify-center py-12 text-cert">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
         ) : items.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-sm text-slate-400">
+          <div className="bg-white rounded-[10px] border border-stone-200 p-8 text-center text-sm text-stone-400">
             등록된 이수증 연수가 없습니다. &quot;새 연수&quot;로 시작하세요.
           </div>
         ) : (
@@ -135,7 +135,7 @@ export default function CertificateBoard({
         />
       ) : (
         !loading && (
-          <div className="bg-white rounded-3xl border border-slate-200 p-10 text-center text-sm text-slate-400">
+          <div className="bg-white rounded-[14px] border border-stone-200 p-10 text-center text-sm text-stone-400">
             왼쪽에서 연수를 선택하세요.
           </div>
         )

@@ -12,20 +12,30 @@ import { departments } from "@/config/hub";
 // **목록의 단일 소스는 src/config/hub.ts입니다** — 새 앱을 허브에 등록하면
 // 이 드롭다운에도 자동으로 나타나므로, 화면마다 링크를 손볼 필요가 없습니다.
 
+// 2026-08-30 디자인 개편: 앱 3개가 각자 고유 강조색을 씁니다(globals.css의
+// --color-swap/--color-cert/--color-assist 토큰). 예전엔 시간표 교체와 이수증 수거가
+// 둘 다 teal이라 색만 보고는 구분이 안 됐습니다.
 const TONES = {
-  teal: {
-    button: "text-slate-500 hover:text-teal-600 border-slate-200",
-    icon: "bg-teal-500/15 text-teal-600",
-    activeRow: "bg-teal-50",
-    activeText: "text-teal-700",
-    badge: "bg-teal-100 text-teal-700",
+  swap: {
+    button: "text-stone-500 hover:text-swap border-stone-200",
+    icon: "bg-swap/15 text-swap",
+    activeRow: "bg-swap/8",
+    activeText: "text-swap",
+    badge: "bg-swap/15 text-swap",
   },
-  amber: {
-    button: "text-stone-500 hover:text-amber-700 border-stone-200",
-    icon: "bg-amber-500/15 text-amber-600",
-    activeRow: "bg-amber-50",
-    activeText: "text-amber-700",
-    badge: "bg-amber-100 text-amber-800",
+  cert: {
+    button: "text-stone-500 hover:text-cert border-stone-200",
+    icon: "bg-cert/15 text-cert",
+    activeRow: "bg-cert/8",
+    activeText: "text-cert",
+    badge: "bg-cert/15 text-cert",
+  },
+  assist: {
+    button: "text-stone-500 hover:text-assist border-stone-200",
+    icon: "bg-assist/15 text-assist",
+    activeRow: "bg-assist/8",
+    activeText: "text-assist",
+    badge: "bg-assist/15 text-assist",
   },
 } as const;
 
@@ -44,7 +54,7 @@ function resolveCurrent(pathname: string) {
   return null;
 }
 
-export default function AppSwitcher({ tone = "teal" }: { tone?: AppSwitcherTone }) {
+export default function AppSwitcher({ tone = "swap" }: { tone?: AppSwitcherTone }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -89,7 +99,7 @@ export default function AppSwitcher({ tone = "teal" }: { tone?: AppSwitcherTone 
         onClick={() => setOpen((prev) => !prev)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-sm font-medium rounded-xl border shadow-sm transition-colors ${style.button}`}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-sm font-medium rounded-[10px] border transition-colors ${style.button}`}
       >
         <CurrentIcon className="w-4 h-4" />
         <span className="max-w-[9rem] truncate">{current.title}</span>
@@ -101,9 +111,9 @@ export default function AppSwitcher({ tone = "teal" }: { tone?: AppSwitcherTone 
         <div className="absolute left-0 top-full pt-1.5 z-50">
           <div
             role="menu"
-            className="w-[19rem] max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-2xl shadow-xl p-1.5"
+            className="w-[19rem] max-w-[calc(100vw-2rem)] bg-white border border-stone-200 rounded-[14px] shadow-xl p-1.5"
           >
-            <p className="px-2.5 pt-1.5 pb-2 text-[11px] font-bold tracking-wider text-slate-400">
+            <p className="px-2.5 pt-1.5 pb-2 text-[11px] font-bold tracking-wider text-stone-400">
               {department.name}
             </p>
             {department.apps.map((app) => {
@@ -117,26 +127,26 @@ export default function AppSwitcher({ tone = "teal" }: { tone?: AppSwitcherTone 
                   onClick={() => setOpen(false)}
                   aria-current={isCurrent ? "page" : undefined}
                   className={`flex items-start gap-2.5 px-2.5 py-2 rounded-xl transition-colors ${
-                    isCurrent ? style.activeRow : "hover:bg-slate-50"
+                    isCurrent ? style.activeRow : "hover:bg-stone-50"
                   }`}
                 >
-                  <span className={`w-8 h-8 shrink-0 grid place-items-center rounded-lg ${style.icon}`}>
+                  <span className={`w-8 h-8 shrink-0 grid place-items-center rounded-[10px] ${style.icon}`}>
                     <Icon className="w-4 h-4" />
                   </span>
                   <span className="flex-1 min-w-0">
                     <span className="flex items-center gap-1.5">
                       <span
-                        className={`text-sm font-semibold truncate ${isCurrent ? style.activeText : "text-slate-800"}`}
+                        className={`text-sm font-semibold truncate ${isCurrent ? style.activeText : "text-stone-800"}`}
                       >
                         {app.title}
                       </span>
                       {isCurrent && (
-                        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${style.badge}`}>
+                        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${style.badge}`}>
                           현재
                         </span>
                       )}
                     </span>
-                    <span className="block mt-0.5 text-xs text-slate-500 leading-snug">{app.description}</span>
+                    <span className="block mt-0.5 text-xs text-stone-500 leading-snug">{app.description}</span>
                   </span>
                 </Link>
               );

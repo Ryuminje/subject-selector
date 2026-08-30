@@ -21,15 +21,16 @@ export default function CertificatesTabs({ isAdmin }: { isAdmin: boolean }) {
   const certMissing = certItems.reduce((acc, i) => acc + i.missingCount, 0);
   const signMissing = signItems.reduce((acc, i) => acc + i.missingCount, 0);
 
-  const tabClass = (tab: Tab, active: string) =>
-    `flex items-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all flex-1 md:flex-none justify-center ${
-      activeTab === tab ? active : "text-slate-500 hover:bg-slate-50 hover:text-teal-600"
+  // 2026-08-30 개편: 탭 3개가 각자 다른 색이던 것을 앱의 단일 강조색(cert)으로 통일.
+  const tabClass = (tab: Tab) =>
+    `flex items-center gap-2 px-4 py-3 rounded-[10px] font-semibold transition-colors flex-1 md:flex-none justify-center whitespace-nowrap ${
+      activeTab === tab ? "bg-cert/10 text-cert" : "text-stone-500 hover:bg-stone-50 hover:text-cert"
     }`;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-2 md:gap-4 mb-2 bg-white p-2 rounded-2xl shadow-sm border border-emerald-100">
-        <button onClick={() => setActiveTab("certificate")} className={tabClass("certificate", "bg-emerald-100 text-emerald-800 shadow-sm")}>
+      <div className="flex flex-wrap gap-2 mb-2 bg-white p-1.5 rounded-[14px] border border-stone-200">
+        <button onClick={() => setActiveTab("certificate")} className={tabClass("certificate")}>
           <ClipboardCheck className="w-5 h-5" />
           이수증 수거
           {certMissing > 0 && (
@@ -38,7 +39,7 @@ export default function CertificatesTabs({ isAdmin }: { isAdmin: boolean }) {
             </span>
           )}
         </button>
-        <button onClick={() => setActiveTab("sign")} className={tabClass("sign", "bg-amber-100 text-amber-800 shadow-sm")}>
+        <button onClick={() => setActiveTab("sign")} className={tabClass("sign")}>
           <QrCode className="w-5 h-5" />
           QR 서명
           {signMissing > 0 && (
@@ -47,7 +48,7 @@ export default function CertificatesTabs({ isAdmin }: { isAdmin: boolean }) {
             </span>
           )}
         </button>
-        <button onClick={() => setActiveTab("settings")} className={tabClass("settings", "bg-teal-100 text-teal-800 shadow-sm")}>
+        <button onClick={() => setActiveTab("settings")} className={tabClass("settings")}>
           <Settings className="w-5 h-5" />
           공통 설정
         </button>

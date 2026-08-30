@@ -74,7 +74,7 @@ export default function RosterTable({ names, mode, onReorder, onRemove }: Roster
               onDragEnd={resetDrag}
               className={
                 mode === "edit"
-                  ? `cursor-grab active:cursor-grabbing ${dragOverFlatIndex === row.flatIndex ? "bg-teal-50" : ""}`
+                  ? `cursor-grab active:cursor-grabbing ${dragOverFlatIndex === row.flatIndex ? "bg-cert/8" : ""}`
                   : undefined
               }
             >

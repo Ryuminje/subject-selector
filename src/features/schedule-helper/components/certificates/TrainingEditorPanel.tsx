@@ -90,15 +90,15 @@ export default function TrainingEditorPanel({
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+    <div className="bg-white rounded-[14px] border border-stone-200 p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-teal-700">
+        <h2 className="font-display text-lg text-cert">
           {isNew ? (category === "sign" ? "새 서명 연수 등록" : "새 이수증 연수 등록") : "연수 편집"}
         </h2>
         <button
           type="button"
           onClick={onClose}
-          className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          className="p-1.5 text-stone-400 hover:text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
           aria-label="닫기"
         >
           <X className="w-4 h-4" />
@@ -106,32 +106,32 @@ export default function TrainingEditorPanel({
       </div>
 
       {!ready ? (
-        <div className="flex justify-center py-10 text-teal-600">
+        <div className="flex justify-center py-10 text-cert">
           <Loader2 className="w-6 h-6 animate-spin" />
         </div>
       ) : (
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-bold text-slate-700 mb-1.5 block">연수 제목</label>
+            <label className="text-sm font-bold text-stone-700 mb-1.5 block">연수 제목</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="예) 2026 청렴교육"
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
+              className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-cert/30 focus:border-cert"
             />
           </div>
 
           {presets && presets.length > 0 && (
             <div>
-              <div className="text-xs font-bold text-slate-500 mb-1.5">명단 프리셋에서 불러오기 (이수증·서명 공통)</div>
+              <div className="text-xs font-bold text-stone-500 mb-1.5">명단 프리셋에서 불러오기 (이수증·서명 공통)</div>
               <div className="flex flex-wrap gap-2">
                 {presets.map((p) => (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => setNames(p.names)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-teal-50 border border-teal-200 text-teal-800 hover:bg-teal-100 hover:border-teal-300 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-cert/8 border border-cert/20 text-cert hover:bg-cert/15 hover:border-cert/30 transition-colors"
                   >
                     {p.name} <span className="opacity-70">· {p.names.length}명</span>
                   </button>
@@ -141,7 +141,7 @@ export default function TrainingEditorPanel({
           )}
 
           <div>
-            <label className="text-sm font-bold text-slate-700 mb-1.5 block">참여 명단 ({names.length}명)</label>
+            <label className="text-sm font-bold text-stone-700 mb-1.5 block">참여 명단 ({names.length}명)</label>
             <div className="flex gap-2 mb-3">
               <input
                 type="text"
@@ -149,12 +149,12 @@ export default function TrainingEditorPanel({
                 onChange={(e) => setAddName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddName()}
                 placeholder="추가할 이름"
-                className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
+                className="flex-1 px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-cert/30 focus:border-cert"
               />
               <button
                 type="button"
                 onClick={handleAddName}
-                className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-bold rounded-xl transition-colors shrink-0"
+                className="px-4 py-2.5 bg-cert hover:opacity-90 text-white text-sm font-bold rounded-[10px] transition-opacity shrink-0"
               >
                 추가
               </button>
@@ -173,7 +173,7 @@ export default function TrainingEditorPanel({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+              className="px-4 py-2 text-sm font-semibold text-stone-500 hover:bg-stone-100 rounded-[10px] transition-colors"
             >
               취소
             </button>
@@ -181,7 +181,7 @@ export default function TrainingEditorPanel({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-60 text-white text-sm font-bold rounded-xl transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-cert hover:opacity-90 disabled:opacity-60 text-white text-sm font-bold rounded-[10px] transition-opacity"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />} 저장
             </button>

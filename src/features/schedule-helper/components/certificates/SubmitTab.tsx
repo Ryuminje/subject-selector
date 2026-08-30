@@ -36,36 +36,36 @@ export default function SubmitTab({
   return (
     <div className="space-y-6">
       {/* Gemini API 키 설정은 "공통 설정" 탭으로 옮겼습니다 (CommonSettings.tsx). */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-        <h2 className="text-lg font-bold text-teal-700 mb-1 flex items-center gap-2">
+      <div className="bg-white rounded-[14px] border border-stone-200 p-6">
+        <h2 className="font-display text-lg text-cert mb-1 flex items-center gap-2">
           <Send className="w-5 h-5" /> 이수증 제출하기
         </h2>
-        <p className="text-sm text-slate-500 mb-5">
+        <p className="text-sm text-stone-500 mb-5">
           {session?.user?.name ?? "본인"} 선생님 이름으로 제출됩니다.
         </p>
 
         <div className="mb-4">
-          <label className="text-sm font-bold text-slate-700 mb-1.5 block">연수 제목</label>
+          <label className="text-sm font-bold text-stone-700 mb-1.5 block">연수 제목</label>
           <TrainingTitleSelect value={trainingTitle} onChange={setTrainingTitle} />
-          <p className="text-xs text-slate-400 mt-1.5">
+          <p className="text-xs text-stone-400 mt-1.5">
             목록에 없는 연수라면 &quot;이수증 수거&quot; 탭의 &quot;새 연수&quot; 버튼으로 먼저 등록해 주세요.
           </p>
         </div>
 
         <div className="mb-5">
-          <label className="text-sm font-bold text-slate-700 mb-1.5 block">이수증 파일 (10MB 이하)</label>
-          <label className="relative flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-200 rounded-2xl py-8 px-4 text-center cursor-pointer hover:border-teal-300 hover:bg-teal-50/30 transition-colors">
+          <label className="text-sm font-bold text-stone-700 mb-1.5 block">이수증 파일 (10MB 이하)</label>
+          <label className="relative flex flex-col items-center justify-center gap-2 border-2 border-dashed border-stone-200 rounded-[10px] py-8 px-4 text-center cursor-pointer hover:border-cert/40 hover:bg-cert/5 transition-colors">
             <input
               type="file"
               accept="image/*,application/pdf"
               className="absolute inset-0 opacity-0 cursor-pointer"
               onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
             />
-            <FileUp className="w-8 h-8 text-slate-300" />
+            <FileUp className="w-8 h-8 text-stone-300" />
             {file ? (
-              <span className="text-sm font-bold text-teal-700">{file.name}</span>
+              <span className="text-sm font-bold text-cert">{file.name}</span>
             ) : (
-              <span className="text-sm text-slate-500">클릭하여 이수증 파일을 선택해주세요</span>
+              <span className="text-sm text-stone-500">클릭하여 이수증 파일을 선택해주세요</span>
             )}
           </label>
           {fileError && <p className="text-xs text-rose-600 mt-2">{fileError}</p>}
@@ -74,7 +74,7 @@ export default function SubmitTab({
         <button
           onClick={handleAnalyze}
           disabled={analyzing || !file || !trainingTitle.trim()}
-          className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-500 disabled:opacity-60 transition-colors"
+          className="w-full inline-flex items-center justify-center gap-2 py-3.5 rounded-[10px] font-bold text-white bg-cert hover:opacity-90 disabled:opacity-60 transition-opacity"
         >
           {analyzing && <Loader2 className="w-4 h-4 animate-spin" />}
           {analyzing ? "AI가 이수증을 분석 중..." : "제출하기"}
@@ -82,13 +82,13 @@ export default function SubmitTab({
 
         {error && <p className="text-sm text-rose-600 mt-3">{error}</p>}
         {successMessage && (
-          <div className="mt-4 flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm font-semibold">
+          <div className="mt-4 flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-[10px] px-4 py-3 text-sm font-semibold">
             <CheckCircle2 className="w-4 h-4" /> {successMessage}
           </div>
         )}
       </div>
 
-      <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex gap-3 text-amber-800 text-sm leading-relaxed">
+      <div className="bg-amber-50 border border-amber-200 p-4 rounded-[10px] flex gap-3 text-amber-800 text-sm leading-relaxed">
         <Info className="w-5 h-5 shrink-0 text-amber-600" />
         <div>
           제미나이 AI가 이수증에서 <strong>이수번호, 이수기관, 이수날짜</strong>를 자동 추출합니다. 추출 결과를
@@ -110,7 +110,7 @@ export default function SubmitTab({
       )}
 
       {noApiKey && modalOpen && (
-        <p className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-slate-800 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg">
+        <p className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] bg-stone-800 text-white text-sm px-4 py-2.5 rounded-[10px] shadow-lg">
           관리자가 아직 Gemini API 키를 설정하지 않았습니다. 값을 직접 입력해 제출할 수 있습니다.
         </p>
       )}

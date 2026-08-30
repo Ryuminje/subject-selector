@@ -43,7 +43,7 @@
   - **`schedule-helper`** (쌤스 헬퍼) — 별도 저장소(`Ryuminje/Myunshinh-schedule-app`, Next.js)에서 통째로 포팅해온 수업교체/협의회 시간 도우미. 자세한 내용은 아래 "🧩 별도 앱 통합(schedule-helper) 참고 메모" 섹션 참고.
   - **`exam-scheduler`** (교육평가부) — 시험 시간표 작성 도우미. 명단→시간표→시험실 배정→분반→자습 배정→결과 출력 5단계 마법사. 별도 로컬 Next.js 프로젝트(`Documents/dev/exam-scheduler`, DB/인증 없음)를 통째로 이 저장소 안에 포팅한 것 — schedule-helper와 같은 패턴입니다. 자세한 내용은 아래 "🎓 별도 앱 통합(exam-scheduler) 참고 메모" 섹션 참고.
 
-**`AppSwitcher` — 같은 부서 앱 사이를 오가는 헤더 드롭다운 (2026-08-06 추가)**: `src/features/schedule-helper/components/AppSwitcher.tsx`. 예전에는 각 앱 헤더에 "○○로 이동" 링크를 손으로 하나씩 넣었는데, 앱이 3개가 되자 헤더가 길어지고 **한 화면에만 링크를 빠뜨리는 일**이 실제로 생겼습니다(시간표 교체 도우미에 "업무 AI 파트너" 링크가 없었음). 지금은 현재 앱 이름이 적힌 버튼 하나에 마우스를 올리면 같은 부서 앱 전체가 펼쳐집니다. **목록은 `src/config/hub.ts`에서 직접 읽으므로, 새 앱을 허브에 등록하면 모든 화면의 드롭다운에 자동으로 나타납니다 — 헤더를 손볼 필요가 없습니다.** 현재 앱은 `usePathname()`과 가장 길게 겹치는 `href`로 판정합니다(`/apps/schedule-helper`와 `/apps/schedule-helper/certificates`가 둘 다 걸리므로 최장 일치가 필요). 호버뿐 아니라 클릭으로도 열리고(터치 기기), 바깥 클릭·Esc로 닫힙니다. `tone` prop으로 teal(시간표·이수증) / amber(업무 AI 파트너) 배색을 맞춥니다.
+**`AppSwitcher` — 같은 부서 앱 사이를 오가는 헤더 드롭다운 (2026-08-06 추가)**: `src/features/schedule-helper/components/AppSwitcher.tsx`. 예전에는 각 앱 헤더에 "○○로 이동" 링크를 손으로 하나씩 넣었는데, 앱이 3개가 되자 헤더가 길어지고 **한 화면에만 링크를 빠뜨리는 일**이 실제로 생겼습니다(시간표 교체 도우미에 "업무 AI 파트너" 링크가 없었음). 지금은 현재 앱 이름이 적힌 버튼 하나에 마우스를 올리면 같은 부서 앱 전체가 펼쳐집니다. **목록은 `src/config/hub.ts`에서 직접 읽으므로, 새 앱을 허브에 등록하면 모든 화면의 드롭다운에 자동으로 나타납니다 — 헤더를 손볼 필요가 없습니다.** 현재 앱은 `usePathname()`과 가장 길게 겹치는 `href`로 판정합니다(`/apps/schedule-helper`와 `/apps/schedule-helper/certificates`가 둘 다 걸리므로 최장 일치가 필요). 호버뿐 아니라 클릭으로도 열리고(터치 기기), 바깥 클릭·Esc로 닫힙니다. `tone` prop으로 배색을 맞춥니다 — 2026-08-30 디자인 개편으로 `swap`(시간표 교체 도우미, 깊은 소나무 `#1F5C52`) / `cert`(연수 이수증 수거, 남색 관인 `#3B4A7A`) / `assist`(업무 AI 파트너, 세이지 `#5C6B4F`) 세 톤으로 바뀌었습니다(예전엔 teal/amber 둘뿐이었음). 색 토큰은 `src/app/globals.css`의 `@theme` 블록에 `--color-swap`/`--color-cert`/`--color-assist`로 정의돼 있고, 기존 exam-scheduler가 쓰는 `--color-surface` 등과 이름이 겹치지 않게 일부러 따로 뒀습니다.
 
 ---
 
@@ -405,6 +405,19 @@ DATABASE_URL="postgresql://..." npx prisma migrate deploy
 ---
 
 ## 📅 개발 히스토리 로그 (최신순)
+
+### 2026-08-30
+
+**쌤스 헬퍼 디자인 전면 개편 — "AI티 안 나게" (요청: "기능은 건드리지 말고 쌤스 헬퍼의 디자인을 AI티나지 않게 수정하고 싶어"):**
+- **먼저 Artifact로 글+미리보기 제안을 올려 사용자가 방향을 고르게 했습니다**(요청: "실제 화면 수정전에 글로 제안하고... 미리보기를 통해 내가 골랐으면 좋겠어"). 확정된 방향: 폰트·모양은 통일하되 앱마다 강조색만 다르게. 표시용 세리프는 Song Myung, 본문은 기존 Noto Sans KR 그대로. 모양은 14px(카드)/10px(버튼·입력창)/pill(배지) 반경 스케일, 그림자 대신 실선 테두리(hairline border), 배경은 파스텔 워시 대신 따뜻한 중립색 `#F1EEE6`.
+- **앱별 강조색 3가지**(사용자가 직접 고름): `swap`(시간표 교체 도우미) 깊은 소나무 `#1F5C52` / `cert`(연수 이수증 수거) 남색 관인 `#3B4A7A` / `assist`(업무 AI 파트너) 세이지 `#5C6B4F`. `src/app/globals.css`의 `@theme` 블록에 `--color-swap`/`--color-cert`/`--color-assist`로 정의 — 기존 exam-scheduler가 쓰는 `--color-surface` 등 토큰과 이름이 겹치지 않게 일부러 새 이름을 씀. Tailwind 전역 `--radius-*` 스케일은 건드리지 않고, 모양 변경은 전부 파일별 임의값 클래스(`rounded-[10px]`/`rounded-[14px]`)로 처리해 exam-scheduler·enrollment-helper·허브 페이지에 영향이 없게 했습니다.
+- **AI 생성 티 나는 패턴을 의도적으로 걷어냈습니다**: 그라데이션+이모지 히어로 배너 → 강조색 단색 배너(이모지 없음), `shadow-sm`류 카드 그림자 → 실선 테두리만, `rounded-3xl`/`rounded-2xl`/`rounded-xl` 뒤섞임 → 14px/10px 두 단계로 통일.
+- **손댄 범위 — 시간표 교체 도우미**: `globals.css` 토큰, `AppSwitcher.tsx`(3톤 드롭다운), 3개 `layout.tsx`(폰트+배경), `(app)/page.tsx`(히어로+탭바+초대코드 패널), `SwapTab.tsx`/`MeetingTab.tsx`/`BlockTab.tsx`/`UploadPanel.tsx`, `MeetingPresetBar.tsx`/`MakeupTray.tsx`(처음엔 빠졌다가 마무리 스윕에서 발견), `accounts/page.tsx`/`teachers/page.tsx`, `login/page.tsx`(하이드레이션 보안 수정은 그대로 보존).
+- **손댄 범위 — 연수 이수증 수거**: `certificates/page.tsx` + 하위 컴포넌트 21개 전부(`CertificatesTabs`/`CertificateBoard`/`SignBoard`/`RosterPresetManager`/`SignSessionMini`/`TrainingEditorPanel` 등) + `sessions/[id]/page.tsx`.
+- **손댄 범위 — 업무 AI 파트너**: `assistant/page.tsx` + `AssistantApp`/`BotCard`/`NewBotForm`/`ChatPanel`/`BotSettingsPanel` 5개.
+- **의도적으로 그대로 둔 것들(의미색 vs 브랜드색 구분)**: 시간표 매칭 화면의 선택/파트너/연쇄교체 강조색(청록·에메랄드·주황·보라 — 기능 상태를 나타냄), 명단 프리셋의 공통(인디고)/개인(앰버) 구분색(이번 세션에 사용자가 요청한 의미 있는 구분), 챗봇 상태 신호등(완료=에메랄드/실패=로즈/분석중=앰버), **챗봇마다 사용자가 직접 고르는 아바타·말풍선 색**(`src/features/schedule-helper/components/assistant/accents.ts` — 앱 브랜드색이 아니라 사용자 커스터마이징 기능이라 손대지 않음). `sign/page.tsx`(QR 서명 키오스크, 네이비/골드 톤 풀블리드 화면)와 인쇄 전용 페이지 2개(등록부 인쇄, 보강원 인쇄 — 실제 종이에 찍히는 공식 문서 서식)는 이미 자기만의 완결된 디자인이라 개편 대상 밖으로 판단.
+- **후속 수정 두 건**(사용자 스크린샷 지적): (1) `assistant/page.tsx`의 좌우/상하 여백이 다른 두 앱과 미묘하게 달랐던 것(`px-3`→`px-2`, 히어로 `mb-6`→`mb-8`) 수정. (2) **더 큰 문제** — `certificates/page.tsx`(`max-w-5xl`)와 `assistant/page.tsx`(`max-w-6xl`)의 본문 최대 너비가 `(app)/page.tsx`(`max-w-[1920px]`)보다 훨씬 좁아서, 넓은 화면에서 좌우 여백이 크게 남아 보이는 문제였습니다. 사용자가 두 스크린샷을 나란히 보여주고서야 원인이 "여백 값"이 아니라 "본문 폭 자체"라는 게 명확해졌습니다 — 둘 다 `max-w-[1920px]`로 맞춰 해결.
+- `tsc --noEmit`·`eslint` 전체 트리 클린을 매 단계마다 재확인. 로그인 없이는 인증된 화면을 직접 렌더링해 검증할 수 없어(테스트 계정 없음), 로그인 화면만 스크린샷으로 실제 확인하고 나머지는 코드 리뷰 + 타입체크로 검증했습니다.
 
 ### 2026-08-29 (4)
 
