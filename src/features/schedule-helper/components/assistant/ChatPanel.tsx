@@ -142,7 +142,7 @@ export default function ChatPanel({
   const noMaterial = readyDocCount === 0;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-13rem)] min-h-[520px] bg-white border border-stone-200 rounded-3xl overflow-hidden shadow-sm">
+    <div className="flex flex-col h-[calc(100vh-13rem)] min-h-[520px] bg-white border border-stone-200 rounded-[14px] overflow-hidden">
       {/* 헤더 */}
       <div className="flex items-center gap-2.5 px-4 py-3 border-b border-stone-200 shrink-0">
         <button
@@ -153,7 +153,7 @@ export default function ChatPanel({
         >
           <ArrowLeft className="w-4 h-4" />
         </button>
-        <div className={`w-10 h-10 shrink-0 grid place-items-center rounded-xl text-lg ${style.avatar}`}>
+        <div className={`w-10 h-10 shrink-0 grid place-items-center rounded-[10px] text-lg ${style.avatar}`}>
           {bot.emoji}
         </div>
         <div className="flex-1 min-w-0">
@@ -232,7 +232,7 @@ export default function ChatPanel({
                         {message.sources.map((source, i) => (
                           <span
                             key={`${source.documentId}-${source.page}-${i}`}
-                            className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800"
+                            className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2 py-1 rounded-lg bg-assist/10 border border-assist/25 text-assist"
                           >
                             <FileText className="w-3 h-3" />
                             {sourceLabel(source)}
@@ -258,7 +258,7 @@ export default function ChatPanel({
               key={starter}
               type="button"
               onClick={() => send(starter)}
-              className="whitespace-nowrap text-xs font-bold px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 transition-colors"
+              className="whitespace-nowrap text-xs font-bold px-3 py-1.5 rounded-full bg-assist/10 border border-assist/25 text-assist hover:bg-assist/15 transition-colors"
             >
               {starter}
             </button>
@@ -279,7 +279,7 @@ export default function ChatPanel({
           onChange={(e) => setInput(e.target.value)}
           disabled={noMaterial || sending}
           placeholder={noMaterial ? "자료를 올리면 질문할 수 있습니다" : "질문을 입력하세요…"}
-          className="flex-1 bg-stone-100 rounded-full px-4 py-2.5 text-sm text-stone-800 placeholder:text-stone-400 outline-none focus:ring-2 focus:ring-amber-200 disabled:opacity-60"
+          className="flex-1 bg-stone-100 rounded-full px-4 py-2.5 text-sm text-stone-800 placeholder:text-stone-400 outline-none focus:ring-2 focus:ring-assist/30 disabled:opacity-60"
         />
         <button
           type="submit"

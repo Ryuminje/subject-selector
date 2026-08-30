@@ -65,11 +65,11 @@ export default function CertificateDetail({
   const openRow = openName ? rows?.find((r) => r.teacherName === openName) ?? null : null;
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-5">
+    <div className="bg-white rounded-[14px] border border-stone-200 p-6 space-y-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="text-lg font-bold text-slate-800">{item.title}</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h2 className="font-display text-lg text-stone-800">{item.title}</h2>
+          <p className="text-xs text-stone-400 mt-0.5">
             등록 {item.registeredByName} · 대상 명단 {item.hasOwnRoster ? "전용" : "전체 기본"} {item.total}명
           </p>
         </div>
@@ -78,7 +78,7 @@ export default function CertificateDetail({
             <button
               type="button"
               onClick={onEdit}
-              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 border border-stone-200 rounded-lg text-stone-600 hover:bg-stone-50 transition-colors"
             >
               <Pencil className="w-3.5 h-3.5" /> 연수 편집
             </button>
@@ -93,26 +93,26 @@ export default function CertificateDetail({
         )}
       </div>
 
-      <div className="grid grid-cols-3 border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="text-center py-3 bg-slate-50">
-          <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">대상</div>
-          <div className="text-2xl font-bold text-slate-700 tabular-nums">{item.total}</div>
+      <div className="grid grid-cols-3 border border-stone-200 rounded-[10px] overflow-hidden">
+        <div className="text-center py-3 bg-stone-50">
+          <div className="text-[10px] font-bold tracking-wider text-stone-400 uppercase">대상</div>
+          <div className="text-2xl font-bold text-stone-700 tabular-nums">{item.total}</div>
         </div>
-        <div className="text-center py-3 bg-slate-50 border-x border-slate-200">
-          <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">제출</div>
+        <div className="text-center py-3 bg-stone-50 border-x border-stone-200">
+          <div className="text-[10px] font-bold tracking-wider text-stone-400 uppercase">제출</div>
           <div className="text-2xl font-bold text-emerald-600 tabular-nums">{item.doneCount}</div>
         </div>
-        <div className="text-center py-3 bg-slate-50">
-          <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">미제출</div>
-          <div className={`text-2xl font-bold tabular-nums ${item.missingCount ? "text-rose-600" : "text-slate-400"}`}>
+        <div className="text-center py-3 bg-stone-50">
+          <div className="text-[10px] font-bold tracking-wider text-stone-400 uppercase">미제출</div>
+          <div className={`text-2xl font-bold tabular-nums ${item.missingCount ? "text-rose-600" : "text-stone-400"}`}>
             {item.missingCount}
           </div>
         </div>
       </div>
 
       {!item.canManage ? (
-        <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-          <Lock className="w-4 h-4 shrink-0 text-slate-400" />
+        <div className="flex items-center gap-2 text-sm text-stone-500 bg-stone-50 border border-stone-200 rounded-[10px] px-4 py-3">
+          <Lock className="w-4 h-4 shrink-0 text-stone-400" />
           제출자 명단은 관리자와 이 연수를 등록한 담당 선생님만 볼 수 있습니다.
         </div>
       ) : (
@@ -144,7 +144,7 @@ export default function CertificateDetail({
             <div>
               <h3 className="text-xs font-bold text-emerald-700 mb-2 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5" /> 제출 완료 {item.doneCount}명
-                <span className="font-medium text-slate-400">— 이름을 누르면 제출물이 보입니다</span>
+                <span className="font-medium text-stone-400">— 이름을 누르면 제출물이 보입니다</span>
               </h3>
               <div className="flex flex-wrap gap-1.5">
                 {(item.done ?? []).map((name) => (
@@ -166,16 +166,16 @@ export default function CertificateDetail({
           )}
 
           {loadingRows && (
-            <div className="flex justify-center py-3 text-teal-600">
+            <div className="flex justify-center py-3 text-cert">
               <Loader2 className="w-5 h-5 animate-spin" />
             </div>
           )}
 
           {openName && !loadingRows && (
-            <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50">
+            <div className="border border-stone-200 rounded-[10px] p-4 bg-stone-50">
               <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-                <h3 className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-teal-600" /> {openName} 선생님 제출물
+                <h3 className="text-sm font-bold text-stone-700 flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-cert" /> {openName} 선생님 제출물
                 </h3>
                 {openRow && (
                   <div className="flex gap-2">
@@ -183,7 +183,7 @@ export default function CertificateDetail({
                       href={`/api/schedule-helper/certificates/${openRow.id}/file`}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-xs px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-lg transition-colors"
+                      className="text-xs px-3 py-1.5 bg-cert hover:opacity-90 text-white font-bold rounded-lg transition-opacity"
                     >
                       파일 열기
                     </a>
@@ -201,17 +201,17 @@ export default function CertificateDetail({
               </div>
               {openRow ? (
                 <dl className="grid grid-cols-[auto_1fr] gap-y-1.5 gap-x-4 text-sm">
-                  <dt className="text-xs font-bold text-slate-400">이수번호</dt>
-                  <dd className="font-bold text-slate-700 tabular-nums">{openRow.number || "—"}</dd>
-                  <dt className="text-xs font-bold text-slate-400">이수기관</dt>
-                  <dd className="font-bold text-slate-700">{openRow.institution || "—"}</dd>
-                  <dt className="text-xs font-bold text-slate-400">이수날짜</dt>
-                  <dd className="font-bold text-slate-700 tabular-nums">{openRow.certDate || "—"}</dd>
-                  <dt className="text-xs font-bold text-slate-400">첨부파일</dt>
-                  <dd className="font-bold text-slate-700 break-all">{openRow.fileName}</dd>
+                  <dt className="text-xs font-bold text-stone-400">이수번호</dt>
+                  <dd className="font-bold text-stone-700 tabular-nums">{openRow.number || "—"}</dd>
+                  <dt className="text-xs font-bold text-stone-400">이수기관</dt>
+                  <dd className="font-bold text-stone-700">{openRow.institution || "—"}</dd>
+                  <dt className="text-xs font-bold text-stone-400">이수날짜</dt>
+                  <dd className="font-bold text-stone-700 tabular-nums">{openRow.certDate || "—"}</dd>
+                  <dt className="text-xs font-bold text-stone-400">첨부파일</dt>
+                  <dd className="font-bold text-stone-700 break-all">{openRow.fileName}</dd>
                 </dl>
               ) : (
-                <p className="text-sm text-slate-400">제출물 정보를 찾지 못했습니다.</p>
+                <p className="text-sm text-stone-400">제출물 정보를 찾지 못했습니다.</p>
               )}
             </div>
           )}

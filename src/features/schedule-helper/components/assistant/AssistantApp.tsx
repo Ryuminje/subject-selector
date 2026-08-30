@@ -50,7 +50,7 @@ export default function AssistantApp() {
           <button
             type="button"
             onClick={() => setView("new")}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-assist hover:opacity-90 text-white text-xs font-bold rounded-lg transition-opacity"
           >
             <Plus className="w-3.5 h-3.5" /> 새 챗봇
           </button>
@@ -59,11 +59,11 @@ export default function AssistantApp() {
         {error && <p className="text-sm text-rose-600 mb-3">{error}</p>}
 
         {loading ? (
-          <div className="grid place-items-center py-16 text-amber-600">
+          <div className="grid place-items-center py-16 text-assist">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
         ) : bots.length === 0 ? (
-          <div className="bg-white border border-stone-200 rounded-2xl p-8 text-center">
+          <div className="bg-white border border-stone-200 rounded-[10px] p-8 text-center">
             <p className="text-sm text-stone-500 leading-relaxed">
               아직 만든 챗봇이 없습니다.
               <br />
@@ -74,7 +74,7 @@ export default function AssistantApp() {
             <button
               type="button"
               onClick={() => setView("new")}
-              className="mt-4 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl transition-colors"
+              className="mt-4 px-4 py-2 bg-assist hover:opacity-90 text-white text-xs font-bold rounded-[10px] transition-opacity"
             >
               첫 챗봇 만들기
             </button>
@@ -99,11 +99,11 @@ export default function AssistantApp() {
       {/* 오른쪽: 대화 또는 설정 */}
       <div className={`${selectedId ? "block" : "hidden lg:block"}`}>
         {!selected ? (
-          <div className="bg-white border border-stone-200 rounded-3xl p-12 text-center text-sm text-stone-400">
+          <div className="bg-white border border-stone-200 rounded-[14px] p-12 text-center text-sm text-stone-400">
             왼쪽에서 챗봇을 고르세요.
           </div>
         ) : detail.loading || !detail.bot ? (
-          <div className="grid place-items-center py-24 text-amber-600">
+          <div className="grid place-items-center py-24 text-assist">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
         ) : view === "settings" ? (

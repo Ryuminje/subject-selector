@@ -22,11 +22,11 @@ export default function BotCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`w-full flex items-center gap-3 p-3.5 bg-white border rounded-2xl text-left transition-all duration-150 hover:-translate-y-px ${
+      className={`w-full flex items-center gap-3 p-3.5 bg-white border rounded-[10px] text-left transition-colors ${
         selected ? style.selected : "border-stone-200 hover:border-stone-300"
       }`}
     >
-      <div className={`w-11 h-11 shrink-0 grid place-items-center rounded-xl text-lg ${style.avatar}`}>
+      <div className={`w-11 h-11 shrink-0 grid place-items-center rounded-[10px] text-lg ${style.avatar}`}>
         {bot.emoji}
       </div>
 

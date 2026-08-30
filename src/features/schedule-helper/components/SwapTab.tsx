@@ -218,7 +218,7 @@ export default function SwapTab() {
           담김 · {pickedForCell.kind === "swap" ? "교체" : "보강"}
         </span>
       ) : (
-        <span className="shrink-0 text-[11px] text-slate-400" title="이 시간은 이미 다른 분으로 담겨 있습니다.">
+        <span className="shrink-0 text-[11px] text-stone-400" title="이 시간은 이미 다른 분으로 담겨 있습니다.">
           —
         </span>
       );
@@ -228,7 +228,7 @@ export default function SwapTab() {
         {exchangeSlot && (
           <button
             onClick={() => addToTray("swap", partnerTeacher, exchangeSlot)}
-            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded-lg bg-teal-600 hover:bg-teal-500 text-white transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded-lg bg-swap hover:opacity-90 text-white transition-opacity"
           >
             <FilePlus2 className="w-3 h-3" /> 교체
           </button>
@@ -251,8 +251,8 @@ export default function SwapTab() {
     >
       <td
         className={cn(
-          "p-1 border sticky left-0 z-10 font-bold border-r-2 border-r-teal-600 w-[85px] whitespace-nowrap overflow-hidden text-ellipsis text-center text-[11px] sm:text-xs",
-          pinned ? "bg-amber-100 border-slate-200" : "bg-slate-50 border-slate-200"
+          "p-1 border sticky left-0 z-10 font-bold border-r-2 border-r-swap w-[85px] whitespace-nowrap overflow-hidden text-ellipsis text-center text-[11px] sm:text-xs",
+          pinned ? "bg-amber-100 border-stone-200" : "bg-stone-50 border-stone-200"
         )}
       >
         {pinned ? (
@@ -286,10 +286,10 @@ export default function SwapTab() {
               key={`${d}-${p}`}
               onClick={() => classStr && handleCellClick(row.teacher, d, p)}
               className={cn(
-                "h-14 border border-slate-200 p-0.5 text-center align-middle transition-colors relative overflow-hidden",
-                pi === 0 && "border-l-2 border-l-slate-400",
+                "h-14 border border-stone-200 p-0.5 text-center align-middle transition-colors relative overflow-hidden",
+                pi === 0 && "border-l-2 border-l-stone-400",
                 classStr && "cursor-pointer hover:bg-amber-100",
-                isSelected && "bg-teal-100 border-2 border-teal-500 font-bold z-10",
+                isSelected && "bg-swap/15 border-2 border-swap font-bold z-10",
                 isPartner && "bg-emerald-100 border-2 border-emerald-500 font-bold z-10",
                 isChainStep1 && "bg-orange-100 border-2 border-orange-500 font-bold z-10",
                 isChainStep2 && "bg-purple-100 border-2 border-purple-500 font-bold z-10"
@@ -297,11 +297,11 @@ export default function SwapTab() {
             >
               {info && (
                 <div className="flex flex-col items-center justify-center leading-tight">
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-700 truncate w-full block">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-stone-700 truncate w-full block">
                     {info.subject.length > 5 ? info.subject.substring(0, 4) + ".." : info.subject}
                   </span>
                   {info.grade !== "?" && info.classNum !== "?" && (
-                    <span className="text-[9px] sm:text-[10px] text-teal-700 font-bold bg-teal-500/10 px-1 py-0.5 rounded mt-0.5 inline-block truncate max-w-full">
+                    <span className="text-[9px] sm:text-[10px] text-swap font-bold bg-swap/10 px-1 py-0.5 rounded mt-0.5 inline-block truncate max-w-full">
                       {info.grade}-{info.classNum}
                     </span>
                   )}
@@ -316,20 +316,20 @@ export default function SwapTab() {
 
   return (
     <div className="flex flex-col lg:flex-row gap-4 items-start">
-    <div className="flex-1 min-w-0 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="flex-1 min-w-0 bg-white rounded-[14px] border border-stone-200 overflow-hidden">
       <div className="overflow-auto max-h-[75vh] relative">
         <table className="w-full border-collapse text-sm table-fixed">
-          <thead ref={theadRef} className="bg-teal-600 text-white sticky top-0 z-20 shadow-md">
+          <thead ref={theadRef} className="bg-swap text-white sticky top-0 z-20">
             <tr>
-              <th rowSpan={2} className="p-2 border-r border-teal-500/50 sticky left-0 z-30 bg-teal-700 w-[85px] whitespace-nowrap overflow-hidden text-ellipsis text-xs sm:text-sm">교사명</th>
+              <th rowSpan={2} className="p-2 border-r border-white/20 sticky left-0 z-30 bg-swap w-[85px] whitespace-nowrap overflow-hidden text-ellipsis text-xs sm:text-sm">교사명</th>
               {data.days.map((d) => (
-                <th key={d} colSpan={data.periods.length} className="p-2 border border-teal-500/50">{d}</th>
+                <th key={d} colSpan={data.periods.length} className="p-2 border border-white/20">{d}</th>
               ))}
             </tr>
             <tr>
               {data.days.map((d) =>
                 data.periods.map((p) => (
-                  <th key={`${d}-${p}`} className="p-1 border border-teal-500/50 text-[10px]">{p}</th>
+                  <th key={`${d}-${p}`} className="p-1 border border-white/20 text-[10px]">{p}</th>
                 ))
               )}
             </tr>
@@ -358,12 +358,12 @@ export default function SwapTab() {
       {(modalOpen || tray.entries.length > 0) && (
       <div className="w-full lg:w-[380px] shrink-0 lg:sticky lg:top-24 space-y-4">
       {modalOpen && (
-        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] border border-teal-200 overflow-hidden animate-in fade-in duration-200">
-          <div className="bg-teal-600 p-3 md:p-4 flex justify-between items-center text-white">
-            <h2 className="text-base md:text-lg font-bold flex items-center gap-2">
+        <div className="bg-white rounded-[14px] border border-stone-200 overflow-hidden animate-in fade-in duration-200">
+          <div className="bg-swap p-3 md:p-4 flex justify-between items-center text-white">
+            <h2 className="font-display text-base md:text-lg flex items-center gap-2">
               <Search className="w-4 h-4 md:w-5 md:h-5" /> 수업 매칭 결과
             </h2>
-            <button onClick={() => { setModalOpen(false); setSelectedCell(null); setSelectedChainIdx(null); }} className="hover:bg-teal-500 p-1 rounded-full transition-colors">
+            <button onClick={() => { setModalOpen(false); setSelectedCell(null); setSelectedChainIdx(null); }} className="hover:bg-white/15 p-1 rounded-full transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -371,11 +371,11 @@ export default function SwapTab() {
           <div className="p-4 md:p-6 max-h-[60vh] overflow-y-auto">
               {/* My Info */}
               <div className="bg-sky-50 p-4 rounded-2xl border-l-4 border-sky-500 mb-6">
-                <div className="text-xs text-slate-500 font-medium mb-1">나의 선택 수업</div>
-                <div className="text-base font-bold text-slate-800 flex items-center flex-wrap gap-2">
+                <div className="text-xs text-stone-500 font-medium mb-1">나의 선택 수업</div>
+                <div className="text-base font-bold text-stone-800 flex items-center flex-wrap gap-2">
                   {selectedCell?.day}요일 {selectedCell?.period}교시 | {myInfo?.grade}학년 {myInfo?.classNum}반 {myInfo?.subject}
                   {myInfo?.isMovingClass && (
-                    <span className="bg-slate-700 text-white px-2 py-0.5 rounded text-xs ml-1">{myInfo.blockGroup}블록</span>
+                    <span className="bg-stone-700 text-white px-2 py-0.5 rounded text-xs ml-1">{myInfo.blockGroup}블록</span>
                   )}
                 </div>
               </div>
@@ -406,7 +406,7 @@ export default function SwapTab() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="font-bold text-emerald-800 text-sm">{res.teacher} 선생님</div>
-                                <div className="text-xs text-slate-600">해당 시간({selectedCell?.day} {selectedCell?.period}교시) <b>공강</b> · 대강 가능</div>
+                                <div className="text-xs text-stone-600">해당 시간({selectedCell?.day} {selectedCell?.period}교시) <b>공강</b> · 대강 가능</div>
                               </div>
                               {/* 동과 대강은 상대의 수업을 내가 대신 갈 시간이 없어 교체가 성립하지 않습니다. */}
                               {renderPickButtons(res.teacher)}
@@ -414,15 +414,15 @@ export default function SwapTab() {
                           ))}
                         </div>
                       )}
-                      <div className="border-b border-dashed border-slate-200 my-5"></div>
-                      <h3 className="text-sm font-bold text-teal-600 mb-3 flex items-center gap-2">
+                      <div className="border-b border-dashed border-stone-200 my-5"></div>
+                      <h3 className="text-sm font-bold text-swap mb-3 flex items-center gap-2">
                         <ArrowRightLeft className="w-4 h-4" /> 2순위 추천: 일반 수업 교체
                       </h3>
                     </div>
                   )}
 
                   {!myInfo.isMovingClass && (
-                    <h3 className="text-sm font-bold text-teal-600 mb-3 flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-swap mb-3 flex items-center gap-2">
                       <ArrowRightLeft className="w-4 h-4" /> 일반 수업 교체
                     </h3>
                   )}
@@ -432,19 +432,19 @@ export default function SwapTab() {
                       &apos;{myInfo.subject}&apos; 과목은 교체가 금지되어 있습니다.
                     </div>
                   ) : results.swap.length === 0 ? (
-                    <div className="text-center p-8 text-slate-400 bg-slate-50 rounded-xl">
+                    <div className="text-center p-8 text-stone-400 bg-stone-50 rounded-xl">
                       교체 가능한 대상이 없습니다.
                     </div>
                   ) : (
                     <div className="space-y-2">
                       {results.swap.map((res, i) => (
-                        <div key={i} className="flex items-center gap-3 p-3 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors">
-                          <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center shrink-0 text-xs font-bold">
+                        <div key={i} className="flex items-center gap-3 p-3 border border-stone-100 rounded-xl hover:bg-stone-50 transition-colors">
+                          <div className="w-8 h-8 rounded-full bg-swap text-white flex items-center justify-center shrink-0 text-xs font-bold">
                             {i + 1}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-bold text-slate-800 text-sm">{res.teacher} 선생님</div>
-                            <div className="text-xs text-slate-600"><b>{res.day}요일 {res.period}교시</b> · {res.subject}</div>
+                            <div className="font-bold text-stone-800 text-sm">{res.teacher} 선생님</div>
+                            <div className="text-xs text-stone-600"><b>{res.day}요일 {res.period}교시</b> · {res.subject}</div>
                           </div>
                           {renderPickButtons(res.teacher, { day: res.day!, period: res.period!, subject: res.subject! })}
                         </div>
@@ -454,11 +454,11 @@ export default function SwapTab() {
 
                   {results.swap.length === 0 && results.chain.length > 0 && (
                     <div className="mt-2">
-                      <div className="border-b border-dashed border-slate-200 mb-5"></div>
+                      <div className="border-b border-dashed border-stone-200 mb-5"></div>
                       <h3 className="text-sm font-bold text-purple-600 mb-1 flex items-center gap-2">
                         <ArrowRightLeft className="w-4 h-4" /> 2단계 교체 (연쇄 교체)
                       </h3>
-                      <p className="text-xs text-slate-500 mb-3">
+                      <p className="text-xs text-stone-500 mb-3">
                         바로 교체할 상대가 없어, 두 번의 교체를 연결하면 가능한 조합을 찾았습니다. 원하는 조합을 선택하세요.
                       </p>
                       <div className="space-y-2">
@@ -467,8 +467,8 @@ export default function SwapTab() {
                             key={i}
                             onClick={() => selectChain(i)}
                             className={cn(
-                              "p-3 border rounded-xl cursor-pointer transition-colors text-xs text-slate-700 space-y-1",
-                              selectedChainIdx === i ? "border-purple-400 bg-purple-50 ring-1 ring-purple-400" : "border-slate-100 hover:bg-slate-50"
+                              "p-3 border rounded-xl cursor-pointer transition-colors text-xs text-stone-700 space-y-1",
+                              selectedChainIdx === i ? "border-purple-400 bg-purple-50 ring-1 ring-purple-400" : "border-stone-100 hover:bg-stone-50"
                             )}
                           >
                             <div><b className="text-orange-600">1단계</b> {ch.b.teacher} ↔ {ch.c.teacher} 교체 — {ch.c.day}요일 {ch.c.period}교시 {ch.c.subject} ↔ (지금시간) {ch.w.subject}</div>
@@ -478,10 +478,10 @@ export default function SwapTab() {
                       </div>
 
                       {selectedChainIdx !== null && (
-                        <div className="mt-3 flex items-center gap-4 text-xs font-semibold text-slate-500">
+                        <div className="mt-3 flex items-center gap-4 text-xs font-semibold text-stone-500">
                           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-orange-400 inline-block" /> 1단계 이동</span>
                           <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-purple-400 inline-block" /> 2단계 이동</span>
-                          <span className="text-slate-400 font-normal">— 아래 시간표에서 확인하세요</span>
+                          <span className="text-stone-400 font-normal">— 아래 시간표에서 확인하세요</span>
                         </div>
                       )}
                     </div>

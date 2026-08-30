@@ -43,6 +43,7 @@ export default function RosterPresetManager({
   const personalPresets = presets?.filter((p) => !p.isShared) ?? [];
 
   // 강조색: 공통=인디고, 개인=앰버 — 목록 배지든 프리셋 이름 앞 점이든 이 두 색으로 한눈에 갈립니다.
+  // (앱 강조색인 cert와는 별개로, "공통이냐 개인이냐"를 나타내는 의미색이라 그대로 둡니다.)
   const groupTheme = {
     indigo: { dot: "bg-indigo-500", text: "text-indigo-700", badgeBg: "bg-indigo-50", badgeBorder: "border-indigo-200" },
     amber: { dot: "bg-amber-500", text: "text-amber-700", badgeBg: "bg-amber-50", badgeBorder: "border-amber-200" },
@@ -60,10 +61,10 @@ export default function RosterPresetManager({
         <div className="flex items-center gap-1.5 mb-2">
           <span className={`w-2 h-2 rounded-full shrink-0 ${theme.dot}`} />
           <span className={`text-xs font-bold ${theme.text}`}>{title}</span>
-          <span className="text-xs text-slate-400">· {hint}</span>
+          <span className="text-xs text-stone-400">· {hint}</span>
         </div>
         {list.length === 0 ? (
-          <p className="text-xs text-slate-400 pl-3.5">아직 없습니다.</p>
+          <p className="text-xs text-stone-400 pl-3.5">아직 없습니다.</p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
             {list.map((p) => (
@@ -72,8 +73,8 @@ export default function RosterPresetManager({
                 onClick={() => (selectedId === p.id && !editMode ? setSelectedId(null) : openPreview(p))}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors min-w-0 ${
                   selectedId === p.id
-                    ? "bg-teal-600 border-teal-600 text-white"
-                    : "bg-slate-50 border-slate-200 text-slate-700 hover:border-teal-300"
+                    ? "bg-cert border-cert text-white"
+                    : "bg-stone-50 border-stone-200 text-stone-700 hover:border-cert/40"
                 }`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${theme.dot}`} />
@@ -213,11 +214,11 @@ export default function RosterPresetManager({
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-      <h2 className="text-lg font-bold text-teal-700 flex items-center gap-2">
+    <div className="bg-white rounded-[14px] border border-stone-200 p-6">
+      <h2 className="font-display text-lg text-cert flex items-center gap-2">
         <ListChecks className="w-5 h-5" /> 명단 프리셋 관리
       </h2>
-      <p className="text-sm text-slate-500 mt-1 mb-4">
+      <p className="text-sm text-stone-500 mt-1 mb-4">
         용도별로 명단을 저장해두고 재사용하세요. 교직원 명렬표 같은 <strong className="font-semibold">엑셀 파일에서
         바로 만들 수도</strong> 있습니다. 표에서 드래그로 순서를 바꿀 수 있고, 연수를 등록·편집할 때와 복수 연수 QR
         세션을 만들 때 저장된 명단을 그대로 불러올 수 있습니다.{" "}
@@ -227,7 +228,7 @@ export default function RosterPresetManager({
 
       <div>
         {loadingPresets ? (
-          <div className="flex justify-center py-8 text-teal-600">
+          <div className="flex justify-center py-8 text-cert">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
         ) : (
@@ -239,14 +240,14 @@ export default function RosterPresetManager({
                 <button
                   onClick={startCreate}
                   disabled={loadingBase}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border-2 border-dashed border-slate-300 text-slate-500 hover:border-teal-300 hover:text-teal-700 transition-colors disabled:opacity-60"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border-2 border-dashed border-stone-300 text-stone-500 hover:border-cert/40 hover:text-cert transition-colors disabled:opacity-60"
                 >
                   {loadingBase ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} 새
                   명단 만들기
                 </button>
                 <button
                   onClick={() => openImport("create")}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border-2 border-dashed border-teal-300 text-teal-700 hover:bg-teal-50 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border-2 border-dashed border-cert/30 text-cert hover:bg-cert/5 transition-colors"
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5" /> 엑셀로 만들기
                 </button>
@@ -259,11 +260,11 @@ export default function RosterPresetManager({
               {error && <p className="text-sm text-rose-600 mb-3">{error}</p>}
 
               {!presets?.length && !selectedId && (
-                <p className="text-sm text-slate-400 text-center py-6">저장된 명단이 없습니다. &quot;새 명단 만들기&quot;로 시작하세요.</p>
+                <p className="text-sm text-stone-400 text-center py-6">저장된 명단이 없습니다. &quot;새 명단 만들기&quot;로 시작하세요.</p>
               )}
 
               {selectedId && (selectedPreset || selectedId === "new") && (
-                <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50">
+                <div className="border border-stone-200 rounded-[10px] p-4 bg-stone-50/50">
                   {editMode ? (
                     <div className="mb-3 flex flex-col sm:flex-row gap-2">
                       <input
@@ -271,7 +272,7 @@ export default function RosterPresetManager({
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
                         placeholder="명단 이름 (예: 전체 교직원)"
-                        className="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
+                        className="flex-1 px-4 py-2.5 bg-white border border-stone-200 rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-cert/30 focus:border-cert"
                       />
                       <div className="flex gap-2">
                         <input
@@ -280,21 +281,21 @@ export default function RosterPresetManager({
                           onChange={(e) => setAddName(e.target.value)}
                           onKeyDown={(e) => e.key === "Enter" && handleAddName()}
                           placeholder="추가할 이름"
-                          className="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
+                          className="flex-1 px-4 py-2.5 bg-white border border-stone-200 rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-cert/30 focus:border-cert"
                         />
                         <button
                           onClick={handleAddName}
-                          className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-sm font-bold rounded-xl transition-colors shrink-0"
+                          className="px-4 py-2.5 bg-cert hover:opacity-90 text-white text-sm font-bold rounded-[10px] transition-opacity shrink-0"
                         >
                           추가
                         </button>
                         <button
                           onClick={() => (importMode === "append" ? setImportMode(null) : openImport("append"))}
                           title="엑셀 파일에서 이름을 한꺼번에 가져옵니다"
-                          className={`px-3 py-2.5 border text-sm font-bold rounded-xl transition-colors shrink-0 inline-flex items-center gap-1.5 ${
+                          className={`px-3 py-2.5 border text-sm font-bold rounded-[10px] transition-colors shrink-0 inline-flex items-center gap-1.5 ${
                             importMode === "append"
-                              ? "bg-teal-100 border-teal-300 text-teal-800"
-                              : "bg-white border-slate-200 text-slate-600 hover:border-teal-300 hover:text-teal-700"
+                              ? "bg-cert/10 border-cert/30 text-cert"
+                              : "bg-white border-stone-200 text-stone-600 hover:border-cert/40 hover:text-cert"
                           }`}
                         >
                           <FileSpreadsheet className="w-4 h-4" /> 엑셀
@@ -303,7 +304,7 @@ export default function RosterPresetManager({
                     </div>
                   ) : (
                     <div className="flex items-center justify-between mb-3">
-                      <div className="font-bold text-slate-800 flex items-center gap-2 flex-wrap">
+                      <div className="font-bold text-stone-800 flex items-center gap-2 flex-wrap">
                         {selectedPreset && (
                           <span
                             className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
@@ -316,7 +317,7 @@ export default function RosterPresetManager({
                           </span>
                         )}
                         {selectedPreset?.name}{" "}
-                        <span className="text-sm font-normal text-slate-500 inline-flex items-center gap-1">
+                        <span className="text-sm font-normal text-stone-500 inline-flex items-center gap-1">
                           · <UserCheck className="w-3.5 h-3.5" /> {selectedPreset?.createdBy} ·{" "}
                           {selectedPreset?.names.length}명
                         </span>
@@ -325,7 +326,7 @@ export default function RosterPresetManager({
                         <div className="flex gap-2">
                           <button
                             onClick={() => startEdit(selectedPreset)}
-                            className="inline-flex items-center gap-1 text-xs px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+                            className="inline-flex items-center gap-1 text-xs px-3 py-1.5 border border-stone-200 rounded-lg text-stone-600 hover:bg-stone-100 transition-colors"
                           >
                             <Pencil className="w-3.5 h-3.5" /> 편집
                           </button>
@@ -360,14 +361,14 @@ export default function RosterPresetManager({
                     <div className="flex justify-end gap-2 mt-3">
                       <button
                         onClick={handleCancelEdit}
-                        className="px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
+                        className="px-4 py-2 text-sm font-semibold text-stone-500 hover:bg-stone-100 rounded-[10px] transition-colors"
                       >
                         취소
                       </button>
                       <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 disabled:opacity-60 text-white text-sm font-bold rounded-xl transition-colors"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-cert hover:opacity-90 disabled:opacity-60 text-white text-sm font-bold rounded-[10px] transition-opacity"
                       >
                         {saving && <Loader2 className="w-4 h-4 animate-spin" />} 저장
                       </button>

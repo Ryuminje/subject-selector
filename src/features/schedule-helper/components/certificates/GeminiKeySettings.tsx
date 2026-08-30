@@ -38,9 +38,9 @@ export default function GeminiKeySettings() {
   };
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+    <div className="bg-white rounded-[14px] border border-stone-200 p-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-teal-700 flex items-center gap-2">
+        <h2 className="font-display text-lg text-cert flex items-center gap-2">
           <KeyRound className="w-5 h-5" /> Gemini API 키 설정
         </h2>
         {configured && !expanded && (
@@ -49,14 +49,14 @@ export default function GeminiKeySettings() {
           </span>
         )}
       </div>
-      <p className="text-sm text-slate-500 mt-1 mb-4">
+      <p className="text-sm text-stone-500 mt-1 mb-4">
         이수증 이미지에서 정보를 자동 추출하는 데 사용됩니다. 한 번 등록하면 우리 학교 전체 선생님이 사용할 수 있습니다.
       </p>
 
       {!expanded ? (
         <button
           onClick={() => setExpanded(true)}
-          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-slate-600 hover:bg-slate-500 text-white text-sm font-semibold rounded-xl transition-colors"
+          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-stone-600 hover:bg-stone-500 text-white text-sm font-semibold rounded-[10px] transition-colors"
         >
           {configured ? "키 다시 설정하기" : "API 키 등록하기"}
         </button>
@@ -66,7 +66,7 @@ export default function GeminiKeySettings() {
             href="https://aistudio.google.com/app/apikey"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 text-sm text-teal-700 font-semibold hover:underline mb-3"
+            className="inline-flex items-center gap-1 text-sm text-cert font-semibold hover:underline mb-3"
           >
             구글 AI 스튜디오에서 무료로 발급받기 <ExternalLink className="w-3.5 h-3.5" />
           </a>
@@ -76,12 +76,12 @@ export default function GeminiKeySettings() {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="AIzaSy... 로 시작하는 API 키를 붙여넣으세요"
-              className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all"
+              className="flex-1 px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-cert/30 focus:border-cert transition-colors"
             />
             <button
               onClick={handleSave}
               disabled={saving || !apiKey.trim()}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-60 text-white font-bold rounded-xl transition-colors shrink-0"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-cert hover:opacity-90 disabled:opacity-60 text-white font-bold rounded-[10px] transition-opacity shrink-0"
             >
               {saving && <Loader2 className="w-4 h-4 animate-spin" />}
               저장

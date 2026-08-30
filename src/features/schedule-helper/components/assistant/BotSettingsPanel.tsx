@@ -166,7 +166,7 @@ export default function BotSettingsPanel({
 
   if (loading) {
     return (
-      <div className="grid place-items-center py-20 text-amber-600">
+      <div className="grid place-items-center py-20 text-assist">
         <Loader2 className="w-6 h-6 animate-spin" />
       </div>
     );
@@ -183,7 +183,7 @@ export default function BotSettingsPanel({
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1.5 text-sm font-bold text-stone-500 hover:text-amber-700 transition-colors"
+          className="inline-flex items-center gap-1.5 text-sm font-bold text-stone-500 hover:text-assist transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> 대화로 돌아가기
         </button>
@@ -192,41 +192,41 @@ export default function BotSettingsPanel({
           type="button"
           onClick={save}
           disabled={saving}
-          className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors"
+          className="px-3.5 py-1.5 bg-assist hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-opacity"
         >
           {saving ? "저장 중…" : saved ? "저장됨" : "저장"}
         </button>
       </div>
 
-      {error && <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2">{error}</p>}
+      {error && <p className="text-sm text-rose-600 bg-rose-50 border border-rose-100 rounded-[10px] px-3 py-2">{error}</p>}
       {notice && (
-        <p className="flex items-center gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+        <p className="flex items-center gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-[10px] px-3 py-2">
           <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
           {notice}
         </p>
       )}
 
       {/* 기본 정보 */}
-      <section className="bg-white border border-stone-200 rounded-2xl p-4">
+      <section className="bg-white border border-stone-200 rounded-[10px] p-4">
         <h3 className="text-[11px] font-bold tracking-wider text-stone-400 mb-3">기본 정보</h3>
         <input
           value={bot.name}
           onChange={(e) => patch({ name: e.target.value })}
           placeholder="챗봇 이름"
-          className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-sm mb-2 outline-none focus:ring-2 focus:ring-amber-200"
+          className="w-full bg-stone-50 border border-stone-200 rounded-[10px] px-3 py-2 text-sm mb-2 outline-none focus:ring-2 focus:ring-assist/30"
         />
         <input
           value={bot.tagline ?? ""}
           onChange={(e) => patch({ tagline: e.target.value })}
           placeholder="한 줄 소개 (예: 기재요령 기반 질의응답)"
-          className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-200"
+          className="w-full bg-stone-50 border border-stone-200 rounded-[10px] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-assist/30"
         />
 
         <div className="flex items-center gap-3 mt-3">
           <input
             value={bot.emoji}
             onChange={(e) => patch({ emoji: e.target.value.slice(0, 2) })}
-            className={`w-11 h-11 shrink-0 text-center text-lg rounded-xl outline-none ${style.avatar}`}
+            className={`w-11 h-11 shrink-0 text-center text-lg rounded-[10px] outline-none ${style.avatar}`}
             aria-label="아바타 이모지"
           />
           <div className="flex gap-2">
@@ -249,7 +249,7 @@ export default function BotSettingsPanel({
           onChange={(e) => patch({ persona: e.target.value })}
           rows={2}
           placeholder="말투·역할 지시 (선택). 예: 신규 선생님도 알아듣게 용어를 풀어서 설명해줘."
-          className="w-full mt-3 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-200 resize-none"
+          className="w-full mt-3 bg-stone-50 border border-stone-200 rounded-[10px] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-assist/30 resize-none"
         />
         <p className="mt-1.5 text-[11px] text-stone-400 leading-relaxed">
           말투는 바꿀 수 있지만, &quot;자료에 없으면 지어내지 않는다&quot;는 규칙은 항상 유지됩니다.
@@ -257,14 +257,14 @@ export default function BotSettingsPanel({
       </section>
 
       {/* 자료함 */}
-      <section className="bg-white border border-stone-200 rounded-2xl p-4">
+      <section className="bg-white border border-stone-200 rounded-[10px] p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[11px] font-bold tracking-wider text-stone-400">자료함 {documents.length}</h3>
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
-            className="inline-flex items-center gap-1 text-xs font-bold text-amber-700 hover:text-amber-600 disabled:opacity-50"
+            className="inline-flex items-center gap-1 text-xs font-bold text-assist hover:opacity-80 disabled:opacity-50"
           >
             <Plus className="w-3.5 h-3.5" /> 파일 추가
           </button>
@@ -292,7 +292,7 @@ export default function BotSettingsPanel({
               doc.chunkCount > 0 ? Math.round((doc.embeddedCount / doc.chunkCount) * 100) : 0;
             return (
               <li key={doc.id} className="flex items-center gap-3 py-2.5">
-                <div className="w-8 h-8 shrink-0 grid place-items-center rounded-lg bg-amber-100 text-amber-700">
+                <div className="w-8 h-8 shrink-0 grid place-items-center rounded-lg bg-assist/12 text-assist">
                   <FileUp className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -315,7 +315,7 @@ export default function BotSettingsPanel({
                     <button
                       type="button"
                       onClick={() => runIngest(doc.id, true)}
-                      className="inline-flex items-center gap-1 mt-1.5 text-[11px] font-bold text-amber-700 hover:text-amber-600"
+                      className="inline-flex items-center gap-1 mt-1.5 text-[11px] font-bold text-assist hover:opacity-80"
                     >
                       <RefreshCw className="w-3 h-3" /> 다시 분석
                     </button>
@@ -338,7 +338,7 @@ export default function BotSettingsPanel({
         </ul>
 
         {uploading && (
-          <p className="flex items-center justify-center gap-2 text-xs text-amber-700 py-3">
+          <p className="flex items-center justify-center gap-2 text-xs text-assist py-3">
             <Loader2 className="w-3.5 h-3.5 animate-spin" /> 올리는 중…
           </p>
         )}
@@ -347,17 +347,17 @@ export default function BotSettingsPanel({
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
-          className="w-full mt-2 border border-dashed border-amber-300 bg-amber-50 rounded-xl py-3.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition-colors disabled:opacity-50"
+          className="w-full mt-2 border border-dashed border-assist/30 bg-assist/5 rounded-[10px] py-3.5 text-xs font-bold text-assist hover:bg-assist/10 transition-colors disabled:opacity-50"
         >
           PDF · DOCX · 엑셀 · 텍스트 파일 올리기
-          <span className="block mt-0.5 font-normal text-amber-700/80">
+          <span className="block mt-0.5 font-normal text-assist/70">
             한글(hwp)은 PDF로 저장한 뒤 올려주세요
           </span>
         </button>
       </section>
 
       {/* 추천 질문 */}
-      <section className="bg-white border border-stone-200 rounded-2xl p-4">
+      <section className="bg-white border border-stone-200 rounded-[10px] p-4">
         <h3 className="text-[11px] font-bold tracking-wider text-stone-400 mb-3">추천 질문 (대화창 아래 칩)</h3>
         {bot.starters.map((starter, i) => (
           <div key={i} className="flex items-center gap-2 mb-2">
@@ -366,7 +366,7 @@ export default function BotSettingsPanel({
               onChange={(e) =>
                 patch({ starters: bot.starters.map((s, j) => (j === i ? e.target.value : s)) })
               }
-              className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-200"
+              className="flex-1 bg-stone-50 border border-stone-200 rounded-[10px] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-assist/30"
             />
             <button
               type="button"
@@ -382,7 +382,7 @@ export default function BotSettingsPanel({
           <button
             type="button"
             onClick={() => patch({ starters: [...bot.starters, ""] })}
-            className="w-full border border-dashed border-stone-300 rounded-xl py-2 text-xs font-bold text-stone-400 hover:text-amber-700 hover:border-amber-300 transition-colors"
+            className="w-full border border-dashed border-stone-300 rounded-[10px] py-2 text-xs font-bold text-stone-400 hover:text-assist hover:border-assist/30 transition-colors"
           >
             ＋ 질문 추가
           </button>
@@ -390,7 +390,7 @@ export default function BotSettingsPanel({
       </section>
 
       {/* 개인정보 경고 */}
-      <div className="flex gap-2.5 bg-orange-50 border border-orange-200 rounded-2xl px-4 py-3">
+      <div className="flex gap-2.5 bg-orange-50 border border-orange-200 rounded-[10px] px-4 py-3">
         <TriangleAlert className="w-4 h-4 shrink-0 text-orange-600 mt-0.5" />
         <div className="text-[11.5px] text-orange-900 leading-relaxed">
           <b className="block mb-0.5">개인정보가 든 파일은 올리지 마세요</b>

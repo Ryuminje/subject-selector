@@ -32,18 +32,18 @@ export default function ConfirmModal({ initial, submitting, onCancel, onConfirm 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onCancel}>
       <div
-        className="bg-white rounded-3xl shadow-xl w-full max-w-md p-6"
+        className="bg-white rounded-[14px] border border-stone-200 w-full max-w-md p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-bold text-teal-700 mb-1 flex items-center gap-2">
+        <h2 className="font-display text-lg text-cert mb-1 flex items-center gap-2">
           <Bot className="w-5 h-5" /> AI 추출 결과 확인
         </h2>
-        <p className="text-sm text-slate-500 mb-5">자동 추출된 정보를 확인하고, 틀린 부분이 있으면 직접 수정해주세요.</p>
+        <p className="text-sm text-stone-500 mb-5">자동 추출된 정보를 확인하고, 틀린 부분이 있으면 직접 수정해주세요.</p>
 
         <div className="space-y-4">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <label className="text-sm font-bold text-slate-700">이수번호</label>
+              <label className="text-sm font-bold text-stone-700">이수번호</label>
               <Badge recognized={!!initial.number} />
             </div>
             <input
@@ -51,12 +51,12 @@ export default function ConfirmModal({ initial, submitting, onCancel, onConfirm 
               value={number}
               onChange={(e) => setNumber(e.target.value)}
               placeholder="이수번호를 입력하세요"
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all"
+              className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-cert/30 focus:border-cert transition-colors"
             />
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <label className="text-sm font-bold text-slate-700">이수기관</label>
+              <label className="text-sm font-bold text-stone-700">이수기관</label>
               <Badge recognized={!!initial.institution} />
             </div>
             <input
@@ -64,12 +64,12 @@ export default function ConfirmModal({ initial, submitting, onCancel, onConfirm 
               value={institution}
               onChange={(e) => setInstitution(e.target.value)}
               placeholder="이수기관을 입력하세요"
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all"
+              className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-cert/30 focus:border-cert transition-colors"
             />
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <label className="text-sm font-bold text-slate-700">이수날짜</label>
+              <label className="text-sm font-bold text-stone-700">이수날짜</label>
               <Badge recognized={!!initial.date} />
             </div>
             <input
@@ -77,7 +77,7 @@ export default function ConfirmModal({ initial, submitting, onCancel, onConfirm 
               value={date}
               onChange={(e) => setDate(e.target.value)}
               placeholder="예) 2025-03-15"
-              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 transition-all"
+              className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-cert/30 focus:border-cert transition-colors"
             />
           </div>
         </div>
@@ -85,14 +85,14 @@ export default function ConfirmModal({ initial, submitting, onCancel, onConfirm 
         <div className="flex gap-3 mt-6">
           <button
             onClick={onCancel}
-            className="flex-1 py-3 rounded-xl font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+            className="flex-1 py-3 rounded-[10px] font-semibold text-stone-600 bg-stone-100 hover:bg-stone-200 transition-colors"
           >
             취소
           </button>
           <button
             onClick={() => onConfirm({ number, institution, date })}
             disabled={submitting}
-            className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-500 disabled:opacity-60 transition-colors"
+            className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-[10px] font-bold text-white bg-cert hover:opacity-90 disabled:opacity-60 transition-opacity"
           >
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
             이대로 제출

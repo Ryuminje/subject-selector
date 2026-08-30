@@ -20,11 +20,11 @@ export default function SignDetail({
   onDelete: () => void;
 }) {
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-5">
+    <div className="bg-white rounded-[14px] border border-stone-200 p-6 space-y-5">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h2 className="text-lg font-bold text-slate-800">{item.title}</h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <h2 className="font-display text-lg text-stone-800">{item.title}</h2>
+          <p className="text-xs text-stone-400 mt-0.5">
             등록 {item.registeredByName} · 대상 명단 {item.hasOwnRoster ? "전용" : "전체 기본"} {item.total}명
           </p>
         </div>
@@ -33,7 +33,7 @@ export default function SignDetail({
             <button
               type="button"
               onClick={onEdit}
-              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+              className="inline-flex items-center gap-1 text-xs px-3 py-1.5 border border-stone-200 rounded-lg text-stone-600 hover:bg-stone-50 transition-colors"
             >
               <Pencil className="w-3.5 h-3.5" /> 연수 편집
             </button>
@@ -48,49 +48,49 @@ export default function SignDetail({
         )}
       </div>
 
-      <div className="grid grid-cols-3 border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="text-center py-3 bg-slate-50">
-          <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">대상</div>
-          <div className="text-2xl font-bold text-slate-700 tabular-nums">{item.total}</div>
+      <div className="grid grid-cols-3 border border-stone-200 rounded-[10px] overflow-hidden">
+        <div className="text-center py-3 bg-stone-50">
+          <div className="text-[10px] font-bold tracking-wider text-stone-400 uppercase">대상</div>
+          <div className="text-2xl font-bold text-stone-700 tabular-nums">{item.total}</div>
         </div>
-        <div className="text-center py-3 bg-slate-50 border-x border-slate-200">
-          <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">서명</div>
+        <div className="text-center py-3 bg-stone-50 border-x border-stone-200">
+          <div className="text-[10px] font-bold tracking-wider text-stone-400 uppercase">서명</div>
           <div className="text-2xl font-bold text-emerald-600 tabular-nums">{item.doneCount}</div>
         </div>
-        <div className="text-center py-3 bg-slate-50">
-          <div className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">미서명</div>
-          <div className={`text-2xl font-bold tabular-nums ${item.missingCount ? "text-rose-600" : "text-slate-400"}`}>
+        <div className="text-center py-3 bg-stone-50">
+          <div className="text-[10px] font-bold tracking-wider text-stone-400 uppercase">미서명</div>
+          <div className={`text-2xl font-bold tabular-nums ${item.missingCount ? "text-rose-600" : "text-stone-400"}`}>
             {item.missingCount}
           </div>
         </div>
       </div>
 
       {/* 수집 도구 — QR 세션 */}
-      <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3">
+      <div className="border border-stone-200 rounded-[10px] p-4 bg-stone-50 space-y-3">
         {item.session ? (
           <>
-            <div className="text-xs font-medium text-slate-400">
+            <div className="text-xs font-medium text-stone-400">
               {new Date(item.session.createdAt).toLocaleDateString("ko-KR")} 개설
             </div>
             <SignSessionMini sessionId={item.session.id} trainingTitle={item.title} />
           </>
         ) : item.canManage ? (
           <>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-stone-500">
               아직 QR 세션을 열지 않았습니다. 세션을 열면 이 연수의 참여 명단으로 서명을 받습니다.
             </p>
             <button
               type="button"
               onClick={onOpenSession}
               disabled={creating}
-              className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-white bg-teal-600 hover:bg-teal-500 disabled:opacity-60 transition-colors text-sm"
+              className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-[10px] font-bold text-white bg-cert hover:opacity-90 disabled:opacity-60 transition-opacity text-sm"
             >
               {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
               QR 세션 열기
             </button>
           </>
         ) : (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-stone-500">
             아직 QR 세션이 열리지 않았습니다. 관리자 또는 이 연수를 등록한 담당 선생님이 세션을 열면 서명할 수
             있습니다.
           </p>
@@ -98,8 +98,8 @@ export default function SignDetail({
       </div>
 
       {!item.canManage ? (
-        <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-          <Lock className="w-4 h-4 shrink-0 text-slate-400" />
+        <div className="flex items-center gap-2 text-sm text-stone-500 bg-stone-50 border border-stone-200 rounded-[10px] px-4 py-3">
+          <Lock className="w-4 h-4 shrink-0 text-stone-400" />
           서명자 명단은 관리자와 이 연수를 등록한 담당 선생님만 볼 수 있습니다.
         </div>
       ) : (

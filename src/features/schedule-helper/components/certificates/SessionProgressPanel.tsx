@@ -72,7 +72,7 @@ export default function SessionProgressPanel({ sessionId }: { sessionId: string 
   if (error) return <p className="text-sm text-rose-600">{error}</p>;
   if (!info) {
     return (
-      <div className="flex justify-center py-12 text-teal-600">
+      <div className="flex justify-center py-12 text-cert">
         <Loader2 className="w-8 h-8 animate-spin" />
       </div>
     );
@@ -85,49 +85,49 @@ export default function SessionProgressPanel({ sessionId }: { sessionId: string 
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+      <div className="bg-white rounded-[14px] border border-stone-200 p-6">
         <div className="text-center mb-5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={qrImgUrl}
             alt="QR 코드"
-            className="w-[200px] h-[200px] border border-slate-200 rounded-xl mx-auto mb-2 bg-slate-50"
+            className="w-[200px] h-[200px] border border-stone-200 rounded-[10px] mx-auto mb-2 bg-stone-50"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
             }}
           />
-          <p className="text-xs text-slate-500 mb-2">스마트폰으로 QR 코드를 스캔하세요</p>
-          <div className="inline-flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-3 py-1.5">
-            <span className="text-xs text-teal-800 font-mono break-all">{signUrl}</span>
-            <button onClick={handleCopy} className="shrink-0 text-teal-700 hover:text-teal-900">
+          <p className="text-xs text-stone-500 mb-2">스마트폰으로 QR 코드를 스캔하세요</p>
+          <div className="inline-flex items-center gap-2 bg-cert/8 border border-cert/20 rounded-[10px] px-3 py-1.5">
+            <span className="text-xs text-cert font-mono break-all">{signUrl}</span>
+            <button onClick={handleCopy} className="shrink-0 text-cert hover:opacity-80">
               {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </button>
           </div>
           <div className="mt-3 flex flex-wrap justify-center gap-1.5">
             {info.trainingTitles.map((t) => (
-              <span key={t} className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full font-semibold">
+              <span key={t} className="text-xs bg-stone-100 text-stone-700 px-2.5 py-1 rounded-full font-semibold">
                 {t}
               </span>
             ))}
           </div>
         </div>
 
-        <div className="bg-slate-50 rounded-2xl p-4 mb-4">
+        <div className="bg-stone-50 rounded-[10px] p-4 mb-4">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-bold text-slate-700">서명 현황</span>
-            <span className="text-base font-bold text-teal-700">
+            <span className="text-sm font-bold text-stone-700">서명 현황</span>
+            <span className="text-base font-bold text-cert">
               {info.signedCount} / {info.totalCount}명
             </span>
           </div>
-          <div className="bg-slate-200 rounded-full h-2 overflow-hidden">
-            <div className="bg-teal-600 h-full rounded-full transition-all" style={{ width: `${percent}%` }} />
+          <div className="bg-stone-200 rounded-full h-2 overflow-hidden">
+            <div className="bg-cert h-full rounded-full transition-all" style={{ width: `${percent}%` }} />
           </div>
         </div>
 
         <button
           onClick={handleToggleLock}
           disabled={toggling}
-          className={`w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-colors disabled:opacity-60 ${
+          className={`w-full inline-flex items-center justify-center gap-2 py-3 rounded-[10px] font-bold transition-colors disabled:opacity-60 ${
             info.locked ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "bg-rose-500 hover:bg-rose-400 text-white"
           }`}
         >
@@ -136,8 +136,8 @@ export default function SessionProgressPanel({ sessionId }: { sessionId: string 
         </button>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-        <h2 className="text-lg font-bold text-teal-700 mb-4 flex items-center gap-2">
+      <div className="bg-white rounded-[14px] border border-stone-200 p-6">
+        <h2 className="font-display text-lg text-cert mb-4 flex items-center gap-2">
           <Printer className="w-5 h-5" /> 인쇄
         </h2>
         <div className="space-y-2">
@@ -147,7 +147,7 @@ export default function SessionProgressPanel({ sessionId }: { sessionId: string 
               href={`/apps/schedule-helper/certificates/sessions/${sessionId}/print?title=${idx}`}
               target="_blank"
               rel="noreferrer"
-              className="block w-full text-left px-4 py-3 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-300 rounded-xl transition-colors text-sm font-semibold text-slate-700"
+              className="block w-full text-left px-4 py-3 bg-stone-50 hover:bg-cert/8 border border-stone-200 hover:border-cert/40 rounded-[10px] transition-colors text-sm font-semibold text-stone-700"
             >
               {t} 등록부 인쇄
             </a>

@@ -24,8 +24,8 @@ export default function TrainingProgressCard({
 
   return (
     <div
-      className={`bg-white rounded-2xl border transition-all ${
-        selected ? "border-teal-500 ring-2 ring-teal-500/20" : "border-slate-200 hover:border-teal-300"
+      className={`bg-white rounded-[10px] border transition-colors ${
+        selected ? "border-cert ring-2 ring-cert/20" : "border-stone-200 hover:border-cert/40"
       }`}
     >
       <button
@@ -39,15 +39,15 @@ export default function TrainingProgressCard({
             좁을 때 배지가 아래 줄로 내려가고 제목/부제는 카드 폭 그대로를 씁니다. */}
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="min-w-0">
-            <div className="font-bold text-slate-800 flex items-center gap-1.5 flex-wrap">
+            <div className="font-bold text-stone-800 flex items-center gap-1.5 flex-wrap">
               <span className="break-keep">{item.title}</span>
               {item.session?.locked && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-stone-100 text-stone-500 px-2 py-0.5 rounded-full">
                   <Lock className="w-3 h-3" /> 마감
                 </span>
               )}
             </div>
-            <div className="text-xs text-slate-400 mt-0.5 break-keep">
+            <div className="text-xs text-stone-400 mt-0.5 break-keep">
               등록 {item.registeredByName} · 명단 {item.hasOwnRoster ? "전용" : "전체 기본"} {item.total}명
             </div>
           </div>
@@ -68,20 +68,20 @@ export default function TrainingProgressCard({
         </div>
 
         <div className="flex items-center gap-2.5">
-          <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+          <div className="flex-1 h-1.5 rounded-full bg-stone-100 overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all duration-500 ${complete ? "bg-emerald-500" : "bg-teal-500"}`}
+              className={`h-full rounded-full transition-all duration-500 ${complete ? "bg-emerald-500" : "bg-cert"}`}
               style={{ width: `${pct}%` }}
             />
           </div>
-          <span className="text-xs font-bold text-slate-500 tabular-nums shrink-0">
+          <span className="text-xs font-bold text-stone-500 tabular-nums shrink-0">
             {item.doneCount} / {item.total}
           </span>
         </div>
       </button>
 
       {item.myStatus !== "out" && (
-        <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-dashed border-slate-200">
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-dashed border-stone-200">
           {item.myStatus === "todo" ? (
             <>
               <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600">
@@ -91,7 +91,7 @@ export default function TrainingProgressCard({
                 <button
                   type="button"
                   onClick={onAction}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-lg transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-cert hover:opacity-90 text-white text-xs font-bold rounded-lg transition-opacity"
                 >
                   {isSign ? <PenLine className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
                   {isSign ? "서명하러 가기" : "지금 제출"}
