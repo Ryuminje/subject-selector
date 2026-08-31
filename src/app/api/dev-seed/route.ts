@@ -17,7 +17,13 @@ import { NextResponse } from "next/server";
 import { hashPassword } from "better-auth/crypto";
 import { prisma } from "@/lib/prisma";
 
-const SCHOOL = "명신고등학교(로컬테스트)";
+// ⚠️ 학교 이름을 일부러 진짜 운영 학교와 똑같이 "명신고등학교"로 씁니다(예전엔 구분되게
+// "명신고등학교(로컬테스트)"였습니다). 실제 화면·인쇄물이 어떻게 보이는지 확인하려는
+// 용도라 이름까지 실제와 같아야 의미가 있습니다. **이 데이터는 여전히 이 컴퓨터의 로컬
+// 전용 DB(prisma dev) 안에만 있고 운영 NAS와는 완전히 무관합니다** — 이름이 같다고
+// 헷갈리지 마세요. 옛 이름으로 만들어졌던 학교가 있으면 아래서 같이 정리합니다.
+const SCHOOL = "명신고등학교";
+const OLD_SCHOOL_NAMES = ["명신고등학교(로컬테스트)"];
 const DAYS = ["월", "화", "수", "목", "금"];
 const PERIODS = [1, 2, 3, 4, 5, 6, 7];
 
@@ -84,11 +90,17 @@ export async function POST() {
   const teachers = tableData.map((r) => r.teacher);
 
   // 여러 번 돌려도 안전하도록, 있으면 지우고 다시 만듭니다.
-  const existing = await prisma.school.findFirst({ where: { name: SCHOOL } });
-  if (existing) {
-    await prisma.user.deleteMany({ where: { schoolId: existing.id } });
-    await prisma.teacher.deleteMany({ where: { schoolId: existing.id } });
-    await prisma.school.delete({ where: { id: existing.id } });
+  // 학교 이름을 "명신고등학교(로컬테스트)" → "명신고등학교"로 바꾼 적이 있어(2026-08-31),
+  // 옛 이름으로 남은 학교도 같이 정리합니다 — 안 지우면 중복으로 쌓입니다.
+  const stale = await prisma.school.findMany({ where: { name: { in: [SCHOOL, ...OLD_SCHOOL_NAMES] } } });
+  for (const s of stale) {
+    const staleUsers = await prisma.user.findMany({ where: { schoolId: s.id }, select: { id: true } });
+    // MeetingPreset은 User에 @relation이 없어 cascade가 안 걸립니다(members DELETE 라우트와 같은 이유) —
+    // 여기서도 먼저 지워야 고아 행이 안 남습니다.
+    await prisma.meetingPreset.deleteMany({ where: { userId: { in: staleUsers.map((u) => u.id) } } });
+    await prisma.user.deleteMany({ where: { schoolId: s.id } });
+    await prisma.teacher.deleteMany({ where: { schoolId: s.id } });
+    await prisma.school.delete({ where: { id: s.id } });
   }
 
   const school = await prisma.school.create({
