@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { useSchedule } from "@/features/schedule-helper/lib/ScheduleContext";
 import { useSession } from "@/lib/auth-client";
 import { parseClassInfo, cn } from "@/features/schedule-helper/lib/utils";
-import { Search, X, Check, ArrowRightLeft, Star, Pin, FilePlus2 } from "lucide-react";
+import { Search, X, Check, ArrowRightLeft, ArrowLeft, ArrowRight, Star, Pin, FilePlus2 } from "lucide-react";
 import MakeupTray from "@/features/schedule-helper/components/makeup/MakeupTray";
 import { useMakeupTray } from "@/features/schedule-helper/components/makeup/useMakeupTray";
-import type { ClassSlot, MakeupKind } from "@/features/schedule-helper/lib/makeup/types";
+import type { ClassSlot, MakeupEntry, MakeupKind } from "@/features/schedule-helper/lib/makeup/types";
 
 interface SearchResult {
   teacher: string;
@@ -24,6 +24,63 @@ interface ChainResult {
   w: { subject: string };
   // B ↔ C: B의 w 수업을 C와 교체해서 B를 이 시간에 비워줌
   c: { teacher: string; day: string; period: number; subject: string };
+}
+
+/** 셀 폭이 좁아 과목명은 5자 넘으면 줄입니다(그리드 셀·확정 배지 공용). */
+function truncateSubject(subject: string) {
+  return subject.length > 5 ? subject.substring(0, 4) + ".." : subject;
+}
+
+/**
+ * 보강원 트레이에 이미 담긴 슬롯을 그리드에 표시하는 배지.
+ *
+ * role "origin" = 결강 교사 본인 행의 그 슬롯 — "내가 어디로 이동했는지"를 보여줍니다
+ * (교체면 교체대상 시간/과목, 보강이면 누가 대신 하는지). 아무 데도 안 옮기는 보강은
+ * 그 자체로 표시할 게 이동 정보가 아니라 대신 하는 사람 이름입니다.
+ * role "exchange" = 교체대상 교사 행의 그 슬롯(교체를 담았을 때만 존재) — 원래 그 자리를
+ * 맡았던 사람 대신 결강 교사가 와서 가르친다는 걸 보여줍니다.
+ */
+function CommittedCell({ entry, role }: { entry: MakeupEntry; role: "origin" | "exchange" }) {
+  if (role === "origin" && entry.kind === "sub") {
+    return (
+      <div className="flex flex-col items-center justify-center leading-tight text-amber-800">
+        <Check className="w-3 h-3" />
+        <span className="text-[9px] sm:text-[10px] font-bold truncate w-full px-0.5">보강 · {entry.partnerTeacher}</span>
+      </div>
+    );
+  }
+  // 여기부터는 kind === "swap"이라 entry.exchange가 항상 채워져 있습니다(교체를 담을 때만 exchange를 넘김).
+  const dest = entry.exchange!;
+  if (role === "origin") {
+    return (
+      <div className="flex flex-col items-center justify-center leading-tight text-amber-800">
+        <span className="flex items-center gap-0.5 text-[9px] sm:text-[10px] font-bold">
+          <ArrowRight className="w-2.5 h-2.5 shrink-0" /> {dest.day}{dest.period}
+        </span>
+        <span className="text-[9px] sm:text-[10px] truncate w-full px-0.5">{truncateSubject(dest.subject)}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col items-center justify-center leading-tight text-amber-800">
+      <span className="flex items-center gap-0.5 text-[9px] sm:text-[10px] font-bold">
+        <ArrowLeft className="w-2.5 h-2.5 shrink-0" /> {entry.absentTeacher}
+      </span>
+      <span className="text-[9px] sm:text-[10px] truncate w-full px-0.5">{truncateSubject(dest.subject)}</span>
+    </div>
+  );
+}
+
+/** 확정된 슬롯에 마우스를 올렸을 때 보여줄 전체 설명(그리드 배지는 공간이 좁아 축약돼 있어서). */
+function committedTooltip(entry: MakeupEntry, role: "origin" | "exchange") {
+  if (role === "origin" && entry.kind === "sub") {
+    return `${entry.absentTeacher} 선생님 결강 → ${entry.partnerTeacher} 선생님이 보강 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다)`;
+  }
+  const dest = entry.exchange!;
+  if (role === "origin") {
+    return `${entry.absentTeacher} 선생님 결강 → ${entry.partnerTeacher} 선생님과 교체, 대신 ${dest.day}요일 ${dest.period}교시 ${dest.subject} 수업으로 이동 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다)`;
+  }
+  return `${entry.partnerTeacher} 선생님의 ${dest.day}요일 ${dest.period}교시 ${dest.subject} 수업을 ${entry.absentTeacher} 선생님이 대신 감 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다)`;
 }
 
 export default function SwapTab() {
@@ -281,24 +338,40 @@ export default function SwapTab() {
           // 2단계(나↔B 교체): B의 원래 시간으로 내가 이동
           const isChainStep2 = !!selectedChain && row.teacher === selectedChain.b.teacher && d === selectedChain.b.day && p === selectedChain.b.period;
 
+          // 보강원 트레이에 이미 담긴 슬롯이면 매칭을 다시 열 수 없게 막고, 대신 무엇으로 확정됐는지
+          // 보여줍니다. 원본(내가 결강하는 자리)과 교체대상(내가 대신 갈 자리) 둘 다 확인합니다 —
+          // 연쇄 교체(2단계)는 담기 버튼 자체가 없어(MakeupTray 쪽 설계상 제외) 여기 걸리지 않습니다.
+          const originEntry = tray.entryFor(row.teacher, d, p);
+          const exchangeEntry = originEntry
+            ? undefined
+            : tray.entries.find(
+                (e) => e.kind === "swap" && e.partnerTeacher === row.teacher && e.exchange?.day === d && e.exchange?.period === p
+              );
+          const committed = originEntry ?? exchangeEntry;
+          const committedRole: "origin" | "exchange" | null = originEntry ? "origin" : exchangeEntry ? "exchange" : null;
+
           return (
             <td
               key={`${d}-${p}`}
-              onClick={() => classStr && handleCellClick(row.teacher, d, p)}
+              onClick={() => !committed && classStr && handleCellClick(row.teacher, d, p)}
+              title={committed ? committedTooltip(committed, committedRole!) : undefined}
               className={cn(
                 "h-14 border border-stone-200 p-0.5 text-center align-middle transition-colors relative overflow-hidden",
                 pi === 0 && "border-l-2 border-l-stone-400",
-                classStr && "cursor-pointer hover:bg-amber-100",
-                isSelected && "bg-swap/15 border-2 border-swap font-bold z-10",
-                isPartner && "bg-emerald-100 border-2 border-emerald-500 font-bold z-10",
-                isChainStep1 && "bg-orange-100 border-2 border-orange-500 font-bold z-10",
-                isChainStep2 && "bg-purple-100 border-2 border-purple-500 font-bold z-10"
+                classStr && !committed && "cursor-pointer hover:bg-amber-100",
+                committed && "cursor-not-allowed bg-amber-50 border-2 border-amber-300",
+                !committed && isSelected && "bg-swap/15 border-2 border-swap font-bold z-10",
+                !committed && isPartner && "bg-emerald-100 border-2 border-emerald-500 font-bold z-10",
+                !committed && isChainStep1 && "bg-orange-100 border-2 border-orange-500 font-bold z-10",
+                !committed && isChainStep2 && "bg-purple-100 border-2 border-purple-500 font-bold z-10"
               )}
             >
-              {info && (
+              {committed ? (
+                <CommittedCell entry={committed} role={committedRole!} />
+              ) : info && (
                 <div className="flex flex-col items-center justify-center leading-tight">
                   <span className="text-[10px] sm:text-[11px] font-bold text-stone-700 truncate w-full block">
-                    {info.subject.length > 5 ? info.subject.substring(0, 4) + ".." : info.subject}
+                    {truncateSubject(info.subject)}
                   </span>
                   {info.grade !== "?" && info.classNum !== "?" && (
                     <span className="text-[9px] sm:text-[10px] text-swap font-bold bg-swap/10 px-1 py-0.5 rounded mt-0.5 inline-block truncate max-w-full">
