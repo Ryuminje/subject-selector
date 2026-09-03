@@ -100,6 +100,25 @@ function busyElsewhereTooltip(entry: MakeupEntry) {
   return `${entry.absentTeacher} 선생님은 ${dest.day}요일 ${dest.period}교시에 ${entry.partnerTeacher} 선생님 대신 ${dest.subject} 수업을 하러 가 있습니다. 원래 시간표는 비어 있어도 이 시간엔 다른 교체를 잡을 수 없습니다 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다).`;
 }
 
+/**
+ * teacher가 (day, period)에 이미 트레이의 다른 건으로 묶여 있는지.
+ *
+ * 매칭 검색 자체는 원본 시간표(row[day+period])와 관리자 교체 불가 설정만 보고 후보를
+ * 뽑기 때문에, 방금 트레이에 담은 다른 교체·보강 건은 전혀 모릅니다. 그래서 예를 들어
+ * "강연주가 이미 다른 교체로 화요일 7교시에 가 있는" 상태에서도, 화요일 7교시에 수업이
+ * 있는 다른 선생님이 계속 교체 후보로 나옵니다. 두 가지 경우를 확인합니다.
+ *  1) teacher가 다른 교체 건의 결강 교사라서 그 시간에 이미 대신 가르치러 가 있는 경우
+ *  2) teacher가 다른 건의 대체 교사로 이미 그 시간을 맡기로 한 경우(교체·보강 모두)
+ */
+function isTeacherBusyViaTray(entries: MakeupEntry[], teacher: string, day: string, period: number): boolean {
+  return entries.some((e) => {
+    if (e.kind === "swap" && e.absentTeacher === teacher && e.exchange?.day === day && e.exchange?.period === period) {
+      return true;
+    }
+    return e.partnerTeacher === teacher && e.absent.day === day && e.absent.period === period;
+  });
+}
+
 export default function SwapTab() {
   const { data, isBlocked, isSubjectBlocked, isTeacherBlocked } = useSchedule();
   const { data: session } = useSession();
@@ -259,6 +278,13 @@ export default function SwapTab() {
     ? tray.entryFor(selectedCell.teacher, selectedCell.day, selectedCell.period)
     : undefined;
 
+  // 지금 이 셀을 위해 이미 담아둔 건(pickedForCell) 자체는 "다른 건과의 충돌"이 아니므로,
+  // 후보 막힘 여부를 확인할 때는 제외합니다 — 안 그러면 방금 담은 후보가 곧바로 "교체 불가"로
+  // 잘못 보입니다.
+  const otherTrayEntries = pickedForCell
+    ? tray.entries.filter((e) => e.id !== pickedForCell.id)
+    : tray.entries;
+
   /**
    * 후보를 보강원 트레이에 담습니다.
    * 교체 후보는 나와 **같은 반**을 다른 시간에 가르치는 사람이라(검색 조건이 그렇습니다),
@@ -284,8 +310,34 @@ export default function SwapTab() {
     });
   };
 
-  /** 후보 한 줄에 붙는 [교체]/[보강] 버튼. 이미 담긴 시간이면 상태만 보여줍니다. */
+  /** 후보 한 줄에 붙는 [교체]/[보강] 버튼. 이미 담긴 시간이면 상태만, 다른 건과 겹치면 막힘 상태를 보여줍니다. */
   const renderPickButtons = (partnerTeacher: string, exchangeSlot?: { day: string; period: number; subject: string }) => {
+    if (!selectedCell) return null;
+
+    // 이 후보가 이미 다른 교체·보강 건과 겹치는지 — 두 방향을 봅니다.
+    //  · iAmBusy: 나(결강 교사)를 교체로 저 시간(exchangeSlot)에 보내야 하는데, 이미 다른
+    //    건으로 그 시간에 가 있는 경우. 교체(exchangeSlot 있는 후보)에만 해당합니다.
+    //  · partnerBusy: 이 후보 선생님이 지금 내 결강 시간을 대신 맡아야 하는데, 이미 다른
+    //    건으로 그 시간을 맡고 있는 경우. 교체·보강 둘 다 해당합니다.
+    const iAmBusy =
+      !!exchangeSlot && isTeacherBusyViaTray(otherTrayEntries, selectedCell.teacher, exchangeSlot.day, exchangeSlot.period);
+    const partnerBusy = isTeacherBusyViaTray(otherTrayEntries, partnerTeacher, selectedCell.day, selectedCell.period);
+
+    if (iAmBusy || partnerBusy) {
+      return (
+        <span
+          className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-lg bg-stone-100 text-stone-400"
+          title={
+            iAmBusy
+              ? `${selectedCell.teacher} 선생님이 ${exchangeSlot!.day}요일 ${exchangeSlot!.period}교시에 이미 다른 교체로 다른 곳에 가 있어, 이 조합은 만들 수 없습니다.`
+              : `${partnerTeacher} 선생님이 ${selectedCell.day}요일 ${selectedCell.period}교시를 이미 다른 교체·보강으로 맡고 있어, 이 조합은 만들 수 없습니다.`
+          }
+        >
+          교체 불가
+        </span>
+      );
+    }
+
     if (pickedForCell) {
       return pickedForCell.partnerTeacher === partnerTeacher ? (
         <span className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-lg bg-amber-100 text-amber-800">
