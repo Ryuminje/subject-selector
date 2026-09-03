@@ -7,6 +7,7 @@ import { parseClassInfo, cn } from "@/features/schedule-helper/lib/utils";
 import { Search, X, Check, ArrowRightLeft, ArrowLeft, ArrowRight, Star, Pin, FilePlus2 } from "lucide-react";
 import MakeupTray from "@/features/schedule-helper/components/makeup/MakeupTray";
 import { useMakeupTray } from "@/features/schedule-helper/components/makeup/useMakeupTray";
+import { absentDateOf, dateForWeekday, exchangeDateOf, koreanDate } from "@/features/schedule-helper/lib/makeup/buildRows";
 import type { ClassSlot, MakeupEntry, MakeupKind } from "@/features/schedule-helper/lib/makeup/types";
 
 interface SearchResult {
@@ -71,16 +72,21 @@ function CommittedCell({ entry, role }: { entry: MakeupEntry; role: "origin" | "
   );
 }
 
-/** 확정된 슬롯에 마우스를 올렸을 때 보여줄 전체 설명(그리드 배지는 공간이 좁아 축약돼 있어서). */
-function committedTooltip(entry: MakeupEntry, role: "origin" | "exchange") {
+/**
+ * 확정된 슬롯에 마우스를 올렸을 때 보여줄 전체 설명(그리드 배지는 공간이 좁아 축약돼 있어서).
+ * 실제 결강/교체 날짜(baseDate 기준 계산값)를 같이 보여줍니다 — 아래 isTeacherBusyViaTray가
+ * "요일이 같아도 주가 다르면 안 겹친다"로 판정을 바꾼 뒤로는, 사용자가 "이게 정확히 언제
+ * 얘기인지"를 바로 확인할 수 있어야 왜 막혔는지/왜 안 막혔는지를 신뢰할 수 있습니다.
+ */
+function committedTooltip(entry: MakeupEntry, role: "origin" | "exchange", baseDate: string) {
   if (role === "origin" && entry.kind === "sub") {
-    return `${entry.absentTeacher} 선생님 결강 → ${entry.partnerTeacher} 선생님이 보강 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다)`;
+    return `${entry.absentTeacher} 선생님 결강(${koreanDate(absentDateOf(entry, baseDate))}) → ${entry.partnerTeacher} 선생님이 보강 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다)`;
   }
   const dest = entry.exchange!;
   if (role === "origin") {
-    return `${entry.absentTeacher} 선생님 결강 → ${entry.partnerTeacher} 선생님과 교체, 대신 ${dest.day}요일 ${dest.period}교시 ${dest.subject} 수업으로 이동 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다)`;
+    return `${entry.absentTeacher} 선생님 결강(${koreanDate(absentDateOf(entry, baseDate))}) → ${entry.partnerTeacher} 선생님과 교체, 대신 ${koreanDate(exchangeDateOf(entry, baseDate))} ${dest.period}교시 ${dest.subject} 수업으로 이동 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다)`;
   }
-  return `${entry.partnerTeacher} 선생님의 ${dest.day}요일 ${dest.period}교시 ${dest.subject} 수업을 ${entry.absentTeacher} 선생님이 대신 감 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다)`;
+  return `${entry.partnerTeacher} 선생님의 ${koreanDate(exchangeDateOf(entry, baseDate))} ${dest.period}교시 ${dest.subject} 수업을 ${entry.absentTeacher} 선생님이 대신 감 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다)`;
 }
 
 /** "여기는 교체 불가능해"를 라벨 없이 보여주는 대각선 빗금. 아래 busyElsewhereEntry 칸에만 씁니다. */
@@ -95,13 +101,13 @@ const HATCH_STYLE = {
  * 빈칸이어도 실제로는 그 시간에 내가 없습니다 — 매칭 알고리즘은 이 사실을 모르므로
  * 빗금으로 직접 알려줍니다.)
  */
-function busyElsewhereTooltip(entry: MakeupEntry) {
+function busyElsewhereTooltip(entry: MakeupEntry, baseDate: string) {
   const dest = entry.exchange!;
-  return `${entry.absentTeacher} 선생님은 ${dest.day}요일 ${dest.period}교시에 ${entry.partnerTeacher} 선생님 대신 ${dest.subject} 수업을 하러 가 있습니다. 원래 시간표는 비어 있어도 이 시간엔 다른 교체를 잡을 수 없습니다 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다).`;
+  return `${entry.absentTeacher} 선생님은 ${koreanDate(exchangeDateOf(entry, baseDate))} ${dest.period}교시에 ${entry.partnerTeacher} 선생님 대신 ${dest.subject} 수업을 하러 가 있습니다. 원래 시간표는 비어 있어도 이 시간엔 다른 교체를 잡을 수 없습니다 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다).`;
 }
 
 /**
- * teacher가 (day, period)에 이미 트레이의 다른 건으로 묶여 있는지.
+ * teacher가 실제로 그 날짜(date)·교시에 이미 트레이의 다른 건으로 묶여 있는지.
  *
  * 매칭 검색 자체는 원본 시간표(row[day+period])와 관리자 교체 불가 설정만 보고 후보를
  * 뽑기 때문에, 방금 트레이에 담은 다른 교체·보강 건은 전혀 모릅니다. 그래서 예를 들어
@@ -109,13 +115,17 @@ function busyElsewhereTooltip(entry: MakeupEntry) {
  * 있는 다른 선생님이 계속 교체 후보로 나옵니다. 두 가지 경우를 확인합니다.
  *  1) teacher가 다른 교체 건의 결강 교사라서 그 시간에 이미 대신 가르치러 가 있는 경우
  *  2) teacher가 다른 건의 대체 교사로 이미 그 시간을 맡기로 한 경우(교체·보강 모두)
+ *
+ * 요일 문자열이 아니라 **실제 날짜**로 비교합니다 — 바꾸는 두 수업이 같은 요일·교시라도
+ * 서로 다른 주(baseDate 기준으로 계산했을 때 다른 날짜, 또는 항목별 날짜 override로 다른
+ * 날을 가리키는 경우)라면 실제로는 겹치지 않으므로 "교체 불가"로 막으면 안 됩니다.
  */
-function isTeacherBusyViaTray(entries: MakeupEntry[], teacher: string, day: string, period: number): boolean {
+function isTeacherBusyViaTray(entries: MakeupEntry[], teacher: string, date: string, period: number, baseDate: string): boolean {
   return entries.some((e) => {
-    if (e.kind === "swap" && e.absentTeacher === teacher && e.exchange?.day === day && e.exchange?.period === period) {
+    if (e.kind === "swap" && e.absentTeacher === teacher && e.exchange?.period === period && exchangeDateOf(e, baseDate) === date) {
       return true;
     }
-    return e.partnerTeacher === teacher && e.absent.day === day && e.absent.period === period;
+    return e.partnerTeacher === teacher && e.absent.period === period && absentDateOf(e, baseDate) === date;
   });
 }
 
@@ -349,16 +359,20 @@ export default function SwapTab() {
     //    건으로 그 시간에 가 있는 경우. 교체(exchangeSlot 있는 후보)에만 해당합니다.
     //  · partnerBusy: 이 후보 선생님이 지금 내 결강 시간을 대신 맡아야 하는데, 이미 다른
     //    건으로 그 시간을 맡고 있는 경우. 교체·보강 둘 다 해당합니다.
+    // "화7"이라는 요일·교시만으로는 몇 주 뒤 얘기인지 알 수 없으므로, 트레이의 결강 주간
+    // 기준일(baseDate)로 실제 날짜를 구해서 비교합니다 — 다른 주의 화7은 겹치지 않습니다.
+    const exchangeDate = exchangeSlot ? dateForWeekday(tray.baseDate, exchangeSlot.day) : undefined;
+    const selectedCellDate = dateForWeekday(tray.baseDate, selectedCell.day);
     const iAmBusy =
-      !!exchangeSlot && isTeacherBusyViaTray(otherTrayEntries, selectedCell.teacher, exchangeSlot.day, exchangeSlot.period);
-    const partnerBusy = isTeacherBusyViaTray(otherTrayEntries, partnerTeacher, selectedCell.day, selectedCell.period);
+      !!exchangeSlot && isTeacherBusyViaTray(otherTrayEntries, selectedCell.teacher, exchangeDate!, exchangeSlot.period, tray.baseDate);
+    const partnerBusy = isTeacherBusyViaTray(otherTrayEntries, partnerTeacher, selectedCellDate, selectedCell.period, tray.baseDate);
 
     if (iAmBusy || partnerBusy) {
       return {
         blocked: true as const,
         blockedTitle: iAmBusy
-          ? `${selectedCell.teacher} 선생님이 ${exchangeSlot!.day}요일 ${exchangeSlot!.period}교시에 이미 다른 교체로 다른 곳에 가 있어, 이 조합은 만들 수 없습니다.`
-          : `${partnerTeacher} 선생님이 ${selectedCell.day}요일 ${selectedCell.period}교시를 이미 다른 교체·보강으로 맡고 있어, 이 조합은 만들 수 없습니다.`,
+          ? `${selectedCell.teacher} 선생님이 ${koreanDate(exchangeDate!)} ${exchangeSlot!.period}교시에 이미 다른 교체로 다른 곳에 가 있어, 이 조합은 만들 수 없습니다.`
+          : `${partnerTeacher} 선생님이 ${koreanDate(selectedCellDate)} ${selectedCell.period}교시를 이미 다른 교체·보강으로 맡고 있어, 이 조합은 만들 수 없습니다.`,
         picked: undefined,
       };
     }
@@ -450,11 +464,16 @@ export default function SwapTab() {
           // 보강원 트레이에 이미 담긴 슬롯이면 매칭을 다시 열 수 없게 막고, 대신 무엇으로 확정됐는지
           // 보여줍니다. 원본(내가 결강하는 자리)과 교체대상(내가 대신 갈 자리) 둘 다 확인합니다 —
           // 연쇄 교체(2단계)는 담기 버튼 자체가 없어(MakeupTray 쪽 설계상 제외) 여기 걸리지 않습니다.
+          // 이 칸(d, p)이 결강 주간 기준일(tray.baseDate) 기준으로 실제 몇 월 며칠인지.
+          // 아래 세 판정 모두 요일 문자열이 아니라 이 실제 날짜로 비교합니다 — 항목이
+          // 날짜 override로 다른 주를 가리키면 겉보기엔 같은 "화7"이어도 이 칸엔 표시되지
+          // 않습니다(실제로 이번 주 이 칸은 비어 있는 게 맞으므로).
+          const cellDate = dateForWeekday(tray.baseDate, d);
           const originEntry = tray.entryFor(row.teacher, d, p);
           const exchangeEntry = originEntry
             ? undefined
             : tray.entries.find(
-                (e) => e.kind === "swap" && e.partnerTeacher === row.teacher && e.exchange?.day === d && e.exchange?.period === p
+                (e) => e.kind === "swap" && e.partnerTeacher === row.teacher && e.exchange?.period === p && exchangeDateOf(e, tray.baseDate) === cellDate
               );
           const committed = originEntry ?? exchangeEntry;
           const committedRole: "origin" | "exchange" | null = originEntry ? "origin" : exchangeEntry ? "exchange" : null;
@@ -465,7 +484,7 @@ export default function SwapTab() {
           const busyElsewhereEntry = committed
             ? undefined
             : tray.entries.find(
-                (e) => e.kind === "swap" && e.absentTeacher === row.teacher && e.exchange?.day === d && e.exchange?.period === p
+                (e) => e.kind === "swap" && e.absentTeacher === row.teacher && e.exchange?.period === p && exchangeDateOf(e, tray.baseDate) === cellDate
               );
 
           return (
@@ -491,9 +510,9 @@ export default function SwapTab() {
               }}
               title={
                 committed
-                  ? committedTooltip(committed, committedRole!)
+                  ? committedTooltip(committed, committedRole!, tray.baseDate)
                   : busyElsewhereEntry
-                    ? busyElsewhereTooltip(busyElsewhereEntry)
+                    ? busyElsewhereTooltip(busyElsewhereEntry, tray.baseDate)
                     : undefined
               }
               style={busyElsewhereEntry ? HATCH_STYLE : undefined}
@@ -717,6 +736,8 @@ export default function SwapTab() {
           onRemove={tray.remove}
           onClear={tray.clear}
           onDateOverride={tray.setDateOverride}
+          baseDate={tray.baseDate}
+          onBaseDateChange={tray.setBaseDate}
         />
       </div>
       )}

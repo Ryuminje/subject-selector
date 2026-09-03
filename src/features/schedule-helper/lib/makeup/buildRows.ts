@@ -56,13 +56,19 @@ export function dateForWeekday(baseIso: string, day: string): string {
   return formatDate(result);
 }
 
-/** 항목의 결강일 — 사용자가 고쳤으면 그 값, 아니면 기준일에서 계산 */
-export function absentDateOf(entry: MakeupEntry, baseDate: string): string {
+/**
+ * 항목의 결강일 — 사용자가 고쳤으면 그 값, 아니면 기준일에서 계산.
+ *
+ * 매개변수 타입을 `MakeupEntry` 전체가 아니라 필요한 필드만(Pick)으로 받습니다 —
+ * 트레이 충돌 판정(useMakeupTray.ts)이 아직 id 없는 새 항목(Omit<MakeupEntry,"id">)에도
+ * 이 함수를 그대로 써야 해서, id 유무와 무관하게 구조적으로 맞으면 넘길 수 있어야 합니다.
+ */
+export function absentDateOf(entry: Pick<MakeupEntry, "absent" | "absentDateOverride">, baseDate: string): string {
   return entry.absentDateOverride || dateForWeekday(baseDate, entry.absent.day);
 }
 
-/** 항목의 교체일 — 교체가 아니면 빈 문자열 */
-export function exchangeDateOf(entry: MakeupEntry, baseDate: string): string {
+/** 항목의 교체일 — 교체가 아니면 빈 문자열. (타입 이유는 absentDateOf 주석 참고) */
+export function exchangeDateOf(entry: Pick<MakeupEntry, "exchange" | "exchangeDateOverride">, baseDate: string): string {
   if (!entry.exchange) return "";
   return entry.exchangeDateOverride || dateForWeekday(baseDate, entry.exchange.day);
 }
