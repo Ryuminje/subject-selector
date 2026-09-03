@@ -1,14 +1,19 @@
 "use client";
 
-import { FileText, Download } from "lucide-react";
+import { useState } from "react";
+import { FileText, Download, FileDown } from "lucide-react";
 import { GradeTabs } from "./GradeTabs";
-import type { GradeKey, ProcessedStudent } from "../../../types";
+import { ConfirmationDownloadModal } from "./ConfirmationDownloadModal";
+import type { GradeKey, ProcessedStudent, SelectedSubjectHours, SubjectMap } from "../../../types";
 
 interface PreviewStepProps {
   activeGrade: GradeKey;
   setActiveGrade: (grade: GradeKey) => void;
   handleExport: () => void;
   activeData: ProcessedStudent[];
+  /** 학생별 확인서(.docx)에 선택과목의 교과군·학점을 채우기 위한 이 학년의 편성표 데이터 */
+  selectedSubjectHours: SelectedSubjectHours[];
+  subjectMap: SubjectMap;
 }
 
 const normS = (s: string) => s ? s.replace(/\s+/g, '').replace(/Ⅰ/g, 'I').replace(/Ⅱ/g, 'II').replace(/Ⅲ/g, 'III') : '';
@@ -18,7 +23,10 @@ export function PreviewStep({
   setActiveGrade,
   handleExport,
   activeData,
+  selectedSubjectHours,
+  subjectMap,
 }: PreviewStepProps) {
+  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const maxSem1 = activeData.length > 0 ? Math.max(4, ...activeData.map(d => d.semester1.length)) : 4;
   const maxSem1_2 = activeData.length > 0 ? Math.max(0, ...activeData.map(d => (d.semester1_2 || []).length)) : 0;
   const maxSem2 = activeData.length > 0 ? Math.max(4, ...activeData.map(d => d.semester2.length)) : 4;
@@ -30,15 +38,35 @@ export function PreviewStep({
           <FileText className="w-6 h-6 text-emerald-700" />
           4단계: 수강신청(본조사) 결과 및 다운로드
         </h2>
-        <button
-          onClick={handleExport}
-          className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-500/25 flex items-center gap-2"
-          disabled={activeData.length === 0}
-        >
-          <Download className="w-4 h-4" />
-          {activeGrade === "pre1" ? "1학년" : activeGrade === "grade1" ? "2학년" : "3학년"} 엑셀 다운로드
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* 학생별 확인서 — 학생이 자기 신청 내역을 확인하고 서명해 보관하는 서식(.docx) */}
+          <button
+            onClick={() => setIsConfirmationOpen(true)}
+            className="px-6 py-3 bg-white border border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-medium rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50"
+            disabled={activeData.length === 0}
+          >
+            <FileDown className="w-4 h-4" />
+            학생별 확인서 (docx)
+          </button>
+          <button
+            onClick={handleExport}
+            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-xl transition-colors shadow-lg shadow-emerald-500/25 flex items-center gap-2"
+            disabled={activeData.length === 0}
+          >
+            <Download className="w-4 h-4" />
+            {activeGrade === "pre1" ? "1학년" : activeGrade === "grade1" ? "2학년" : "3학년"} 엑셀 다운로드
+          </button>
+        </div>
       </div>
+
+      <ConfirmationDownloadModal
+        isOpen={isConfirmationOpen}
+        onClose={() => setIsConfirmationOpen(false)}
+        activeGrade={activeGrade}
+        students={activeData}
+        selectedSubjectHours={selectedSubjectHours}
+        subjectMap={subjectMap}
+      />
 
       <GradeTabs activeGrade={activeGrade} setActiveGrade={setActiveGrade} />
 

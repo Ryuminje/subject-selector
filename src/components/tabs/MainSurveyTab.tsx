@@ -299,6 +299,8 @@ export function MainSurveyTab() {
                       setActiveGrade={setActiveGrade}
                       handleExport={handleExport}
                       activeData={activeData}
+                      selectedSubjectHours={selectedSubjectHours[activeGrade]}
+                      subjectMap={subjectMap[activeGrade]}
                     />
                   )}
                   {activeTab === "classOpening" && (
