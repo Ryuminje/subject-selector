@@ -132,6 +132,31 @@ export default function SwapTab() {
   // (조기 return보다 위에 있어야 훅 순서가 어긋나지 않습니다.)
   const tray = useMakeupTray();
 
+  // 그리드에서 초록 후보 셀을 직접 눌렀을 때 뜨는 "교체/보강 바로 고르기" 팝오버.
+  // rect는 클릭 시점 셀의 화면 좌표 스냅샷(고정 위치 팝오버를 그 위치에 앵커링하는 용도) —
+  // DOMRect를 그대로 들고 있으면 스크롤에 따라 값이 바뀌므로 숫자만 복사해 둡니다.
+  const [quickPick, setQuickPick] = useState<{
+    teacher: string;
+    day: string;
+    period: number;
+    rect: { top: number; left: number; width: number; height: number };
+  } | null>(null);
+  const quickPickRef = useRef<HTMLDivElement>(null);
+
+  // 팝오버가 열려 있을 때 바깥을 누르면 닫습니다. 팝오버를 연 바로 그 클릭이 곧장 다시
+  // 닫아버리지 않도록 리스너 등록을 한 틱 미룹니다(버블링 중인 이벤트를 피함).
+  useEffect(() => {
+    if (!quickPick) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (quickPickRef.current && !quickPickRef.current.contains(e.target as Node)) setQuickPick(null);
+    };
+    const t = window.setTimeout(() => document.addEventListener("click", onDocClick), 0);
+    return () => {
+      window.clearTimeout(t);
+      document.removeEventListener("click", onDocClick);
+    };
+  }, [quickPick]);
+
   // 로그인한 계정 이름과 일치하는 교사 행을 "내 시간표"로 맨 위에 고정하기 위해,
   // 헤더(sticky) 높이만큼 아래로 sticky 위치를 잡아줍니다.
   useEffect(() => {
@@ -150,6 +175,7 @@ export default function SwapTab() {
 
     setSelectedCell({ teacher, day, period });
     setSelectedChainIdx(null);
+    setQuickPick(null);
 
     if (isTeacherBlocked(teacher)) {
       setResults({ swap: [], sub: [], chain: [] });
@@ -310,9 +336,13 @@ export default function SwapTab() {
     });
   };
 
-  /** 후보 한 줄에 붙는 [교체]/[보강] 버튼. 이미 담긴 시간이면 상태만, 다른 건과 겹치면 막힘 상태를 보여줍니다. */
-  const renderPickButtons = (partnerTeacher: string, exchangeSlot?: { day: string; period: number; subject: string }) => {
-    if (!selectedCell) return null;
+  /**
+   * 후보 하나(partnerTeacher, exchangeSlot 있으면 교체용)의 지금 상태를 판정합니다.
+   * 결과 목록 줄(renderPickButtons)과 그리드 클릭 팝오버(quickPick) 양쪽에서 같이 씁니다 —
+   * 같은 후보인데 목록과 팝오버의 판정이 어긋나면 안 되므로 로직을 한 곳에 둡니다.
+   */
+  const getCandidateState = (partnerTeacher: string, exchangeSlot?: { day: string; period: number; subject: string }) => {
+    if (!selectedCell) return { blocked: false as const, blockedTitle: undefined, picked: undefined };
 
     // 이 후보가 이미 다른 교체·보강 건과 겹치는지 — 두 방향을 봅니다.
     //  · iAmBusy: 나(결강 교사)를 교체로 저 시간(exchangeSlot)에 보내야 하는데, 이미 다른
@@ -324,24 +354,34 @@ export default function SwapTab() {
     const partnerBusy = isTeacherBusyViaTray(otherTrayEntries, partnerTeacher, selectedCell.day, selectedCell.period);
 
     if (iAmBusy || partnerBusy) {
+      return {
+        blocked: true as const,
+        blockedTitle: iAmBusy
+          ? `${selectedCell.teacher} 선생님이 ${exchangeSlot!.day}요일 ${exchangeSlot!.period}교시에 이미 다른 교체로 다른 곳에 가 있어, 이 조합은 만들 수 없습니다.`
+          : `${partnerTeacher} 선생님이 ${selectedCell.day}요일 ${selectedCell.period}교시를 이미 다른 교체·보강으로 맡고 있어, 이 조합은 만들 수 없습니다.`,
+        picked: undefined,
+      };
+    }
+
+    return { blocked: false as const, blockedTitle: undefined, picked: pickedForCell };
+  };
+
+  /** 후보 한 줄에 붙는 [교체]/[보강] 버튼. 이미 담긴 시간이면 상태만, 다른 건과 겹치면 막힘 상태를 보여줍니다. */
+  const renderPickButtons = (partnerTeacher: string, exchangeSlot?: { day: string; period: number; subject: string }) => {
+    const state = getCandidateState(partnerTeacher, exchangeSlot);
+
+    if (state.blocked) {
       return (
-        <span
-          className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-lg bg-stone-100 text-stone-400"
-          title={
-            iAmBusy
-              ? `${selectedCell.teacher} 선생님이 ${exchangeSlot!.day}요일 ${exchangeSlot!.period}교시에 이미 다른 교체로 다른 곳에 가 있어, 이 조합은 만들 수 없습니다.`
-              : `${partnerTeacher} 선생님이 ${selectedCell.day}요일 ${selectedCell.period}교시를 이미 다른 교체·보강으로 맡고 있어, 이 조합은 만들 수 없습니다.`
-          }
-        >
+        <span className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-lg bg-stone-100 text-stone-400" title={state.blockedTitle}>
           교체 불가
         </span>
       );
     }
 
-    if (pickedForCell) {
-      return pickedForCell.partnerTeacher === partnerTeacher ? (
+    if (state.picked) {
+      return state.picked.partnerTeacher === partnerTeacher ? (
         <span className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-lg bg-amber-100 text-amber-800">
-          담김 · {pickedForCell.kind === "swap" ? "교체" : "보강"}
+          담김 · {state.picked.kind === "swap" ? "교체" : "보강"}
         </span>
       ) : (
         <span className="shrink-0 text-[11px] text-stone-400" title="이 시간은 이미 다른 분으로 담겨 있습니다.">
@@ -431,7 +471,24 @@ export default function SwapTab() {
           return (
             <td
               key={`${d}-${p}`}
-              onClick={() => !committed && classStr && handleCellClick(row.teacher, d, p)}
+              onClick={(e) => {
+                if (committed || !classStr) return;
+                if (isPartner) {
+                  // 초록 후보 셀을 직접 눌렀습니다 — 새 검색을 시작하는 대신, 이 자리에서
+                  // 바로 교체/보강을 고르는 팝오버를 띄웁니다(결과 목록의 같은 줄과 완전히
+                  // 같은 판정·같은 addToTray를 씁니다). 같은 셀을 다시 누르면 닫습니다.
+                  e.stopPropagation();
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setQuickPick((prev) =>
+                    prev && prev.teacher === row.teacher && prev.day === d && prev.period === p
+                      ? null
+                      : { teacher: row.teacher, day: d, period: p, rect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height } }
+                  );
+                  return;
+                }
+                setQuickPick(null);
+                handleCellClick(row.teacher, d, p);
+              }}
               title={
                 committed
                   ? committedTooltip(committed, committedRole!)
@@ -522,7 +579,10 @@ export default function SwapTab() {
             <h2 className="font-display text-base md:text-lg flex items-center gap-2">
               <Search className="w-4 h-4 md:w-5 md:h-5" /> 수업 매칭 결과
             </h2>
-            <button onClick={() => { setModalOpen(false); setSelectedCell(null); setSelectedChainIdx(null); }} className="hover:bg-white/15 p-1 rounded-full transition-colors">
+            <button
+              onClick={() => { setModalOpen(false); setSelectedCell(null); setSelectedChainIdx(null); setQuickPick(null); }}
+              className="hover:bg-white/15 p-1 rounded-full transition-colors"
+            >
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -660,6 +720,66 @@ export default function SwapTab() {
         />
       </div>
       )}
+
+      {/* 그리드 후보 셀을 직접 눌렀을 때 뜨는 "바로 담기" 팝오버. 판정·담기 로직은
+          결과 목록(renderPickButtons)과 완전히 같은 getCandidateState/addToTray를 씁니다 —
+          어디서 눌러도 같은 결과가 나와야 하니 로직을 두 번 만들지 않습니다. */}
+      {quickPick && (() => {
+        const match = results.swap.find(
+          (r) => r.teacher === quickPick.teacher && r.day === quickPick.day && r.period === quickPick.period
+        );
+        if (!match) return null;
+        const exchangeSlot = { day: match.day!, period: match.period!, subject: match.subject! };
+        const state = getCandidateState(quickPick.teacher, exchangeSlot);
+        // 화면 위쪽 가까이 있으면 셀 아래로, 아니면 위로 띄워서 뷰포트 밖으로 안 나가게 합니다.
+        // innerWidth가 0/비정상이면(레이아웃 계산 전 등) 폭을 못 구해 팝오버가 화면 밖으로
+        // 튕겨 나가므로, 그럴 땐 그냥 넉넉한 값으로 대체합니다.
+        const openBelow = quickPick.rect.top < 180;
+        const viewportWidth = window.innerWidth > 0 ? window.innerWidth : 1280;
+        const left = Math.min(Math.max(quickPick.rect.left + quickPick.rect.width / 2 - 90, 8), viewportWidth - 188);
+
+        return (
+          <div
+            ref={quickPickRef}
+            className="fixed z-50 w-[180px] bg-white rounded-xl border border-stone-200 shadow-xl p-2.5 animate-in fade-in zoom-in-95 duration-100"
+            style={{
+              left,
+              top: openBelow ? quickPick.rect.top + quickPick.rect.height + 6 : quickPick.rect.top - 6,
+              transform: openBelow ? undefined : "translateY(-100%)",
+            }}
+          >
+            <p className="text-[11px] font-bold text-stone-500 mb-1.5 truncate">{quickPick.teacher} 선생님과</p>
+            {state.blocked ? (
+              <p className="text-[11px] text-stone-400 leading-snug">{state.blockedTitle}</p>
+            ) : state.picked ? (
+              <p className="text-[11px] font-bold text-amber-700">
+                이미 {state.picked.kind === "swap" ? "교체" : "보강"}로 담겨 있습니다.
+              </p>
+            ) : (
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => {
+                    addToTray("swap", quickPick.teacher, exchangeSlot);
+                    setQuickPick(null);
+                  }}
+                  className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] font-bold rounded-lg bg-swap hover:opacity-90 text-white transition-opacity"
+                >
+                  <FilePlus2 className="w-3 h-3" /> 교체
+                </button>
+                <button
+                  onClick={() => {
+                    addToTray("sub", quickPick.teacher);
+                    setQuickPick(null);
+                  }}
+                  className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                >
+                  <FilePlus2 className="w-3 h-3" /> 보강
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
