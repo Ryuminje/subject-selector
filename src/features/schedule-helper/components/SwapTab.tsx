@@ -129,6 +129,21 @@ function isTeacherBusyViaTray(entries: MakeupEntry[], teacher: string, date: str
   });
 }
 
+/**
+ * 후보 하나를 식별하는 키. 겹침 후보마다 사용자가 입력 중인 날짜(pendingDates)를 따로
+ * 기억해야 해서 필요합니다 — exchangeSlot이 있으면 교체 후보, 없으면 보강(동과 대강) 전용
+ * 후보라 partnerTeacher만으로 구분합니다.
+ */
+function candidateKey(partnerTeacher: string, exchangeSlot?: { day: string; period: number }) {
+  return exchangeSlot ? `${partnerTeacher}|${exchangeSlot.day}|${exchangeSlot.period}` : `${partnerTeacher}|sub`;
+}
+
+/** 후보 하나(교체·보강)에 사용자가 겹침을 풀려고 직접 입력 중인 날짜. */
+interface PendingDates {
+  absentDateOverride?: string;
+  exchangeDateOverride?: string;
+}
+
 export default function SwapTab() {
   const { data, isBlocked, isSubjectBlocked, isTeacherBlocked } = useSchedule();
   const { data: session } = useSession();
@@ -152,6 +167,10 @@ export default function SwapTab() {
     rect: { top: number; left: number; width: number; height: number };
   } | null>(null);
   const quickPickRef = useRef<HTMLDivElement>(null);
+
+  // 겹침으로 뜬 후보마다 사용자가 "실제로는 다른 날짜"라고 직접 고쳐 입력 중인 날짜.
+  // candidateKey로 후보별 따로 두어야, 한 후보의 날짜를 고치는 게 다른 후보에 영향을 안 줍니다.
+  const [pendingDates, setPendingDates] = useState<Record<string, PendingDates>>({});
 
   // 팝오버가 열려 있을 때 바깥을 누르면 닫습니다. 팝오버를 연 바로 그 클릭이 곧장 다시
   // 닫아버리지 않도록 리스너 등록을 한 틱 미룹니다(버블링 중인 이벤트를 피함).
@@ -186,6 +205,7 @@ export default function SwapTab() {
     setSelectedCell({ teacher, day, period });
     setSelectedChainIdx(null);
     setQuickPick(null);
+    setPendingDates({});
 
     if (isTeacherBlocked(teacher)) {
       setResults({ swap: [], sub: [], chain: [] });
@@ -326,7 +346,12 @@ export default function SwapTab() {
    * 교체 후보는 나와 **같은 반**을 다른 시간에 가르치는 사람이라(검색 조건이 그렇습니다),
    * 내가 대신 갈 수업의 학년·반은 내 수업과 같습니다.
    */
-  const addToTray = (kind: MakeupKind, partnerTeacher: string, exchangeSlot?: { day: string; period: number; subject: string }) => {
+  const addToTray = (
+    kind: MakeupKind,
+    partnerTeacher: string,
+    exchangeSlot?: { day: string; period: number; subject: string },
+    pending?: PendingDates
+  ) => {
     if (!selectedCell || !myInfo) return;
     const absent: ClassSlot = {
       day: selectedCell.day,
@@ -343,6 +368,10 @@ export default function SwapTab() {
       exchange: exchangeSlot
         ? { ...exchangeSlot, grade: myInfo.grade, classNum: myInfo.classNum }
         : undefined,
+      // 겹침을 풀려고 사용자가 직접 고른 날짜가 있으면 새 항목에 바로 그 날짜를 심어둡니다 —
+      // 담고 나서 트레이로 가서 또 고치게 하지 않고, 고른 그대로 반영합니다.
+      absentDateOverride: pending?.absentDateOverride,
+      exchangeDateOverride: kind === "swap" ? pending?.exchangeDateOverride : undefined,
     });
   };
 
@@ -350,47 +379,71 @@ export default function SwapTab() {
    * 후보 하나(partnerTeacher, exchangeSlot 있으면 교체용)의 지금 상태를 판정합니다.
    * 결과 목록 줄(renderPickButtons)과 그리드 클릭 팝오버(quickPick) 양쪽에서 같이 씁니다 —
    * 같은 후보인데 목록과 팝오버의 판정이 어긋나면 안 되므로 로직을 한 곳에 둡니다.
+   *
+   * 겹침을 "교체"와 "보강" 각각 따로 판정합니다 — 둘이 겹치는 이유가 다르기 때문입니다.
+   *  · exchangeConflict: 나(결강 교사)를 교체로 저 시간(exchangeSlot)에 보내야 하는데,
+   *    이미 다른 건으로 그 시간에 가 있는 경우. **교체만** 막습니다 — 보강은 내가 어디로도
+   *    옮겨가지 않으니 이 충돌과 무관합니다.
+   *  · absentConflict: 이 후보 선생님이 지금 내 결강 시간을 대신 맡아야 하는데, 이미 다른
+   *    건으로 그 시간을 맡고 있는 경우. 교체·보강 **둘 다** 막습니다.
+   * pending에 사용자가 직접 입력 중인 날짜가 있으면 그 값으로, 없으면 결강 주간 기준일
+   * (baseDate)로 계산한 기본값으로 판정합니다 — "화7"이라는 요일·교시만으로는 몇 주 뒤
+   * 얘기인지 알 수 없어 실제 날짜가 같을 때만 겹치는 것으로 봅니다.
    */
-  const getCandidateState = (partnerTeacher: string, exchangeSlot?: { day: string; period: number; subject: string }) => {
-    if (!selectedCell) return { blocked: false as const, blockedTitle: undefined, picked: undefined };
-
-    // 이 후보가 이미 다른 교체·보강 건과 겹치는지 — 두 방향을 봅니다.
-    //  · iAmBusy: 나(결강 교사)를 교체로 저 시간(exchangeSlot)에 보내야 하는데, 이미 다른
-    //    건으로 그 시간에 가 있는 경우. 교체(exchangeSlot 있는 후보)에만 해당합니다.
-    //  · partnerBusy: 이 후보 선생님이 지금 내 결강 시간을 대신 맡아야 하는데, 이미 다른
-    //    건으로 그 시간을 맡고 있는 경우. 교체·보강 둘 다 해당합니다.
-    // "화7"이라는 요일·교시만으로는 몇 주 뒤 얘기인지 알 수 없으므로, 트레이의 결강 주간
-    // 기준일(baseDate)로 실제 날짜를 구해서 비교합니다 — 다른 주의 화7은 겹치지 않습니다.
-    const exchangeDate = exchangeSlot ? dateForWeekday(tray.baseDate, exchangeSlot.day) : undefined;
-    const selectedCellDate = dateForWeekday(tray.baseDate, selectedCell.day);
-    const iAmBusy =
-      !!exchangeSlot && isTeacherBusyViaTray(otherTrayEntries, selectedCell.teacher, exchangeDate!, exchangeSlot.period, tray.baseDate);
-    const partnerBusy = isTeacherBusyViaTray(otherTrayEntries, partnerTeacher, selectedCellDate, selectedCell.period, tray.baseDate);
-
-    if (iAmBusy || partnerBusy) {
+  const getCandidateState = (
+    partnerTeacher: string,
+    exchangeSlot?: { day: string; period: number; subject: string },
+    pending?: PendingDates
+  ) => {
+    if (!selectedCell) {
       return {
-        blocked: true as const,
-        blockedTitle: iAmBusy
-          ? `${selectedCell.teacher} 선생님이 ${koreanDate(exchangeDate!)} ${exchangeSlot!.period}교시에 이미 다른 교체로 다른 곳에 가 있어, 이 조합은 만들 수 없습니다.`
-          : `${partnerTeacher} 선생님이 ${koreanDate(selectedCellDate)} ${selectedCell.period}교시를 이미 다른 교체·보강으로 맡고 있어, 이 조합은 만들 수 없습니다.`,
         picked: undefined,
+        exchangeDate: undefined as string | undefined,
+        absentDate: "",
+        exchangeConflict: false,
+        absentConflict: false,
+        exchangeTitle: undefined as string | undefined,
+        absentTitle: undefined as string | undefined,
       };
     }
 
-    return { blocked: false as const, blockedTitle: undefined, picked: pickedForCell };
+    const exchangeDate = exchangeSlot
+      ? pending?.exchangeDateOverride || dateForWeekday(tray.baseDate, exchangeSlot.day)
+      : undefined;
+    const absentDate = pending?.absentDateOverride || dateForWeekday(tray.baseDate, selectedCell.day);
+
+    const exchangeConflict =
+      !!exchangeSlot && isTeacherBusyViaTray(otherTrayEntries, selectedCell.teacher, exchangeDate!, exchangeSlot.period, tray.baseDate);
+    const absentConflict = isTeacherBusyViaTray(otherTrayEntries, partnerTeacher, absentDate, selectedCell.period, tray.baseDate);
+
+    return {
+      picked: pickedForCell,
+      exchangeDate,
+      absentDate,
+      exchangeConflict,
+      absentConflict,
+      exchangeTitle: exchangeConflict
+        ? `${selectedCell.teacher} 선생님이 ${koreanDate(exchangeDate!)} ${exchangeSlot!.period}교시에 이미 다른 교체로 다른 곳에 가 있습니다. 이 교체가 실제로 다른 주라면, 아래에서 교체일을 다시 지정해 보세요.`
+        : undefined,
+      absentTitle: absentConflict
+        ? `${partnerTeacher} 선생님이 ${koreanDate(absentDate)} ${selectedCell.period}교시를 이미 다른 교체·보강으로 맡고 있습니다. 이 결강이 실제로 다른 주라면, 아래에서 결강일을 다시 지정해 보세요.`
+        : undefined,
+    };
   };
 
-  /** 후보 한 줄에 붙는 [교체]/[보강] 버튼. 이미 담긴 시간이면 상태만, 다른 건과 겹치면 막힘 상태를 보여줍니다. */
+  /**
+   * 후보 한 줄에 붙는 [교체]/[보강] 버튼.
+   *
+   * 이미 담긴 시간이면 상태만 보여줍니다. 다른 건과 겹치면(교체·보강 중 막힌 쪽만) 버튼을
+   * 완전히 숨기는 대신 비활성화하고, 그 원인이 된 날짜(교체일 또는 결강일)를 바로 옆에서
+   * 고칠 수 있는 미니 날짜 선택기를 보여줍니다 — 실제로 다른 주 얘기라면 날짜를 바꾸는
+   * 순간 그 자리에서 버튼이 다시 눌리게 됩니다(담기 전에 막혀서 트레이로 가서 날짜를
+   * 고칠 기회조차 없었던 문제를 이렇게 풉니다).
+   */
   const renderPickButtons = (partnerTeacher: string, exchangeSlot?: { day: string; period: number; subject: string }) => {
-    const state = getCandidateState(partnerTeacher, exchangeSlot);
-
-    if (state.blocked) {
-      return (
-        <span className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-lg bg-stone-100 text-stone-400" title={state.blockedTitle}>
-          교체 불가
-        </span>
-      );
-    }
+    const key = candidateKey(partnerTeacher, exchangeSlot);
+    const pending = pendingDates[key];
+    const state = getCandidateState(partnerTeacher, exchangeSlot, pending);
 
     if (state.picked) {
       return state.picked.partnerTeacher === partnerTeacher ? (
@@ -403,22 +456,60 @@ export default function SwapTab() {
         </span>
       );
     }
+
+    const swapAvailable = !!exchangeSlot && !state.exchangeConflict && !state.absentConflict;
+    const subAvailable = !state.absentConflict;
+    const setPending = (patch: Partial<PendingDates>) =>
+      setPendingDates((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+
     return (
-      <div className="shrink-0 flex gap-1">
-        {exchangeSlot && (
-          <button
-            onClick={() => addToTray("swap", partnerTeacher, exchangeSlot)}
-            className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded-lg bg-swap hover:opacity-90 text-white transition-opacity"
-          >
-            <FilePlus2 className="w-3 h-3" /> 교체
-          </button>
+      <div className="shrink-0 flex flex-col items-end gap-1">
+        {state.absentConflict && (
+          <label className="flex items-center gap-1 text-[10px] font-bold text-rose-500" title={state.absentTitle}>
+            겹침·결강일
+            <input
+              type="date"
+              value={pending?.absentDateOverride ?? state.absentDate}
+              onChange={(e) => setPending({ absentDateOverride: e.target.value })}
+              className="border border-rose-200 rounded px-1 py-0.5 text-[10px] w-[108px]"
+            />
+          </label>
         )}
-        <button
-          onClick={() => addToTray("sub", partnerTeacher)}
-          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
-        >
-          <FilePlus2 className="w-3 h-3" /> 보강
-        </button>
+        {exchangeSlot && state.exchangeConflict && (
+          <label className="flex items-center gap-1 text-[10px] font-bold text-rose-500" title={state.exchangeTitle}>
+            겹침·교체일
+            <input
+              type="date"
+              value={pending?.exchangeDateOverride ?? state.exchangeDate}
+              onChange={(e) => setPending({ exchangeDateOverride: e.target.value })}
+              className="border border-rose-200 rounded px-1 py-0.5 text-[10px] w-[108px]"
+            />
+          </label>
+        )}
+        <div className="flex gap-1">
+          {exchangeSlot && (
+            <button
+              disabled={!swapAvailable}
+              onClick={() => addToTray("swap", partnerTeacher, exchangeSlot, pending)}
+              className={cn(
+                "inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded-lg transition-opacity",
+                swapAvailable ? "bg-swap hover:opacity-90 text-white" : "bg-stone-100 text-stone-300 cursor-not-allowed"
+              )}
+            >
+              <FilePlus2 className="w-3 h-3" /> 교체
+            </button>
+          )}
+          <button
+            disabled={!subAvailable}
+            onClick={() => addToTray("sub", partnerTeacher, undefined, pending)}
+            className={cn(
+              "inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded-lg transition-colors",
+              subAvailable ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "bg-stone-100 text-stone-300 cursor-not-allowed"
+            )}
+          >
+            <FilePlus2 className="w-3 h-3" /> 보강
+          </button>
+        </div>
       </div>
     );
   };
@@ -599,7 +690,7 @@ export default function SwapTab() {
               <Search className="w-4 h-4 md:w-5 md:h-5" /> 수업 매칭 결과
             </h2>
             <button
-              onClick={() => { setModalOpen(false); setSelectedCell(null); setSelectedChainIdx(null); setQuickPick(null); }}
+              onClick={() => { setModalOpen(false); setSelectedCell(null); setSelectedChainIdx(null); setQuickPick(null); setPendingDates({}); }}
               className="hover:bg-white/15 p-1 rounded-full transition-colors"
             >
               <X className="w-5 h-5" />
@@ -751,18 +842,25 @@ export default function SwapTab() {
         );
         if (!match) return null;
         const exchangeSlot = { day: match.day!, period: match.period!, subject: match.subject! };
-        const state = getCandidateState(quickPick.teacher, exchangeSlot);
+        const key = candidateKey(quickPick.teacher, exchangeSlot);
+        const pending = pendingDates[key];
+        const state = getCandidateState(quickPick.teacher, exchangeSlot, pending);
+        const swapAvailable = !state.exchangeConflict && !state.absentConflict;
+        const subAvailable = !state.absentConflict;
+        const setPending = (patch: Partial<PendingDates>) =>
+          setPendingDates((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
         // 화면 위쪽 가까이 있으면 셀 아래로, 아니면 위로 띄워서 뷰포트 밖으로 안 나가게 합니다.
         // innerWidth가 0/비정상이면(레이아웃 계산 전 등) 폭을 못 구해 팝오버가 화면 밖으로
-        // 튕겨 나가므로, 그럴 땐 그냥 넉넉한 값으로 대체합니다.
+        // 튕겨 나가므로, 그럴 땐 그냥 넉넉한 값으로 대체합니다. 겹침일 때 날짜 입력칸이
+        // 들어가야 해서 기존 180px보다 조금 넓게(208px) 잡습니다.
         const openBelow = quickPick.rect.top < 180;
         const viewportWidth = window.innerWidth > 0 ? window.innerWidth : 1280;
-        const left = Math.min(Math.max(quickPick.rect.left + quickPick.rect.width / 2 - 90, 8), viewportWidth - 188);
+        const left = Math.min(Math.max(quickPick.rect.left + quickPick.rect.width / 2 - 104, 8), viewportWidth - 216);
 
         return (
           <div
             ref={quickPickRef}
-            className="fixed z-50 w-[180px] bg-white rounded-xl border border-stone-200 shadow-xl p-2.5 animate-in fade-in zoom-in-95 duration-100"
+            className="fixed z-50 w-[208px] bg-white rounded-xl border border-stone-200 shadow-xl p-2.5 animate-in fade-in zoom-in-95 duration-100"
             style={{
               left,
               top: openBelow ? quickPick.rect.top + quickPick.rect.height + 6 : quickPick.rect.top - 6,
@@ -770,32 +868,62 @@ export default function SwapTab() {
             }}
           >
             <p className="text-[11px] font-bold text-stone-500 mb-1.5 truncate">{quickPick.teacher} 선생님과</p>
-            {state.blocked ? (
-              <p className="text-[11px] text-stone-400 leading-snug">{state.blockedTitle}</p>
-            ) : state.picked ? (
+            {state.picked ? (
               <p className="text-[11px] font-bold text-amber-700">
                 이미 {state.picked.kind === "swap" ? "교체" : "보강"}로 담겨 있습니다.
               </p>
             ) : (
-              <div className="flex gap-1.5">
-                <button
-                  onClick={() => {
-                    addToTray("swap", quickPick.teacher, exchangeSlot);
-                    setQuickPick(null);
-                  }}
-                  className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] font-bold rounded-lg bg-swap hover:opacity-90 text-white transition-opacity"
-                >
-                  <FilePlus2 className="w-3 h-3" /> 교체
-                </button>
-                <button
-                  onClick={() => {
-                    addToTray("sub", quickPick.teacher);
-                    setQuickPick(null);
-                  }}
-                  className="flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
-                >
-                  <FilePlus2 className="w-3 h-3" /> 보강
-                </button>
+              <div className="space-y-1.5">
+                {state.absentConflict && (
+                  <label className="block text-[10px] font-bold text-rose-500" title={state.absentTitle}>
+                    겹침 · 결강일
+                    <input
+                      type="date"
+                      value={pending?.absentDateOverride ?? state.absentDate}
+                      onChange={(e) => setPending({ absentDateOverride: e.target.value })}
+                      className="mt-0.5 w-full border border-rose-200 rounded px-1.5 py-1 text-[11px] font-normal text-stone-700"
+                    />
+                  </label>
+                )}
+                {state.exchangeConflict && (
+                  <label className="block text-[10px] font-bold text-rose-500" title={state.exchangeTitle}>
+                    겹침 · 교체일
+                    <input
+                      type="date"
+                      value={pending?.exchangeDateOverride ?? state.exchangeDate}
+                      onChange={(e) => setPending({ exchangeDateOverride: e.target.value })}
+                      className="mt-0.5 w-full border border-rose-200 rounded px-1.5 py-1 text-[11px] font-normal text-stone-700"
+                    />
+                  </label>
+                )}
+                <div className="flex gap-1.5">
+                  <button
+                    disabled={!swapAvailable}
+                    onClick={() => {
+                      addToTray("swap", quickPick.teacher, exchangeSlot, pending);
+                      setQuickPick(null);
+                    }}
+                    className={cn(
+                      "flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] font-bold rounded-lg transition-opacity",
+                      swapAvailable ? "bg-swap hover:opacity-90 text-white" : "bg-stone-100 text-stone-300 cursor-not-allowed"
+                    )}
+                  >
+                    <FilePlus2 className="w-3 h-3" /> 교체
+                  </button>
+                  <button
+                    disabled={!subAvailable}
+                    onClick={() => {
+                      addToTray("sub", quickPick.teacher, undefined, pending);
+                      setQuickPick(null);
+                    }}
+                    className={cn(
+                      "flex-1 inline-flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] font-bold rounded-lg transition-colors",
+                      subAvailable ? "bg-emerald-600 hover:bg-emerald-500 text-white" : "bg-stone-100 text-stone-300 cursor-not-allowed"
+                    )}
+                  >
+                    <FilePlus2 className="w-3 h-3" /> 보강
+                  </button>
+                </div>
               </div>
             )}
           </div>
