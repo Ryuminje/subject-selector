@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { FileText, Trash2, X, AlertTriangle } from "lucide-react";
 import {
   absentDateOf,
   buildDoc,
   buildSheets,
   exchangeDateOf,
-  formatDate,
   koreanDate,
 } from "@/features/schedule-helper/lib/makeup/buildRows";
 import {
@@ -22,18 +21,18 @@ interface Props {
   onRemove: (id: string) => void;
   onClear: () => void;
   onDateOverride: (id: string, field: "absentDateOverride" | "exchangeDateOverride", value: string) => void;
+  /**
+   * 결강 주간 기준일. 예전엔 이 컴포넌트가 지역 상태로만 들고 있었는데, SwapTab의 시간표
+   * 충돌 판정(그리드 배지·"교체 불가")도 같은 기준일을 알아야 실제 날짜를 계산할 수 있어
+   * useMakeupTray 훅으로 끌어올렸습니다. 그래서 여기서는 prop으로만 받습니다.
+   */
+  baseDate: string;
+  onBaseDateChange: (value: string) => void;
 }
 
-export default function MakeupTray({ entries, schoolName, onRemove, onClear, onDateOverride }: Props) {
-  const [baseDate, setBaseDate] = useState("");
+export default function MakeupTray({ entries, schoolName, onRemove, onClear, onDateOverride, baseDate, onBaseDateChange }: Props) {
   const [reason, setReason] = useState<string>(MAKEUP_REASONS[0]);
   const [reasonDetail, setReasonDetail] = useState("");
-
-  // 기본값을 오늘로. 렌더 중에 new Date()를 부르면 서버 렌더와 값이 어긋날 수 있어
-  // 마운트 후에 채웁니다.
-  useEffect(() => {
-    Promise.resolve().then(() => setBaseDate(formatDate(new Date())));
-  }, []);
 
   if (entries.length === 0) return null;
 
@@ -159,7 +158,7 @@ export default function MakeupTray({ entries, schoolName, onRemove, onClear, onD
             <input
               type="date"
               value={baseDate}
-              onChange={(e) => setBaseDate(e.target.value)}
+              onChange={(e) => onBaseDateChange(e.target.value)}
               className="w-full border border-stone-200 rounded-[10px] px-3 py-2 text-sm"
             />
             <span className="block text-[11px] text-stone-400 mt-1">
