@@ -259,9 +259,9 @@ curl -X POST http://localhost:3000/api/dev-seed       # 표본 데이터 심기
 
 ### 운영 DB에 마이그레이션 적용하기
 
-앱은 Vercel, DB는 NAS라 **스키마를 바꿨으면 사람이 직접 한 번 적용해야 합니다**(Vercel 자동 적용은 아직 안 걸려 있음). NAS 앞에 갈 필요는 없고 DB에 네트워크로 닿는 컴퓨터면 됩니다.
+앱은 Vercel, DB는 NAS라 **스키마를 바꿨으면 사람이 직접 한 번 적용해야 합니다**(Vercel 자동 적용은 아직 안 걸려 있음).
 
-- 같은 랜 안: `192.168.0.21:55432` / 밖에서: `fbalswp.duckdns.org:55432` (라우터 포트포워딩)
+- **⚠️ 이 저장소의 개발 컴퓨터(같은 랜, `192.168.0.21:55432`)에서만 진행하세요 — 2026-09-03 확인.** 이론상으로는 밖에서 `fbalswp.duckdns.org:55432`(라우터 포트포워딩)로도 닿아야 하지만, 실제로 다른 컴퓨터에서 시도했을 때 안 됐습니다(원인 미확인 — 포트포워딩·NAS 방화벽·DuckDNS 갱신 중 하나로 추정). **그러니 "아무 컴퓨터나 DB에 네트워크로 닿으면 된다"고 안내하지 말고, 항상 이 개발 컴퓨터에서 진행하도록 안내하세요.**
 - **비밀번호는 Vercel에서 다시 볼 수 없습니다** — `DATABASE_URL`이 Secret 타입이라 저장 후 열람 불가입니다. NAS의 `~/docker/subject-selector-db/docker-compose.yml`(`POSTGRES_PASSWORD`)이나 개발 컴퓨터의 `.env`에서 찾으세요. Vercel 환경변수 편집 화면에서 값 칸이 비어 보이는 건 정상이며, **거기서 Save를 누르면 운영 주소가 지워집니다.**
 - 적용 순서는 **마이그레이션 먼저, 코드 푸시 나중**입니다. 반대로 하면 새 코드가 없는 표를 찾습니다.
 
@@ -269,6 +269,11 @@ curl -X POST http://localhost:3000/api/dev-seed       # 표본 데이터 심기
 DATABASE_URL="postgresql://..." npx prisma migrate status   # 뭐가 밀렸는지 먼저 확인
 DATABASE_URL="postgresql://..." npx prisma migrate deploy
 ```
+
+**⚠️ AI 에이전트(Claude Code)는 이 두 명령을 스스로 실행할 수 없습니다 — 2026-09-03 확인.** 운영 DB로 보이는 곳에 대한 쓰기(`migrate deploy`)뿐 아니라 **읽기 전용 원본 SQL 조회(`$queryRawUnsafe` 등)까지** 세션의 자동 권한 분류기가 차단합니다("Blocked by classifier" — 우회 시도 금지, 차단되면 사용자에게 그대로 알리고 맡길 것). 그래서 이 작업은 **항상 사람이 직접 터미널에서 실행**해야 합니다 — 에이전트는 명령만 준비해서 건네주세요. 절차:
+1. **적용 전 백업.** 이 저장소 개발 컴퓨터엔 `pg_dump`도 Docker도 안 깔려 있을 수 있습니다(2026-09-03 기준 확인됨). 그럴 땐 이미 설치된 Prisma Client로 논리 백업(JSON)을 대신 뜹니다 — 저장소 루트에 `_tmp_backup.mts`처럼 임시 파일(커밋 금지, 실행 후 삭제)을 만들어 `PrismaClient`로 스키마의 모든 모델을 `findMany()`한 뒤 파일로 저장하고, `node`가 아니라 **`npx tsx`로 실행**하세요(생성된 Prisma Client가 `.ts`라 `node`로 바로 못 돌립니다). 적용 후엔 같은 방식으로 테이블별 `count()`를 백업 파일의 행 수와 대조해 데이터 유실이 없는지 확인하세요.
+2. **PowerShell에서 `npx`가 `PSSecurityException`으로 막히는 경우**: PowerShell 기본 실행 정책이 `npx.ps1`(PowerShell 스크립트 래퍼) 실행을 막아서 나는 오류입니다(`about_Execution_Policies` 참고). 정책을 바꾸지 말고 **`npx.cmd prisma migrate deploy`**처럼 `.cmd` 래퍼를 직접 부르면 우회됩니다(`cmd /c "npx ..."`도 됨).
+3. 사람이 명령을 실행한 뒤, 에이전트는 `npx prisma migrate status`로 "Database schema is up to date!"를 확인하고 위 백업 대조까지 끝내야 이 작업이 완료된 것입니다.
 
 ---
 
@@ -398,6 +403,15 @@ DATABASE_URL="postgresql://..." npx prisma migrate deploy
 ---
 
 ## 📅 개발 히스토리 로그 (최신순)
+
+### 2026-09-03
+
+**운영 DB 마이그레이션 미적용으로 인한 500 에러 — `MakeupBatch` 테이블 수동 적용:**
+- 다른 세션에서 커밋한 `20260903120000_add_makeup_batch` 마이그레이션(순수 `CREATE TABLE`, "이름 붙여 저장하는 교체·보강 작업 세트" 기능용)이 운영 DB에는 반영되지 않아, 배포된 사이트에서 해당 기능이 500 에러로 실패했습니다. 커밋(`ef4a9e3`)·마이그레이션 파일 존재를 먼저 검증한 뒤 진행.
+- **AI 에이전트는 운영 DB에 대한 쓰기·읽기 SQL을 직접 실행할 수 없다는 걸 실제로 확인했습니다.** `npx prisma migrate deploy`와 읽기 전용 `$queryRawUnsafe` 둘 다 세션의 자동 권한 분류기가 "Blocked by classifier"로 막았습니다(우회 시도 안 함, 즉시 사용자에게 알리고 넘김). 자세한 절차는 위 "운영 DB에 마이그레이션 적용하기" 섹션의 2026-09-03 추가 항목 참고.
+- **개발 컴퓨터에 `pg_dump`/Docker가 없어** 사전 백업은 이미 있는 Prisma Client로 대체 — 저장소 루트에 임시 `.mts` 스크립트(커밋 안 함, 작업 후 삭제)를 만들어 18개 테이블 322행을 JSON으로 떠서 로컬에 저장. 마이그레이션 적용 후 같은 방식으로 테이블별 `count()`를 백업과 대조해 **전 테이블 행 수 일치, 데이터 유실 없음**을 확인.
+- 사용자가 직접 터미널에서 `npx prisma migrate deploy`를 실행했는데 **PowerShell 기본 실행 정책이 `npx.ps1`을 막아 `PSSecurityException`**이 났습니다 — `npx.cmd prisma migrate deploy`(`.cmd` 래퍼 직접 호출)로 우회, 정상 적용됨(`npx prisma migrate status` → "Database schema is up to date!").
+- **빌드 스크립트에 `prisma migrate deploy` 자동화(`"build": "prisma migrate deploy && next build"`)는 사용자가 보류를 선택**했습니다 — 배포가 NAS 가용성에 새로 의존하게 되는 트레이드오프를 설명한 뒤, 앞으로도 스키마를 바꿀 때마다 위 절차로 수동 적용하기로 함.
 
 ### 2026-08-30
 
