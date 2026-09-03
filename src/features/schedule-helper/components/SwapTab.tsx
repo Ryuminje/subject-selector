@@ -132,6 +132,21 @@ function isTeacherBusyViaTray(entries: MakeupEntry[], teacher: string, date: str
 }
 
 /**
+ * partnerTeacher의 그 시간(교체대상 슬롯)이, 지금 담으려는 나와는 무관하게 **이미 다른
+ * 결강 교사**의 교체로 채워져 있는지. 위 isTeacherBusyViaTray의 두 검사(내가 바쁨 / 상대가
+ * 내 결강 시간에 바쁨)는 모두 "나"를 기준으로 본 충돌인데, 이건 그것과 성격이 다릅니다 —
+ * 예를 들어 신경진의 화5가 이미 강연주와의 교체로 채워져 있으면, 고순정과는 전혀 무관하게
+ * 그 자리 자체를 못 씁니다(그 시간, 그 반엔 이미 강연주가 가 있으니까). 그리드에서 이런
+ * 칸은 "←강연주"로 이미 표시되고 있지만, 결과 목록·팝오버 쪽 판정에는 지금까지 반영되지
+ * 않아 경고 없이 담겨버릴 수 있었습니다.
+ */
+function isExchangeSlotTaken(entries: MakeupEntry[], partnerTeacher: string, date: string, period: number, baseDate: string): boolean {
+  return entries.some(
+    (e) => e.kind === "swap" && e.partnerTeacher === partnerTeacher && e.exchange?.period === period && exchangeDateOf(e, baseDate) === date
+  );
+}
+
+/**
  * 후보 하나를 식별하는 키. 겹침 후보마다 사용자가 입력 중인 날짜(pendingDates)를 따로
  * 기억해야 해서 필요합니다 — exchangeSlot이 있으면 교체 후보, 없으면 보강(동과 대강) 전용
  * 후보라 partnerTeacher만으로 구분합니다.
@@ -481,8 +496,15 @@ export default function SwapTab() {
       : undefined;
     const absentDate = pending?.absentDateOverride || dateForWeekday(tray.baseDate, selectedCell.day);
 
-    const exchangeConflict =
+    // 교체가 막히는 두 원인을 따로 봅니다 — 문구가 달라야 사용자가 뭘 고쳐야 하는지 압니다.
+    //  · iAmBusyElsewhere: 나(결강 교사) 자신이 이미 다른 교체로 그 시간에 가 있는 경우.
+    //  · slotTaken: 나와 무관하게, 그 교체대상 슬롯 자체가 이미 다른 결강 교사의 교체로
+    //    채워져 있는 경우(신경진의 화5가 이미 강연주로 채워진 것처럼).
+    const iAmBusyElsewhere =
       !!exchangeSlot && isTeacherBusyViaTray(conflictCheckEntries, selectedCell.teacher, exchangeDate!, exchangeSlot.period, tray.baseDate);
+    const slotTaken =
+      !!exchangeSlot && isExchangeSlotTaken(conflictCheckEntries, partnerTeacher, exchangeDate!, exchangeSlot.period, tray.baseDate);
+    const exchangeConflict = iAmBusyElsewhere || slotTaken;
     const absentConflict = isTeacherBusyViaTray(conflictCheckEntries, partnerTeacher, absentDate, selectedCell.period, tray.baseDate);
 
     return {
@@ -492,7 +514,9 @@ export default function SwapTab() {
       exchangeConflict,
       absentConflict,
       exchangeTitle: exchangeConflict
-        ? `${selectedCell.teacher} 선생님이 ${koreanDate(exchangeDate!)} ${exchangeSlot!.period}교시에 이미 다른 교체로 다른 곳에 가 있습니다. 이 교체가 실제로 다른 주라면, 아래에서 교체일을 다시 지정해 보세요.`
+        ? slotTaken
+          ? `${partnerTeacher} 선생님의 ${koreanDate(exchangeDate!)} ${exchangeSlot!.period}교시는 이미 다른 교체로 다른 분이 대신하기로 되어 있습니다. 이 교체가 실제로 다른 주라면, 아래에서 교체일을 다시 지정해 보세요.`
+          : `${selectedCell.teacher} 선생님이 ${koreanDate(exchangeDate!)} ${exchangeSlot!.period}교시에 이미 다른 교체로 다른 곳에 가 있습니다. 이 교체가 실제로 다른 주라면, 아래에서 교체일을 다시 지정해 보세요.`
         : undefined,
       absentTitle: absentConflict
         ? `${partnerTeacher} 선생님이 ${koreanDate(absentDate)} ${selectedCell.period}교시를 이미 다른 교체·보강으로 맡고 있습니다. 이 결강이 실제로 다른 주라면, 아래에서 결강일을 다시 지정해 보세요.`
@@ -647,15 +671,24 @@ export default function SwapTab() {
                 (e) => e.kind === "swap" && e.absentTeacher === row.teacher && e.exchange?.period === p && exchangeDateOf(e, tray.baseDate) === cellDate
               );
 
+          // "확정된 칸"이라도, 그게 "다른 사람 교체로 채워진 칸"(exchange)이면서 지금 검색
+          // 중인 후보이기도 하면 막지 않습니다 — 신경진의 화5가 이번 주엔 이미 강연주로
+          // 채워져 있어도, 다른 주라면 고순정도 쓸 수 있으니 눌러서 날짜를 다시 지정할
+          // 기회를 줘야 합니다(팝오버가 겹침 판정을 보여줍니다). 반면 "내 자신의 확정
+          // 칸"(origin)은 재검색할 이유가 없어 그대로 막습니다.
+          const clickableCommittedCandidate = committedRole === "exchange" && !!isPartner;
+
           return (
             <td
               key={`${d}-${p}`}
               onClick={(e) => {
-                if (committed || !classStr) return;
+                if (committed && !clickableCommittedCandidate) return;
+                if (!committed && !classStr) return;
                 if (isPartner) {
-                  // 초록 후보 셀을 직접 눌렀습니다 — 새 검색을 시작하는 대신, 이 자리에서
-                  // 바로 교체/보강을 고르는 팝오버를 띄웁니다(결과 목록의 같은 줄과 완전히
-                  // 같은 판정·같은 addToTray를 씁니다). 같은 셀을 다시 누르면 닫습니다.
+                  // 초록 후보 셀(또는 이미 다른 분 교체로 채워졌지만 동시에 후보이기도 한
+                  // 칸)을 직접 눌렀습니다 — 새 검색을 시작하는 대신, 이 자리에서 바로
+                  // 교체/보강을 고르는 팝오버를 띄웁니다(결과 목록의 같은 줄과 완전히 같은
+                  // 판정·같은 addToTray를 씁니다). 같은 셀을 다시 누르면 닫습니다.
                   e.stopPropagation();
                   const rect = e.currentTarget.getBoundingClientRect();
                   setQuickPick((prev) =>
@@ -670,7 +703,9 @@ export default function SwapTab() {
               }}
               title={
                 committed
-                  ? committedTooltip(committed, committedRole!, tray.baseDate)
+                  ? clickableCommittedCandidate
+                    ? `${committedTooltip(committed, committedRole!, tray.baseDate)} — 지금 찾는 후보이기도 합니다. 눌러서 다른 날짜로 담을 수 있는지 확인해 보세요.`
+                    : committedTooltip(committed, committedRole!, tray.baseDate)
                   : busyElsewhereEntry
                     ? busyElsewhereTooltip(busyElsewhereEntry, tray.baseDate)
                     : undefined
@@ -680,7 +715,8 @@ export default function SwapTab() {
                 "h-14 border border-stone-200 p-0.5 text-center align-middle transition-colors relative overflow-hidden",
                 pi === 0 && "border-l-2 border-l-stone-400",
                 classStr && !committed && "cursor-pointer hover:bg-amber-100",
-                committed && "cursor-not-allowed bg-amber-50 border-2 border-amber-300",
+                committed && !clickableCommittedCandidate && "cursor-not-allowed bg-amber-50 border-2 border-amber-300",
+                committed && clickableCommittedCandidate && "cursor-pointer bg-amber-50 hover:bg-amber-100 border-2 border-emerald-500 font-bold z-10",
                 busyElsewhereEntry && "cursor-not-allowed bg-amber-50/60 border-2 border-amber-200",
                 !committed && isSelected && "bg-swap/15 border-2 border-swap font-bold z-10",
                 !committed && isPartner && "bg-emerald-100 border-2 border-emerald-500 font-bold z-10",
