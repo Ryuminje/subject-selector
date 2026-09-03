@@ -350,11 +350,24 @@ export default function SwapTab() {
           const committed = originEntry ?? exchangeEntry;
           const committedRole: "origin" | "exchange" | null = originEntry ? "origin" : exchangeEntry ? "exchange" : null;
 
+          // 교체대상(B) 셀 — 내가 대신 가서 가르치게 될 자리 — 은 텍스트 표시 위에 대각선
+          // 빗금을 덧그립니다. 원본(A) 셀은 이미 "→ 이동" 라벨로 충분히 구분되고, 이 빗금은
+          // "여기는(=B) 원래 있던 사람이 못 쓴다"는 걸 상대 교사 행에서 한눈에 알아보게 하려는
+          // 것이라 exchange 셀에만 넣습니다.
+          const exchangeHatchStyle =
+            committedRole === "exchange"
+              ? {
+                  backgroundImage:
+                    "repeating-linear-gradient(45deg, rgba(180,83,9,0.22) 0px, rgba(180,83,9,0.22) 4px, transparent 4px, transparent 10px)",
+                }
+              : undefined;
+
           return (
             <td
               key={`${d}-${p}`}
               onClick={() => !committed && classStr && handleCellClick(row.teacher, d, p)}
               title={committed ? committedTooltip(committed, committedRole!) : undefined}
+              style={exchangeHatchStyle}
               className={cn(
                 "h-14 border border-stone-200 p-0.5 text-center align-middle transition-colors relative overflow-hidden",
                 pi === 0 && "border-l-2 border-l-stone-400",
