@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Trash2, X, AlertTriangle } from "lucide-react";
+import { FileText, Trash2, X, Info } from "lucide-react";
 import {
   absentDateOf,
-  buildDoc,
-  buildSheets,
+  buildDocs,
   exchangeDateOf,
   koreanDate,
 } from "@/features/schedule-helper/lib/makeup/buildRows";
@@ -36,22 +35,23 @@ export default function MakeupTray({ entries, schoolName, onRemove, onClear, onD
 
   if (entries.length === 0) return null;
 
-  const writerTeacher = entries[0].absentTeacher;
-  // 트레이는 한 사람의 결강을 모으는 곳입니다. 시간표에서 다른 교사 칸을 눌러 담으면
-  // 한 장에 두 사람이 섞여 결재가 안 되므로 미리 알려줍니다.
-  const mixedTeachers = entries.some((e) => e.absentTeacher !== writerTeacher);
+  // 여러 선생님이 한꺼번에 출장 가는 경우(수학여행 등)를 한 사람이 트레이 하나에 같이
+  // 담아 처리할 수 있어야 해서, 더 이상 한 명으로 제한하지 않습니다 — 서식이 "교 사" 한
+  // 명 명의로 찍히는 문서라, buildDocs가 결강 교사별로 문서를 알아서 나눠 만들어 줍니다.
+  const distinctTeachers = [...new Set(entries.map((e) => e.absentTeacher))];
   // 사유는 서식에 인쇄된 보기 중 하나를 고르는 것이라 값 자체는 항상 있습니다.
   // "기타"만 괄호 안에 적을 내용을 따로 받습니다.
   const needsDetail = reason === "기타" && !reasonDetail.trim();
-  const canSubmit = !!baseDate && !needsDetail && !mixedTeachers;
+  const canSubmit = !!baseDate && !needsDetail;
 
-  // 서식이 하루 한 장이라 결강일이 여러 날이면 그만큼 장이 나옵니다. 미리 알려줍니다.
-  const sheetCount = baseDate ? buildSheets(entries, baseDate).length : 0;
+  // 서식이 "교사 한 명당 하루 한 장"이라, 결강 교사 수 × 결강일 수만큼 장이 나옵니다.
+  const sheetCount = baseDate
+    ? buildDocs({ schoolName, baseDate, reason, entries }).reduce((sum, doc) => sum + doc.sheets.length, 0)
+    : 0;
 
   const handleCreate = () => {
-    const doc = buildDoc({
+    const docs = buildDocs({
       schoolName,
-      writerTeacher,
       baseDate,
       reason,
       reasonDetail: reasonDetail.trim() || undefined,
@@ -64,7 +64,7 @@ export default function MakeupTray({ entries, schoolName, onRemove, onClear, onD
     // 끊겨서 인쇄 탭에서는 "보강원 데이터가 없습니다"만 나왔습니다(실제로 겪은 버그).
     // localStorage는 같은 출처의 모든 탭이 공유하므로 확실히 넘어갑니다.
     // 넘겨받은 쪽에서 바로 지우므로 사유(병가 등)가 브라우저에 남지 않습니다.
-    localStorage.setItem(MAKEUP_DOC_KEY, JSON.stringify(doc));
+    localStorage.setItem(MAKEUP_DOC_KEY, JSON.stringify(docs));
     window.open("/apps/schedule-helper/makeup/print", "_blank", "noopener");
   };
 
@@ -80,12 +80,12 @@ export default function MakeupTray({ entries, schoolName, onRemove, onClear, onD
       </div>
 
       <div className="p-4 space-y-4 max-h-[50vh] overflow-y-auto">
-        {mixedTeachers && (
-          <div className="flex items-start gap-2 text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-[10px] p-3">
-            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+        {distinctTeachers.length > 1 && (
+          <div className="flex items-start gap-2 text-xs text-stone-500 bg-stone-50 border border-stone-200 rounded-[10px] p-3">
+            <Info className="w-4 h-4 shrink-0 mt-0.5" />
             <span>
-              여러 선생님의 결강이 섞여 있습니다. 보강원 한 장에는 한 분의 결강만 담아야 합니다. 다른 분의 건은
-              빼주세요.
+              {distinctTeachers.length}명의 선생님 몫이 함께 담겨 있습니다. 보강원 만들기를 누르면 선생님별로
+              문서가 따로 나뉘어 한 번에 만들어집니다.
             </span>
           </div>
         )}
@@ -108,6 +108,8 @@ export default function MakeupTray({ entries, schoolName, onRemove, onClear, onD
                     <span className="font-bold text-stone-800 truncate">{entry.partnerTeacher} 선생님</span>
                   </div>
                   <div className="text-stone-600">
+                    {/* 여러 선생님이 섞여 있을 때 "누구의 결강 건인지"를 구분할 수 있어야 합니다. */}
+                    <span className="font-semibold text-stone-500">{entry.absentTeacher}</span> 결강 ·{" "}
                     {entry.absent.day} {entry.absent.period}교시 · {entry.absent.grade}-{entry.absent.classNum}{" "}
                     {entry.absent.subject}
                   </div>
@@ -204,8 +206,9 @@ export default function MakeupTray({ entries, schoolName, onRemove, onClear, onD
         </button>
         {baseDate && canSubmit && (
           <p className="text-[11px] text-stone-400 mt-2 text-center">
-            {koreanDate(baseDate)} 주간 · {writerTeacher} 선생님
-            {sheetCount > 1 && ` · 결강일이 ${sheetCount}일이라 ${sheetCount}장으로 나옵니다`}
+            {koreanDate(baseDate)} 주간 ·{" "}
+            {distinctTeachers.length > 1 ? `${distinctTeachers[0]} 선생님 외 ${distinctTeachers.length - 1}명` : `${distinctTeachers[0]} 선생님`}
+            {sheetCount > 1 && ` · 총 ${sheetCount}장으로 나옵니다`}
           </p>
         )}
       </div>

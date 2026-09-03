@@ -7,6 +7,8 @@ import { parseClassInfo, cn } from "@/features/schedule-helper/lib/utils";
 import { Search, X, Check, ArrowRightLeft, ArrowLeft, ArrowRight, Star, Pin, FilePlus2 } from "lucide-react";
 import MakeupTray from "@/features/schedule-helper/components/makeup/MakeupTray";
 import { useMakeupTray } from "@/features/schedule-helper/components/makeup/useMakeupTray";
+import MakeupBatchBar from "@/features/schedule-helper/components/makeup/MakeupBatchBar";
+import { useMakeupBatches, type MakeupBatch } from "@/features/schedule-helper/components/makeup/useMakeupBatches";
 import { absentDateOf, dateForWeekday, exchangeDateOf, koreanDate } from "@/features/schedule-helper/lib/makeup/buildRows";
 import type { ClassSlot, MakeupEntry, MakeupKind } from "@/features/schedule-helper/lib/makeup/types";
 
@@ -144,6 +146,35 @@ interface PendingDates {
   exchangeDateOverride?: string;
 }
 
+/**
+ * 저장된 작업 세트(다른 배치)의 항목을 겹침 판정에 섞어 넣기 전에, 그 배치 **자신의**
+ * 결강 주간 기준일로 실제 날짜를 미리 확정해 둡니다.
+ *
+ * isTeacherBusyViaTray는 baseDate 하나로 모든 항목의 날짜를 계산하는데, 지금 작업 중인
+ * 트레이의 baseDate와 다른 배치가 저장될 때 썼던 baseDate가 서로 다를 수 있습니다(배치
+ * A는 이번 주 기준, 배치 B는 다음 달 기준일 수 있음). override가 없는 항목은 원래
+ * baseDate로 계산해야 맞으므로, 미리 실제 날짜를 override 자리에 못박아 둔 뒤 섞습니다 —
+ * absentDateOf/exchangeDateOf는 override가 있으면 항상 그 값을 우선하므로, 이렇게 해두면
+ * 나중에 어떤 baseDate로 다시 계산해도 이 값 그대로 쓰입니다.
+ */
+function resolveEntryDates(entry: MakeupEntry, baseDate: string): MakeupEntry {
+  return {
+    ...entry,
+    absentDateOverride: absentDateOf(entry, baseDate),
+    exchangeDateOverride: entry.exchange ? exchangeDateOf(entry, baseDate) : entry.exchangeDateOverride,
+  };
+}
+
+/**
+ * teacher가 실제로 결강하는 그 순간(날짜+교시)을 식별하는 키. 한 결강 시간엔 한 사람만
+ * 들어간다는 이 앱의 규칙(entryFor 참고) 덕분에, 지금 트레이에 있는 항목과 정확히 같은
+ * 키를 가진 "다른 배치의 항목"은 사실 같은 건(트레이가 그 배치에서 불러왔거나, 방금 그
+ * 배치로 저장한 것)이지 새로운 충돌이 아니므로 겹침 대상에서 빼야 합니다.
+ */
+function absentSignature(entry: MakeupEntry, baseDate: string): string {
+  return `${entry.absentTeacher}|${absentDateOf(entry, baseDate)}|${entry.absent.period}`;
+}
+
 export default function SwapTab() {
   const { data, isBlocked, isSubjectBlocked, isTeacherBlocked } = useSchedule();
   const { data: session } = useSession();
@@ -156,6 +187,11 @@ export default function SwapTab() {
   // 보강원 작성 트레이 — 후보를 여러 건 담아 한 장으로 만듭니다.
   // (조기 return보다 위에 있어야 훅 순서가 어긋나지 않습니다.)
   const tray = useMakeupTray();
+
+  // 이름 붙여 저장한 작업 세트 목록 — "저장된 작업 세트" 막대(UI)뿐 아니라, 겹침 판정에도
+  // 다른 세트의 항목을 같이 참고해야 해서 SwapTab이 직접 들고 있습니다(MakeupBatchBar가
+  // 따로 fetch하면 같은 데이터를 두 번 부르게 됩니다).
+  const makeupBatches = useMakeupBatches();
 
   // 그리드에서 초록 후보 셀을 직접 눌렀을 때 뜨는 "교체/보강 바로 고르기" 팝오버.
   // rect는 클릭 시점 셀의 화면 좌표 스냅샷(고정 위치 팝오버를 그 위치에 앵커링하는 용도) —
@@ -335,11 +371,25 @@ export default function SwapTab() {
     : undefined;
 
   // 지금 이 셀을 위해 이미 담아둔 건(pickedForCell) 자체는 "다른 건과의 충돌"이 아니므로,
-  // 후보 막힘 여부를 확인할 때는 제외합니다 — 안 그러면 방금 담은 후보가 곧바로 "교체 불가"로
+  // 후보 막힘 여부를 확인할 때는 제외합니다 — 안 그러면 방금 담은 후보가 곧바로 "겹침"으로
   // 잘못 보입니다.
   const otherTrayEntries = pickedForCell
     ? tray.entries.filter((e) => e.id !== pickedForCell.id)
     : tray.entries;
+
+  // 지금 트레이뿐 아니라, 이름 붙여 저장해 둔 다른 작업 세트들의 항목도 겹침 판정에 같이
+  // 봅니다 — 수학여행처럼 며칠에 걸쳐 여러 세트를 오가며 작업할 때, 다른 세트로 이미
+  // 확정해 둔 시간과 겹치는 걸 놓치지 않기 위해서입니다. 지금 트레이와 신호(같은 결강
+  // 교사·같은 실제 날짜·같은 교시)가 겹치는 항목은 "새로운 충돌"이 아니라 지금 트레이가
+  // 불러왔거나 방금 저장한 그 항목 자신이므로 제외합니다(그래야 자기 자신과 겹친다고
+  // 잘못 뜨지 않습니다).
+  const liveSignatures = new Set(tray.entries.map((e) => absentSignature(e, tray.baseDate)));
+  const otherBatchEntries = makeupBatches.batches.flatMap((batch) =>
+    batch.entries
+      .map((e) => resolveEntryDates(e, batch.baseDate))
+      .filter((e) => !liveSignatures.has(absentSignature(e, tray.baseDate)))
+  );
+  const conflictCheckEntries = [...otherTrayEntries, ...otherBatchEntries];
 
   /**
    * 후보를 보강원 트레이에 담습니다.
@@ -373,6 +423,25 @@ export default function SwapTab() {
       absentDateOverride: pending?.absentDateOverride,
       exchangeDateOverride: kind === "swap" ? pending?.exchangeDateOverride : undefined,
     });
+  };
+
+  /**
+   * 저장된 작업 세트를 불러와 지금 트레이 내용을 통째로 교체합니다. 이미 담긴 게 있으면
+   * 잃어버리기 쉬운 작업량(여러 선생님 몫일 수 있음)이라 확인을 한 번 받습니다.
+   */
+  const handleLoadBatch = (batch: MakeupBatch) => {
+    if (tray.entries.length > 0) {
+      const ok = window.confirm(
+        `"${batch.name}"을(를) 불러오면 지금 담긴 내역(${tray.entries.length}건)이 이 작업 세트 내용으로 바뀝니다. 계속할까요?`
+      );
+      if (!ok) return;
+    }
+    tray.loadEntries(batch.entries, batch.baseDate);
+    setModalOpen(false);
+    setSelectedCell(null);
+    setSelectedChainIdx(null);
+    setQuickPick(null);
+    setPendingDates({});
   };
 
   /**
@@ -413,8 +482,8 @@ export default function SwapTab() {
     const absentDate = pending?.absentDateOverride || dateForWeekday(tray.baseDate, selectedCell.day);
 
     const exchangeConflict =
-      !!exchangeSlot && isTeacherBusyViaTray(otherTrayEntries, selectedCell.teacher, exchangeDate!, exchangeSlot.period, tray.baseDate);
-    const absentConflict = isTeacherBusyViaTray(otherTrayEntries, partnerTeacher, absentDate, selectedCell.period, tray.baseDate);
+      !!exchangeSlot && isTeacherBusyViaTray(conflictCheckEntries, selectedCell.teacher, exchangeDate!, exchangeSlot.period, tray.baseDate);
+    const absentConflict = isTeacherBusyViaTray(conflictCheckEntries, partnerTeacher, absentDate, selectedCell.period, tray.baseDate);
 
     return {
       picked: pickedForCell,
@@ -680,8 +749,10 @@ export default function SwapTab() {
       </div>
     </div>
 
-      {/* Docked Panel + 보강원 트레이 — 결과 패널을 닫아도 담아둔 건 남아야 하므로 같은 열에 둡니다. */}
-      {(modalOpen || tray.entries.length > 0) && (
+      {/* Docked Panel + 보강원 트레이 — 결과 패널을 닫아도 담아둔 건 남아야 하므로 같은 열에 둡니다.
+          저장된 작업 세트가 있으면 트레이가 비어 있어도(막 들어와 아직 아무것도 안 담았어도)
+          "불러오기"부터 할 수 있어야 하므로 같이 조건에 넣습니다. */}
+      {(modalOpen || tray.entries.length > 0 || makeupBatches.batches.length > 0) && (
       <div className="w-full lg:w-[380px] shrink-0 lg:sticky lg:top-24 space-y-4">
       {modalOpen && (
         <div className="bg-white rounded-[14px] border border-stone-200 overflow-hidden animate-in fade-in duration-200">
@@ -820,6 +891,20 @@ export default function SwapTab() {
           </div>
         </div>
       )}
+
+        <div className="bg-white rounded-[14px] border border-stone-200 p-4">
+          <MakeupBatchBar
+            entries={tray.entries}
+            baseDate={tray.baseDate}
+            onLoad={handleLoadBatch}
+            batches={makeupBatches.batches}
+            loading={makeupBatches.loading}
+            error={makeupBatches.error}
+            create={makeupBatches.create}
+            update={makeupBatches.update}
+            remove={makeupBatches.remove}
+          />
+        </div>
 
         <MakeupTray
           entries={tray.entries}
