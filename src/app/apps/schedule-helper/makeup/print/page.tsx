@@ -11,7 +11,10 @@ import { MAKEUP_DOC_KEY, type MakeupDoc } from "@/features/schedule-helper/lib/m
 // 문서는 서버에 저장하지 않는 기능이라 sessionStorage로 넘겨받습니다.
 
 export default function MakeupPrintPage() {
-  const [doc, setDoc] = useState<MakeupDoc | null>(null);
+  // 여러 선생님 몫을 한 트레이에 같이 담아 만들면(수학여행 등으로 여러 명이 한꺼번에
+  // 출장 가는 경우) 교사별로 문서가 나뉘어 배열로 넘어옵니다 — 한 명뿐이어도 항상
+  // 배열(길이 1)로 통일해 두어 이 페이지가 두 모양을 따로 다루지 않게 합니다.
+  const [docs, setDocs] = useState<MakeupDoc[] | null>(null);
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
@@ -32,7 +35,9 @@ export default function MakeupPrintPage() {
         return;
       }
       try {
-        setDoc(JSON.parse(raw) as MakeupDoc);
+        const parsed = JSON.parse(raw) as MakeupDoc[];
+        if (!Array.isArray(parsed) || parsed.length === 0) throw new Error("empty");
+        setDocs(parsed);
       } catch {
         setMissing(true);
       }
@@ -44,11 +49,11 @@ export default function MakeupPrintPage() {
   // ⚠️ 브라우저 자동화로 이 페이지를 열면 인쇄 대화상자가 렌더러를 막아 페이지 읽기가
   // 타임아웃됩니다. 내용만 확인할 때는 주소에 ?noprint=1 을 붙이세요.
   useEffect(() => {
-    if (!doc) return;
+    if (!docs) return;
     if (new URLSearchParams(window.location.search).has("noprint")) return;
     const timer = window.setTimeout(() => window.print(), 300);
     return () => window.clearTimeout(timer);
-  }, [doc]);
+  }, [docs]);
 
   if (missing) {
     return (
@@ -59,7 +64,9 @@ export default function MakeupPrintPage() {
     );
   }
 
-  if (!doc) return <div className="p-10 text-center text-slate-400">불러오는 중...</div>;
+  if (!docs) return <div className="p-10 text-center text-slate-400">불러오는 중...</div>;
+
+  const totalSheets = docs.reduce((sum, d) => sum + d.sheets.length, 0);
 
   return (
     <div className="bg-slate-100 print:bg-white min-h-screen py-8 print:py-0">
@@ -76,8 +83,8 @@ export default function MakeupPrintPage() {
 
       <div className="no-print max-w-[210mm] mx-auto mb-4 flex items-center justify-between gap-4 px-4">
         <p className="text-sm text-slate-500">
-          {doc.writerTeacher} 선생님 · 총 {doc.sheets.length}장
-          {doc.sheets.length > 1 && " (하루에 한 장씩)"}
+          {docs.length > 1 ? `${docs.length}명의 선생님` : `${docs[0].writerTeacher} 선생님`} · 총 {totalSheets}장
+          {totalSheets > 1 && " (하루·선생님별로 한 장씩)"}
         </p>
         <button
           onClick={() => window.print()}
@@ -87,9 +94,7 @@ export default function MakeupPrintPage() {
         </button>
       </div>
 
-      {doc.sheets.map((sheet) => (
-        <MakeupSheet key={sheet.date} doc={doc} sheet={sheet} />
-      ))}
+      {docs.map((doc) => doc.sheets.map((sheet) => <MakeupSheet key={`${doc.writerTeacher}-${sheet.date}`} doc={doc} sheet={sheet} />))}
     </div>
   );
 }

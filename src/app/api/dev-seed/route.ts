@@ -101,6 +101,7 @@ export async function POST() {
     // MeetingPreset은 User에 @relation이 없어 cascade가 안 걸립니다(members DELETE 라우트와 같은 이유) —
     // 여기서도 먼저 지워야 고아 행이 안 남습니다.
     await prisma.meetingPreset.deleteMany({ where: { userId: { in: staleUsers.map((u) => u.id) } } });
+    await prisma.makeupBatch.deleteMany({ where: { userId: { in: staleUsers.map((u) => u.id) } } });
     await prisma.user.deleteMany({ where: { schoolId: s.id } });
     await prisma.teacher.deleteMany({ where: { schoolId: s.id } });
     await prisma.school.delete({ where: { id: s.id } });

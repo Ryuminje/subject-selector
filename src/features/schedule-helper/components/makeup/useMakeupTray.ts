@@ -53,6 +53,15 @@ export function useMakeupTray() {
 
   const clear = useCallback(() => setEntries([]), []);
 
+  /**
+   * 저장된 작업 세트(MakeupBatch)를 불러와 트레이 내용을 통째로 교체합니다.
+   * baseDate가 비어 있으면(예전에 기준일을 한 번도 안 정하고 저장한 세트) 오늘 날짜로 채웁니다.
+   */
+  const loadEntries = useCallback((newEntries: MakeupEntry[], newBaseDate: string) => {
+    setEntries(newEntries);
+    setBaseDate(newBaseDate || formatDate(new Date()));
+  }, []);
+
   /** 자동 계산된 날짜를 사용자가 고칠 때 */
   const setDateOverride = useCallback(
     (id: string, field: "absentDateOverride" | "exchangeDateOverride", value: string) => {
@@ -77,5 +86,5 @@ export function useMakeupTray() {
     [entries, baseDate]
   );
 
-  return { entries, add, remove, clear, setDateOverride, entryFor, baseDate, setBaseDate };
+  return { entries, add, remove, clear, loadEntries, setDateOverride, entryFor, baseDate, setBaseDate };
 }

@@ -141,6 +141,42 @@ export function buildDoc(params: {
   };
 }
 
+/**
+ * entries에 여러 결강 교사가 섞여 있어도 한 번에 처리합니다 — 서식이 "교 사" 한 명 명의로
+ * 찍히는 문서라(buildDoc의 writerTeacher가 문서 전체에 하나), 교사별로 먼저 나누고 그 안에서
+ * buildDoc을 그대로 재사용해 각자의 문서를 만듭니다. 결과는 교사 이름순으로 정렬됩니다.
+ *
+ * 여러 선생님이 한꺼번에 출장 가는 경우(수학여행 등)처럼, 한 사람이 여러 선생님 몫을
+ * 트레이 하나에 같이 담아 처리할 수 있게 하는 게 이 함수의 존재 이유입니다.
+ */
+export function buildDocs(params: {
+  schoolName: string;
+  baseDate: string;
+  reason: string;
+  reasonDetail?: string;
+  entries: MakeupEntry[];
+}): MakeupDoc[] {
+  const byTeacher = new Map<string, MakeupEntry[]>();
+  for (const entry of params.entries) {
+    const bucket = byTeacher.get(entry.absentTeacher);
+    if (bucket) bucket.push(entry);
+    else byTeacher.set(entry.absentTeacher, [entry]);
+  }
+
+  return [...byTeacher.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0], "ko"))
+    .map(([writerTeacher, entries]) =>
+      buildDoc({
+        schoolName: params.schoolName,
+        writerTeacher,
+        baseDate: params.baseDate,
+        reason: params.reason,
+        reasonDetail: params.reasonDetail,
+        entries,
+      })
+    );
+}
+
 /** "2026-08-20" → "2026년 8월 20일(목)" — 문서에 찍히는 형태 */
 export function koreanDate(iso: string): string {
   const date = parseDate(iso);
