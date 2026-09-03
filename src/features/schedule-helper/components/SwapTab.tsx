@@ -83,6 +83,23 @@ function committedTooltip(entry: MakeupEntry, role: "origin" | "exchange") {
   return `${entry.partnerTeacher} 선생님의 ${dest.day}요일 ${dest.period}교시 ${dest.subject} 수업을 ${entry.absentTeacher} 선생님이 대신 감 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다)`;
 }
 
+/** "여기는 교체 불가능해"를 라벨 없이 보여주는 대각선 빗금. 아래 busyElsewhereEntry 칸에만 씁니다. */
+const HATCH_STYLE = {
+  backgroundImage:
+    "repeating-linear-gradient(45deg, rgba(180,83,9,0.22) 0px, rgba(180,83,9,0.22) 4px, transparent 4px, transparent 10px)",
+} as const;
+
+/**
+ * 교체로 담긴 슬롯 때문에, 결강 교사 본인 시간표에서 원래 비어 있던 칸이 실은 못 쓰게 된
+ * 경우에 붙는 설명. (박교체의 수4 자리로 대신 가르치러 가므로, 내 시간표의 수4는 원래
+ * 빈칸이어도 실제로는 그 시간에 내가 없습니다 — 매칭 알고리즘은 이 사실을 모르므로
+ * 빗금으로 직접 알려줍니다.)
+ */
+function busyElsewhereTooltip(entry: MakeupEntry) {
+  const dest = entry.exchange!;
+  return `${entry.absentTeacher} 선생님은 ${dest.day}요일 ${dest.period}교시에 ${entry.partnerTeacher} 선생님 대신 ${dest.subject} 수업을 하러 가 있습니다. 원래 시간표는 비어 있어도 이 시간엔 다른 교체를 잡을 수 없습니다 (보강원 트레이에 담김 · 오른쪽 패널에서 뺄 수 있습니다).`;
+}
+
 export default function SwapTab() {
   const { data, isBlocked, isSubjectBlocked, isTeacherBlocked } = useSchedule();
   const { data: session } = useSession();
@@ -350,29 +367,33 @@ export default function SwapTab() {
           const committed = originEntry ?? exchangeEntry;
           const committedRole: "origin" | "exchange" | null = originEntry ? "origin" : exchangeEntry ? "exchange" : null;
 
-          // 교체대상(B) 셀 — 내가 대신 가서 가르치게 될 자리 — 은 텍스트 표시 위에 대각선
-          // 빗금을 덧그립니다. 원본(A) 셀은 이미 "→ 이동" 라벨로 충분히 구분되고, 이 빗금은
-          // "여기는(=B) 원래 있던 사람이 못 쓴다"는 걸 상대 교사 행에서 한눈에 알아보게 하려는
-          // 것이라 exchange 셀에만 넣습니다.
-          const exchangeHatchStyle =
-            committedRole === "exchange"
-              ? {
-                  backgroundImage:
-                    "repeating-linear-gradient(45deg, rgba(180,83,9,0.22) 0px, rgba(180,83,9,0.22) 4px, transparent 4px, transparent 10px)",
-                }
-              : undefined;
+          // 결강 교사(나) 본인 행에서, 교체대상 시간과 같은 칸 — 원래 시간표엔 빈칸이지만
+          // 그 시간엔 내가 대신 다른 반을 가르치러 가 있으므로 실제로는 못 씁니다. committed가
+          // 이미 있으면(= 이 칸이 원본/교체대상 자체면) 중복으로 안 겹치게 건너뜁니다.
+          const busyElsewhereEntry = committed
+            ? undefined
+            : tray.entries.find(
+                (e) => e.kind === "swap" && e.absentTeacher === row.teacher && e.exchange?.day === d && e.exchange?.period === p
+              );
 
           return (
             <td
               key={`${d}-${p}`}
               onClick={() => !committed && classStr && handleCellClick(row.teacher, d, p)}
-              title={committed ? committedTooltip(committed, committedRole!) : undefined}
-              style={exchangeHatchStyle}
+              title={
+                committed
+                  ? committedTooltip(committed, committedRole!)
+                  : busyElsewhereEntry
+                    ? busyElsewhereTooltip(busyElsewhereEntry)
+                    : undefined
+              }
+              style={busyElsewhereEntry ? HATCH_STYLE : undefined}
               className={cn(
                 "h-14 border border-stone-200 p-0.5 text-center align-middle transition-colors relative overflow-hidden",
                 pi === 0 && "border-l-2 border-l-stone-400",
                 classStr && !committed && "cursor-pointer hover:bg-amber-100",
                 committed && "cursor-not-allowed bg-amber-50 border-2 border-amber-300",
+                busyElsewhereEntry && "cursor-not-allowed bg-amber-50/60 border-2 border-amber-200",
                 !committed && isSelected && "bg-swap/15 border-2 border-swap font-bold z-10",
                 !committed && isPartner && "bg-emerald-100 border-2 border-emerald-500 font-bold z-10",
                 !committed && isChainStep1 && "bg-orange-100 border-2 border-orange-500 font-bold z-10",
