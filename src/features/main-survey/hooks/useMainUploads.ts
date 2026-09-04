@@ -139,10 +139,19 @@ export function useMainUploads(
         parentHeaders.push(lastParentHeader);
       }
 
+      // 과목 선택 매트릭스는 H열(0-based 인덱스 7)부터 시작한다고 가정합니다.
+      // 그 이전 열(순번/학년/반/성별/과정 등 메타데이터)은 학번·이름 열을 제외하곤 과목으로 파싱하지 않습니다.
+      const SUBJECT_MATRIX_START_COL = 7;
+
       for (let colIndex = 0; colIndex < maxLength; colIndex++) {
         const val1 = String(row1[colIndex] || "").trim();
         const val2 = row2 ? String(row2[colIndex] || "").trim() : "";
         const parentHeader = parentHeaders[colIndex] || "";
+
+        if (colIndex < SUBJECT_MATRIX_START_COL && colIndex !== idColIndex && colIndex !== nameColIndex) {
+          headers.push("");
+          continue;
+        }
 
         if (hasMultiRowHeader) {
           if (blocklist.some(b => val1.includes(b))) {
