@@ -407,20 +407,8 @@ export function useMainClassSummary(
         if (!item) return [];
         const result = [item];
 
-        // 일본어, 중국어 특수 처리
-        if (item.subject.includes("일본어") && !item.subject.includes("회화")) {
-          item.sem2 = 0; // 강제로 2학기 제외
-          if (item.sem1 === 0) item.sem1 = 2; // 기본 시수
-          item.detailedCategory = "일본어"; // 카테고리 강제 지정
-
-          result.push({
-            ...item,
-            subject: "일본어 회화",
-            sem1: 0,
-            sem2: item.sem1,
-            detailedCategory: "일본어",
-          });
-        } else if (item.subject.includes("중국어") && !item.subject.includes("회화")) {
+        // 중국어 특수 처리
+        if (item.subject.includes("중국어") && !item.subject.includes("회화")) {
           item.sem2 = 0; // 강제로 2학기 제외
           if (item.sem1 === 0) item.sem1 = 2; // 기본 시수
           item.detailedCategory = "중국어"; // 카테고리 강제 지정
