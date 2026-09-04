@@ -5,6 +5,14 @@ import { GradeTabs } from "./GradeTabs";
 import { getClassRecommendation } from "../hooks/useMainClassSummary";
 import type { GradeKey, SubjectStat } from "../../../types";
 
+/** 신청자 수를 개설 반 수로 나눈 학급당 평균 인원. 폐강/논의처럼 반 수가 정해지지 않은 경우는 표시하지 않습니다. */
+function getAveragePerClass(applicants: number, displayRemark: string): string | null {
+  if (displayRemark === "폐강" || displayRemark === "논의") return null;
+  const classCount = Number(displayRemark.split("~")[0]);
+  if (!classCount || classCount <= 0) return null;
+  return (applicants / classCount).toFixed(1);
+}
+
 interface ClassOpeningStepProps {
   activeGrade: GradeKey;
   setActiveGrade: (grade: GradeKey) => void;
@@ -159,7 +167,7 @@ export function ClassOpeningStep({
                   <th className="px-4 py-3 text-center border-r border-stone-200 min-w-[100px]">선택군</th>
                   <th className="px-4 py-3 text-center border-r border-stone-200 min-w-[120px]">학기</th>
                   <th className="px-6 py-3 border-r border-stone-200">과목</th>
-                  <th className="px-4 py-3 text-center border-r border-stone-200 min-w-[120px]">신청자 수</th>
+                  <th className="px-4 py-3 text-center border-r border-stone-200 min-w-[120px]">신청자 수(평균)</th>
                   <th className="px-4 py-3 text-center border-r border-stone-200 min-w-[120px]">개설 반 수</th>
                   <th className="px-4 py-3 text-center min-w-[120px]">개설여부</th>
                 </tr>
@@ -182,6 +190,7 @@ export function ClassOpeningStep({
                   }
 
                   const isEditable = displayRemark === "논의" || displayRemark.includes("~") || manualStep5Classes[key] !== undefined;
+                  const averagePerClass = getAveragePerClass(row.applicants, displayRemark);
 
                   return (
                     <tr key={idx} className="border-b border-stone-200 hover:bg-stone-50 transition-colors">
@@ -205,7 +214,7 @@ export function ClassOpeningStep({
                         {row.subject}
                       </td>
                       <td className="px-4 py-3.5 text-center border-r border-stone-200 font-semibold text-amber-600">
-                        {row.applicants}명
+                        {row.applicants}명{averagePerClass !== null && ` (${averagePerClass}명)`}
                       </td>
                       <td className="px-4 py-3.5 text-center align-middle border-r border-stone-200">
                         {editingStep5Classes[key] ? (
