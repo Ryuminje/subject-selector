@@ -39,6 +39,11 @@ export default function MakeupTray({ entries, schoolName, onRemove, onClear, onD
   // 담아 처리할 수 있어야 해서, 더 이상 한 명으로 제한하지 않습니다 — 서식이 "교 사" 한
   // 명 명의로 찍히는 문서라, buildDocs가 결강 교사별로 문서를 알아서 나눠 만들어 줍니다.
   const distinctTeachers = [...new Set(entries.map((e) => e.absentTeacher))];
+  // 결강 교사별로 묶어 보여주기 위한 그룹. distinctTeachers의 순서(=최초 등장 순)를 그대로 따릅니다.
+  const groupedEntries = distinctTeachers.map((teacher) => ({
+    teacher,
+    items: entries.filter((e) => e.absentTeacher === teacher),
+  }));
   // 사유는 서식에 인쇄된 보기 중 하나를 고르는 것이라 값 자체는 항상 있습니다.
   // "기타"만 괄호 안에 적을 내용을 따로 받습니다.
   const needsDetail = reason === "기타" && !reasonDetail.trim();
@@ -68,6 +73,76 @@ export default function MakeupTray({ entries, schoolName, onRemove, onClear, onD
     window.open("/apps/schedule-helper/makeup/print", "_blank", "noopener");
   };
 
+  /**
+   * 항목 카드 하나(교체/보강 배지 · 파트너 · 결강/교체 시간 · 날짜 입력). 여러 선생님이
+   * 섞여 있을 때만 카드 안에 "OO 결강" 표시가 필요합니다 — 교사별로 묶어서 보여줄 때는
+   * 그룹 제목이 이미 그 이름을 알려주므로 줄마다 반복하지 않습니다.
+   */
+  const renderEntryCard = (entry: MakeupEntry, showAbsentTeacher: boolean) => (
+    <div key={entry.id} className="border border-stone-200 rounded-[10px] p-3 text-xs space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span
+              className={
+                entry.kind === "swap"
+                  ? "px-1.5 py-0.5 rounded bg-swap/10 text-swap font-bold"
+                  : "px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold"
+              }
+            >
+              {entry.kind === "swap" ? "교체" : "보강"}
+            </span>
+            <span className="font-bold text-stone-800 truncate">{entry.partnerTeacher} 선생님</span>
+          </div>
+          <div className="text-stone-600">
+            {showAbsentTeacher && (
+              <>
+                <span className="font-semibold text-stone-500">{entry.absentTeacher}</span> 결강 ·{" "}
+              </>
+            )}
+            {entry.absent.day} {entry.absent.period}교시 · {entry.absent.grade}-{entry.absent.classNum}{" "}
+            {entry.absent.subject}
+          </div>
+        </div>
+        <button
+          onClick={() => onRemove(entry.id)}
+          className="shrink-0 text-stone-400 hover:text-rose-600 transition-colors"
+          title="빼기"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      <label className="flex items-center gap-2">
+        <span className="text-stone-500 w-12 shrink-0">결강일</span>
+        <input
+          type="date"
+          value={absentDateOf(entry, baseDate)}
+          onChange={(e) => onDateOverride(entry.id, "absentDateOverride", e.target.value)}
+          className="flex-1 min-w-0 border border-stone-200 rounded-lg px-2 py-1"
+        />
+      </label>
+
+      {entry.exchange && (
+        <>
+          <div className="text-stone-600">
+            ↔ 내가 대신: {entry.exchange.day} {entry.exchange.period}교시 · {entry.exchange.grade}-
+            {entry.exchange.classNum} {entry.exchange.subject}
+          </div>
+          <label className="flex items-center gap-2">
+            <span className="text-stone-500 w-12 shrink-0">교체일</span>
+            <input
+              type="date"
+              value={exchangeDateOf(entry, baseDate)}
+              onChange={(e) => onDateOverride(entry.id, "exchangeDateOverride", e.target.value)}
+              className="flex-1 min-w-0 border border-stone-200 rounded-lg px-2 py-1"
+            />
+          </label>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div className="w-full bg-white rounded-[14px] border border-stone-200 overflow-hidden">
       <div className="bg-swap px-4 py-3 flex items-center justify-between text-white">
@@ -81,78 +156,43 @@ export default function MakeupTray({ entries, schoolName, onRemove, onClear, onD
 
       <div className="p-4 space-y-4 max-h-[50vh] overflow-y-auto">
         {distinctTeachers.length > 1 && (
-          <div className="flex items-start gap-2 text-xs text-stone-500 bg-stone-50 border border-stone-200 rounded-[10px] p-3">
-            <Info className="w-4 h-4 shrink-0 mt-0.5" />
-            <span>
-              {distinctTeachers.length}명의 선생님 몫이 함께 담겨 있습니다. 보강원 만들기를 누르면 선생님별로
-              문서가 따로 나뉘어 한 번에 만들어집니다.
-            </span>
-          </div>
+          <>
+            <div className="flex items-start gap-2 text-xs text-stone-500 bg-stone-50 border border-stone-200 rounded-[10px] p-3">
+              <Info className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                {distinctTeachers.length}명의 선생님 몫이 함께 담겨 있습니다. 보강원 만들기를 누르면 선생님별로
+                문서가 따로 나뉘어 한 번에 만들어집니다.
+              </span>
+            </div>
+            {/* 담자마자 누가 몇 건인지 한눈에 보이는 요약 칩. */}
+            <div className="flex flex-wrap gap-1.5">
+              {groupedEntries.map(({ teacher, items }) => (
+                <span key={teacher} className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-swap/10 text-swap">
+                  {teacher} {items.length}건
+                </span>
+              ))}
+            </div>
+          </>
         )}
 
-        <div className="space-y-2">
-          {entries.map((entry) => (
-            <div key={entry.id} className="border border-stone-200 rounded-[10px] p-3 text-xs space-y-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span
-                      className={
-                        entry.kind === "swap"
-                          ? "px-1.5 py-0.5 rounded bg-swap/10 text-swap font-bold"
-                          : "px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold"
-                      }
-                    >
-                      {entry.kind === "swap" ? "교체" : "보강"}
-                    </span>
-                    <span className="font-bold text-stone-800 truncate">{entry.partnerTeacher} 선생님</span>
-                  </div>
-                  <div className="text-stone-600">
-                    {/* 여러 선생님이 섞여 있을 때 "누구의 결강 건인지"를 구분할 수 있어야 합니다. */}
-                    <span className="font-semibold text-stone-500">{entry.absentTeacher}</span> 결강 ·{" "}
-                    {entry.absent.day} {entry.absent.period}교시 · {entry.absent.grade}-{entry.absent.classNum}{" "}
-                    {entry.absent.subject}
-                  </div>
+        {distinctTeachers.length > 1 ? (
+          <div className="space-y-4">
+            {groupedEntries.map(({ teacher, items }) => (
+              <div key={teacher} className="space-y-2">
+                <div className="flex items-baseline justify-between pb-1 border-b border-dashed border-stone-200">
+                  <span className="flex items-center gap-1.5 font-extrabold text-stone-800 text-sm">
+                    <span className="w-[3px] h-3.5 rounded-full bg-swap inline-block" />
+                    {teacher} 선생님
+                  </span>
+                  <span className="text-[11px] text-stone-400">{items.length}건</span>
                 </div>
-                <button
-                  onClick={() => onRemove(entry.id)}
-                  className="shrink-0 text-stone-400 hover:text-rose-600 transition-colors"
-                  title="빼기"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <div className="space-y-2 pl-2.5">{items.map((entry) => renderEntryCard(entry, false))}</div>
               </div>
-
-              <label className="flex items-center gap-2">
-                <span className="text-stone-500 w-12 shrink-0">결강일</span>
-                <input
-                  type="date"
-                  value={absentDateOf(entry, baseDate)}
-                  onChange={(e) => onDateOverride(entry.id, "absentDateOverride", e.target.value)}
-                  className="flex-1 min-w-0 border border-stone-200 rounded-lg px-2 py-1"
-                />
-              </label>
-
-              {entry.exchange && (
-                <>
-                  <div className="text-stone-600">
-                    ↔ 내가 대신: {entry.exchange.day} {entry.exchange.period}교시 · {entry.exchange.grade}-
-                    {entry.exchange.classNum} {entry.exchange.subject}
-                  </div>
-                  <label className="flex items-center gap-2">
-                    <span className="text-stone-500 w-12 shrink-0">교체일</span>
-                    <input
-                      type="date"
-                      value={exchangeDateOf(entry, baseDate)}
-                      onChange={(e) => onDateOverride(entry.id, "exchangeDateOverride", e.target.value)}
-                      className="flex-1 min-w-0 border border-stone-200 rounded-lg px-2 py-1"
-                    />
-                  </label>
-                </>
-              )}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">{entries.map((entry) => renderEntryCard(entry, true))}</div>
+        )}
 
         <div className="border-t border-dashed border-stone-200 pt-4 space-y-3">
           <label className="block">

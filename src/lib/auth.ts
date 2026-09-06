@@ -8,6 +8,12 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  // 로그인 화면의 "이 기기 자동 로그인" 체크박스(rememberMe)가 켜졌을 때 유지되는 기간.
+  // rememberMe:false면 이 값과 무관하게 브라우저 세션 쿠키(창 닫으면 로그아웃)로 발급됨.
+  session: {
+    expiresIn: 60 * 60 * 24 * 180, // 180일
+    updateAge: 60 * 60 * 24 * 14, // 14일마다 접속 시 자동 연장
+  },
   user: {
     additionalFields: {
       // "ADMIN" | "TEACHER" — plain string since better-auth's additionalFields don't support Prisma enums.
