@@ -43,6 +43,7 @@ function LoginForm() {
   const schoolBoxRef = useRef<HTMLDivElement>(null);
   const [loginId, setLoginId] = useState("");
   const [idPassword, setIdPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -76,7 +77,7 @@ function LoginForm() {
     e?.preventDefault();
     setError(null);
     setLoading(true);
-    const { error: signInError } = await signIn.email({ email, password });
+    const { error: signInError } = await signIn.email({ email, password, rememberMe });
     setLoading(false);
     if (signInError) {
       setError(signInError.message ?? "로그인에 실패했습니다.");
@@ -96,7 +97,7 @@ function LoginForm() {
     const res = await fetch("/api/schedule-helper/login-id", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ schoolId: selectedSchool.id, loginId, password: idPassword }),
+      body: JSON.stringify({ schoolId: selectedSchool.id, loginId, password: idPassword, rememberMe }),
     });
     const body = await res.json().catch(() => ({}));
     setLoading(false);
@@ -188,6 +189,16 @@ function LoginForm() {
                   className="w-full px-3 py-2.5 bg-[#FBF9F4] border border-[#E2DCCC] rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-swap/40 focus:border-swap transition-all"
                 />
               </div>
+
+              <label className="flex items-center gap-2 text-sm text-[#5B564C]">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-[#E2DCCC] text-swap focus:ring-swap/40"
+                />
+                자동 로그인
+              </label>
 
               {error && (
                 <div className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-[10px] px-3 py-2">
@@ -293,6 +304,16 @@ function LoginForm() {
                   className="w-full px-3 py-2.5 bg-[#FBF9F4] border border-[#E2DCCC] rounded-[10px] text-sm focus:outline-none focus:ring-2 focus:ring-swap/40 focus:border-swap transition-all"
                 />
               </div>
+
+              <label className="flex items-center gap-2 text-sm text-[#5B564C]">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-[#E2DCCC] text-swap focus:ring-swap/40"
+                />
+                자동 로그인
+              </label>
 
               {error && (
                 <div className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-[10px] px-3 py-2">

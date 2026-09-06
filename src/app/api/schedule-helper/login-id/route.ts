@@ -12,6 +12,7 @@ export async function POST(request: Request) {
   const schoolId = typeof body?.schoolId === "string" ? body.schoolId.trim() : "";
   const loginId = typeof body?.loginId === "string" ? normalizeLoginId(body.loginId) : "";
   const password = typeof body?.password === "string" ? body.password : "";
+  const rememberMe = body?.rememberMe !== false; // 기본값 true — email 로그인과 동일한 규칙
 
   if (!schoolId || !loginId || !password) {
     return NextResponse.json({ error: "학교, 아이디, 비밀번호를 모두 입력해 주세요." }, { status: 400 });
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await auth.api.signInEmail({ body: { email: user.email, password } });
+    const result = await auth.api.signInEmail({ body: { email: user.email, password, rememberMe } });
     return NextResponse.json({ user: { id: result.user.id, name: result.user.name } });
   } catch (error) {
     if (error instanceof APIError) {
