@@ -73,7 +73,9 @@ export function buildNotices(student: ProcessedStudent, grade: GradeKey): string
 
   // 원인 1 — 기초(국·수·영) 과다. 4단계 화면의 "기초과목 최대학점 초과"(basicCount >= 10)와 같은 조건.
   if (student.basicCount >= 10) {
-    notes.push("기초 교과(국·수·영)는 필수과목을 제외하고 선택과목에서 9개 까지만 이수할 수 있습니다. 담임과 상의해 조정하세요.");
+    notes.push(
+      "기초 교과(국·수·영)는 필수과목을 제외하고 선택과목에서 9개 까지만 이수할 수 있습니다. 담임 선생님과 상의해 조정하세요. 공동교육과정을 들은 경우에는 교육과정부로 따로 문의하세요."
+    );
   }
 
   // 원인 2 — 같은 과목을 두 번 이상 신청.
@@ -83,15 +85,17 @@ export function buildNotices(student: ProcessedStudent, grade: GradeKey): string
 
   // 원인 3 — 선수과목 없이 심화과목 신청. v.subject가 심화, v.prereq가 선수.
   for (const v of student.hierarchyViolations ?? []) {
-    notes.push(`필수는 아니지만 ${josa(v.prereq, "을", "를")} 듣고 ${josa(v.subject, "을", "를")} 듣는 것을 권장합니다.`);
+    notes.push(
+      `필수는 아니지만 ${josa(v.prereq, "을", "를")} 듣고 ${josa(v.subject, "을", "를")} 듣는 것을 권장합니다. 현재 ${josa(v.prereq, "을", "를")} 듣지 않았습니다. 그래도 수강신청을 원한다면 서명해 주세요.`
+    );
   }
 
   // 원인 4 — 사회/과학 영역에서 아무것도 안 고름. 3학년(grade2 탭)만 문구가 다릅니다.
   for (const category of student.missingCategories ?? []) {
     notes.push(
       grade === "grade2"
-        ? `${category} 교과(군)에서 최소 1과목을 선택해야 합니다.`
-        : `졸업까지 ${category} 교과(군)에서 최소 1과목은 선택하여 이수해야 합니다.`
+        ? `${category} 교과(군)에서 최소 1과목을 선택해야 합니다. 선택하지 않을 시 졸업이 되지 않습니다.`
+        : `졸업까지 ${category} 교과(군)에서 최소 1과목은 선택하여 이수해야 합니다. 3학년 선택과목에서 ${category} 교과(군)에서 꼭 1과목 이상 수강신청 하세요.`
     );
   }
 
