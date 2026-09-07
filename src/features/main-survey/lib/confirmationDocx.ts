@@ -107,8 +107,14 @@ export function buildNotices(student: ProcessedStudent, grade: GradeKey): string
 interface SubjectRow {
   category: string;
   subject: string;
+  /** 학점(과목명 옆 괄호 표기용) — 편성표에 없으면 null. 신청 여부와는 별개입니다. */
   sem1: number | null;
   sem2: number | null;
+  /** 그 학기에 실제로 신청했는지(1·2학기 열의 O/빈칸용). 학점 데이터 유무와 무관하게 항상 참값입니다 —
+   * 편성표에 없는 과목이라도 학생이 그 학기에 신청한 사실 자체는 확실하므로, 학점 조회 실패 때문에
+   * "신청 안 함"으로 잘못 보이면 안 됩니다. */
+  inSem1: boolean;
+  inSem2: boolean;
 }
 
 /** 4단계 화면과 같은 규칙으로 과목명을 비교합니다(공백 제거, 로마숫자 통일). */
@@ -125,15 +131,15 @@ function buildSubjectRows(student: ProcessedStudent, input: ConfirmationDocxInpu
 
   for (const subject of student.semester1) {
     const h = findHours(subject);
-    rows.push({ category: h?.detailedCategory ?? "", subject, sem1: h ? h.sem1 || h.sem2 || null : null, sem2: null });
+    rows.push({ category: h?.detailedCategory ?? "", subject, sem1: h ? h.sem1 || h.sem2 || null : null, sem2: null, inSem1: true, inSem2: false });
   }
   for (const subject of student.semester1_2 ?? []) {
     const h = findHours(subject);
-    rows.push({ category: h?.detailedCategory ?? "", subject, sem1: h ? h.sem1 || null : null, sem2: h ? h.sem2 || null : null });
+    rows.push({ category: h?.detailedCategory ?? "", subject, sem1: h ? h.sem1 || null : null, sem2: h ? h.sem2 || null : null, inSem1: true, inSem2: true });
   }
   for (const subject of student.semester2) {
     const h = findHours(subject);
-    rows.push({ category: h?.detailedCategory ?? "", subject, sem1: null, sem2: h ? h.sem2 || h.sem1 || null : null });
+    rows.push({ category: h?.detailedCategory ?? "", subject, sem1: null, sem2: h ? h.sem2 || h.sem1 || null : null, inSem1: false, inSem2: true });
   }
   return rows;
 }
@@ -228,10 +234,6 @@ function fullWidthTable(rows: TableRow[]) {
   return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows });
 }
 
-function hoursText(n: number | null) {
-  return n === null ? "—" : String(n);
-}
-
 function formatKoreanDate(iso: string) {
   const [y, m, d] = iso.split("-").map(Number);
   if (!y || !m || !d) return "년   월   일";
@@ -242,8 +244,10 @@ function studentSection(student: ProcessedStudent, input: ConfirmationDocxInput)
   const gradeNum = CONFIRMATION_GRADE_NUMBER[input.grade];
   const gradeLabel = CONFIRMATION_GRADE_LABEL[input.grade];
   const rows = buildSubjectRows(student, input);
-  const sum1 = rows.reduce((acc, r) => acc + (r.sem1 ?? 0), 0);
-  const sum2 = rows.reduce((acc, r) => acc + (r.sem2 ?? 0), 0);
+  // 학점 합계가 아니라 "몇 과목을 신청했는지" 개수입니다 — inSem1/inSem2는 학점 데이터 유무와
+  // 무관하게 실제 신청 여부를 담고 있어(SubjectRow 주석 참고), 이 개수도 항상 정확합니다.
+  const count1 = rows.filter((r) => r.inSem1).length;
+  const count2 = rows.filter((r) => r.inSem2).length;
   const notices = buildNotices(student, input.grade);
   const rs = rowStyleFor(rows.length);
   const dense = { size: rs.size, margins: rs.margins };
@@ -272,23 +276,24 @@ function studentSection(student: ProcessedStudent, input: ConfirmationDocxInput)
     height: rowHeight,
     children: [
       cell("교과(군)", { ...dense, width: 16, bold: true, fill: HEADER_FILL }),
-      cell("과목명", { ...dense, width: 48, bold: true, fill: HEADER_FILL }),
+      cell("과목명(학점)", { ...dense, width: 60, bold: true, fill: HEADER_FILL }),
       cell("1학기", { ...dense, width: 12, bold: true, fill: HEADER_FILL }),
       cell("2학기", { ...dense, width: 12, bold: true, fill: HEADER_FILL }),
-      cell("계", { ...dense, width: 12, bold: true, fill: HEADER_FILL }),
     ],
   });
   const subjectRows = rows.map((r) => {
-    const total = (r.sem1 ?? 0) + (r.sem2 ?? 0);
+    // 학점(과목명 옆 괄호)은 편성표에 없으면 지어내지 않고 괄호째로 생략합니다 — hoursText가
+    // 하던 "—" 표시는 신청 여부(O/빈칸)로 이미 표현되므로 더 필요 없습니다.
+    const credit = r.sem1 ?? r.sem2;
+    const subjectLabel = credit === null ? r.subject : `${r.subject}(${credit})`;
     return new TableRow({
       cantSplit: true,
       height: rowHeight,
       children: [
         cell(r.category, { ...dense, width: 16 }),
-        cell(r.subject, { ...dense, width: 48, align: AlignmentType.LEFT }),
-        cell(hoursText(r.sem1), { ...dense, width: 12 }),
-        cell(hoursText(r.sem2), { ...dense, width: 12 }),
-        cell(r.sem1 === null && r.sem2 === null ? "—" : String(total), { ...dense, width: 12 }),
+        cell(subjectLabel, { ...dense, width: 60, align: AlignmentType.LEFT }),
+        cell(r.inSem1 ? "O" : "", { ...dense, width: 12 }),
+        cell(r.inSem2 ? "O" : "", { ...dense, width: 12 }),
       ],
     });
   });
@@ -296,10 +301,9 @@ function studentSection(student: ProcessedStudent, input: ConfirmationDocxInput)
     cantSplit: true,
     height: rowHeight,
     children: [
-      cell("선택과목 학점 합계", { ...dense, width: 64, bold: true, fill: TOTAL_FILL, columnSpan: 2 }),
-      cell(String(sum1), { ...dense, width: 12, bold: true, fill: TOTAL_FILL }),
-      cell(String(sum2), { ...dense, width: 12, bold: true, fill: TOTAL_FILL }),
-      cell(String(sum1 + sum2), { ...dense, width: 12, bold: true, fill: TOTAL_FILL }),
+      cell("선택과목 신청 합계", { ...dense, width: 76, bold: true, fill: TOTAL_FILL, columnSpan: 2 }),
+      cell(String(count1), { ...dense, width: 12, bold: true, fill: TOTAL_FILL }),
+      cell(String(count2), { ...dense, width: 12, bold: true, fill: TOTAL_FILL }),
     ],
   });
   const subjectTable = fullWidthTable([subjectHeader, ...subjectRows, totalRow]);
@@ -365,7 +369,7 @@ function studentSection(student: ProcessedStudent, input: ConfirmationDocxInput)
       para(
         [
           text("신청 선택과목", { bold: true, size: 21 }),
-          text("   본인이 신청한 선택과목입니다(학교 지정 과목 제외). 숫자는 학기별 운영학점입니다.", { size: 15, color: "555555" }),
+          text("   본인이 신청한 선택과목입니다(학교 지정 과목 제외). 과목명 옆 괄호 숫자는 학점, O는 신청한 학기입니다.", { size: 15, color: "555555" }),
         ],
         { before: 160, after: 60 }
       ),
