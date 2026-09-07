@@ -37,6 +37,18 @@ export function getClassRecommendation(applicants: number, standardSize: number)
   return `${nominalClasses}`;
 }
 
+/**
+ * 신청자 수를 개설 반 수로 나눈 학급당 평균 인원. 폐강/논의처럼 반 수가 정해지지 않은
+ * 경우는 표시하지 않습니다. 화면(ClassOpeningStep)과 엑셀 다운로드(handleExportStep5)가
+ * 같은 "신청자 수(평균)" 표기를 써야 해서 여기 하나로 모아 둡니다.
+ */
+export function getAveragePerClass(applicants: number, displayRemark: string): string | null {
+  if (displayRemark === "폐강" || displayRemark === "논의") return null;
+  const classCount = Number(displayRemark.split("~")[0]);
+  if (!classCount || classCount <= 0) return null;
+  return (applicants / classCount).toFixed(1);
+}
+
 export function useMainClassSummary(
   activeGrade: GradeKey,
   processedData: { [key in GradeKey]: ProcessedStudent[] },
@@ -218,7 +230,7 @@ export function useMainClassSummary(
     const aoa: any[][] = [
       [titleText, "", "", "", "", ""],
       ["", "", "", "", "", ""],
-      ["선택군", "학기", "과목", "신청자수", "개설 반 수", "개설여부"]
+      ["선택군", "학기", "과목", "신청자 수(평균)", "개설 반 수", "개설여부"]
     ];
 
     stats.forEach(s => {
@@ -230,11 +242,15 @@ export function useMainClassSummary(
       if (displayRemark === "폐강") openingStatus = "폐강";
       else if (!isNaN(Number(displayRemark))) openingStatus = "확정";
 
+      // 화면 표(ClassOpeningStep)와 같은 "184명 (23.0명)" 표기 — 평균이 없으면(폐강·논의) 총원만.
+      const averagePerClass = getAveragePerClass(s.applicants, displayRemark);
+      const applicantsDisplay = `${s.applicants}명${averagePerClass !== null ? ` (${averagePerClass}명)` : ""}`;
+
       aoa.push([
         s.group,
         s.semester,
         s.subject,
-        s.applicants,
+        applicantsDisplay,
         displayRemark,
         openingStatus
       ]);

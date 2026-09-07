@@ -2,16 +2,8 @@
 
 import { CheckCircle2, Download, RotateCcw } from "lucide-react";
 import { GradeTabs } from "./GradeTabs";
-import { getClassRecommendation } from "../hooks/useMainClassSummary";
+import { getAveragePerClass, getClassRecommendation } from "../hooks/useMainClassSummary";
 import type { GradeKey, SubjectStat } from "../../../types";
-
-/** 신청자 수를 개설 반 수로 나눈 학급당 평균 인원. 폐강/논의처럼 반 수가 정해지지 않은 경우는 표시하지 않습니다. */
-function getAveragePerClass(applicants: number, displayRemark: string): string | null {
-  if (displayRemark === "폐강" || displayRemark === "논의") return null;
-  const classCount = Number(displayRemark.split("~")[0]);
-  if (!classCount || classCount <= 0) return null;
-  return (applicants / classCount).toFixed(1);
-}
 
 interface ClassOpeningStepProps {
   activeGrade: GradeKey;
