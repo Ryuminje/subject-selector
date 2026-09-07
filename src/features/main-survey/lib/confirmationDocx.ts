@@ -116,7 +116,7 @@ export function buildNotices(student: ProcessedStudent, grade: GradeKey): string
     notes.push(
       grade === "grade2"
         ? `${category} 교과(군)에서 최소 1과목을 선택해야 합니다. 선택하지 않을 시 졸업이 되지 않습니다.`
-        : `졸업까지 ${category} 교과(군)에서 최소 1과목은 선택하여 이수해야 합니다. 3학년 선택과목에서 ${category} 교과(군)에서 꼭 1과목 이상 수강신청 하세요.`
+        : `졸업까지 ${category} 교과(군)에서 최소 1과목은 선택하여 이수해야 합니다. 3학년 선택과목 수강신청 시 ${category} 교과(군)에서 꼭 1과목 이상 수강신청 하세요.`
     );
   }
 
