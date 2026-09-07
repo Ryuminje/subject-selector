@@ -39,17 +39,24 @@ export const CONFIRMATION_GRADE_LABEL: Record<GradeKey, string> = {
 const CONFIRMATION_GRADE_NUMBER: Record<GradeKey, number> = { pre1: 1, grade1: 2, grade2: 3 };
 
 /**
- * 학번 맨 앞자리(학년)는 문서의 다른 정보(학년·반·번호)와 반대로 **올해(현재) 학년**을 써야
- * 합니다 — 이 확인서 자체는 다음 학년도 수강신청 결과지만, 학번은 아직 올라가지 않은 지금의
- * 학번이기 때문입니다(예: 다음 학년도 2학년이 될 학생의 학번은 지금 1학년이므로 1로 시작).
- * 업로드 파일의 학번 앞자리가 이미 무엇이든(현재든 다음 학년도든) 여기서 강제로 맞춰
- * 씁니다 — 두 자릿수 이상인 학년(고1~3)만 대상이고, 예비 1학년(중학교 재학생)은 애초에
- * 고등학교 학번 체계가 아니라 그대로 둡니다.
+ * 정보표의 "학년" 칸과 학번 앞자리는 문서 상단 제목(다음 학년도 기준)과 반대로, 반·번호처럼
+ * **올해(현재) 학년**을 써야 합니다 — 이 확인서 자체는 다음 학년도 수강신청 결과지만, 학생을
+ * 지금 기준으로 식별하는 정보이기 때문입니다(예: 다음 학년도 2학년이 될 학생은 지금 1학년).
+ * 예비 1학년(pre1)은 지금 중학교 재학생이라 고교 학년 번호 체계 밖이므로 다음 학년도 번호를
+ * 그대로 씁니다.
+ */
+function currentGradeNumber(grade: GradeKey): number {
+  return grade === "pre1" ? CONFIRMATION_GRADE_NUMBER[grade] : CONFIRMATION_GRADE_NUMBER[grade] - 1;
+}
+
+/**
+ * 업로드 파일의 학번 앞자리가 이미 무엇이든(현재든 다음 학년도든) currentGradeNumber로 강제
+ * 맞춰 씁니다 — 두 자릿수 이상인 학년(고1~3)만 대상이고, 예비 1학년은 애초에 고등학교 학번
+ * 체계가 아니라 그대로 둡니다.
  */
 function currentGradeStudentId(studentId: string, grade: GradeKey): string {
   if (grade === "pre1" || !studentId) return studentId;
-  const currentGradeDigit = String(CONFIRMATION_GRADE_NUMBER[grade] - 1);
-  return currentGradeDigit + studentId.slice(1);
+  return String(currentGradeNumber(grade)) + studentId.slice(1);
 }
 
 export interface ConfirmationDocxInput {
@@ -255,7 +262,9 @@ function formatKoreanDate(iso: string) {
 }
 
 function studentSection(student: ProcessedStudent, input: ConfirmationDocxInput) {
-  const gradeNum = CONFIRMATION_GRADE_NUMBER[input.grade];
+  // 정보표 "학년" 칸·하단 학년-반-번호 태그는 반/번호(업로드 원본 그대로)와 마찬가지로
+  // 현재(올해) 학년을 써야 합니다 — 문서 제목에 쓰는 gradeLabel(다음 학년도)과는 다릅니다.
+  const gradeNum = currentGradeNumber(input.grade);
   const gradeLabel = CONFIRMATION_GRADE_LABEL[input.grade];
   const rows = buildSubjectRows(student, input);
   // 학점 합계가 아니라 "몇 과목을 신청했는지" 개수입니다 — inSem1/inSem2는 학점 데이터 유무와
