@@ -38,6 +38,20 @@ export const CONFIRMATION_GRADE_LABEL: Record<GradeKey, string> = {
 };
 const CONFIRMATION_GRADE_NUMBER: Record<GradeKey, number> = { pre1: 1, grade1: 2, grade2: 3 };
 
+/**
+ * 학번 맨 앞자리(학년)는 문서의 다른 정보(학년·반·번호)와 반대로 **올해(현재) 학년**을 써야
+ * 합니다 — 이 확인서 자체는 다음 학년도 수강신청 결과지만, 학번은 아직 올라가지 않은 지금의
+ * 학번이기 때문입니다(예: 다음 학년도 2학년이 될 학생의 학번은 지금 1학년이므로 1로 시작).
+ * 업로드 파일의 학번 앞자리가 이미 무엇이든(현재든 다음 학년도든) 여기서 강제로 맞춰
+ * 씁니다 — 두 자릿수 이상인 학년(고1~3)만 대상이고, 예비 1학년(중학교 재학생)은 애초에
+ * 고등학교 학번 체계가 아니라 그대로 둡니다.
+ */
+function currentGradeStudentId(studentId: string, grade: GradeKey): string {
+  if (grade === "pre1" || !studentId) return studentId;
+  const currentGradeDigit = String(CONFIRMATION_GRADE_NUMBER[grade] - 1);
+  return currentGradeDigit + studentId.slice(1);
+}
+
 export interface ConfirmationDocxInput {
   schoolName: string;
   grade: GradeKey;
@@ -264,7 +278,7 @@ function studentSection(student: ProcessedStudent, input: ConfirmationDocxInput)
         cell(student.num || "", { width: 12, bold: true, size: 24 }),
         cell("성명", { width: 11, bold: true, fill: HEADER_FILL }),
         cell(
-          [para([text(student.name, { bold: true, size: 24 }), text(`  (${student.studentId})`, { size: 18, color: "666666" })], { align: AlignmentType.CENTER })],
+          [para([text(student.name, { bold: true, size: 24 }), text(`  (${currentGradeStudentId(student.studentId, input.grade)})`, { size: 18, color: "666666" })], { align: AlignmentType.CENTER })],
           { width: 20 }
         ),
       ],
