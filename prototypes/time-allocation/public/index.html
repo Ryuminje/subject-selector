@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>선택과목 타임 배정</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>선택과목 타임(구획) 배정</h1>
+  <nav class="tabs">
+    <button class="tab active" data-tab="input">① 데이터 입력</button>
+    <button class="tab" data-tab="alloc">② 타임 배정</button>
+    <button class="tab" data-tab="student">③ 학생별 결과</button>
+  </nav>
+</header>
+
+<section id="tab-input" class="panel active">
+  <p class="hint">엑셀에서 헤더 2줄(학기/택N 행 + 과목명 행), 합계 행, 학생 행을 그대로 복사해 붙여넣은 뒤 <b>불러오기</b>를 누르세요.</p>
+  <textarea id="raw" placeholder="여기에 탭으로 구분된 데이터를 붙여넣기…"></textarea>
+  <div class="row">
+    <button id="btn-load" class="primary">불러오기</button>
+    <button id="btn-clear">지우기</button>
+    <button id="btn-sample">샘플 불러오기</button>
+    <span id="load-msg" class="msg"></span>
+  </div>
+  <div id="preview"></div>
+</section>
+
+<section id="tab-alloc" class="panel">
+  <div class="toolbar">
+    <label>학급당 <input id="cap" type="number" min="1" value="29"> 명씩</label>
+    <label class="chk"><input id="allow-over" type="checkbox"> 인원초과 허용</label>
+    <label><select id="start-letter"></select> 부터 전체 <select id="num-times"></select> 타임(구획)으로</label>
+  </div>
+  <div class="common-box">
+    <div class="toolbar">
+      <label class="chk"><input id="common-on" type="checkbox" checked> <b>반 고정 공통과목</b></label>
+      <label>타임 1개 = <input id="common-hours" type="number" min="1" max="8" value="3">시수</label>
+      <button id="btn-common-add">＋ 과목 추가</button>
+      <button id="btn-common-pack">구획 자동 배치</button>
+      <span id="common-msg" class="msg"></span>
+    </div>
+    <div id="common-list"></div>
+  </div>
+  <div class="toolbar">
+    <button id="btn-opt" class="orange">① 최적화</button>
+    <button id="btn-assign" class="green">② 배정</button>
+    <button id="btn-confirm" class="navy">③ 확정</button>
+    <button id="btn-unconfirm">확정취소</button>
+    <button id="btn-reset" class="cyan">초기화</button>
+    <span class="sep"></span>
+    <button id="btn-backup" class="purple">백업</button>
+    <button id="btn-restore" class="purple">복구</button>
+    <span id="alloc-msg" class="msg"></span>
+  </div>
+  <p class="hint small">셀을 클릭하면 해당 타임에 분반을 추가/제거합니다(수동 조정). 조정 후 <b>② 배정</b>을 다시 누르세요.</p>
+  <div id="grid" class="grid-wrap"></div>
+</section>
+
+<section id="tab-student" class="panel">
+  <div class="toolbar">
+    <button id="btn-copy" class="primary">TSV 복사</button>
+    <label class="chk"><input id="only-unassigned" type="checkbox"> 미배정 학생만</label>
+    <span id="student-msg" class="msg"></span>
+  </div>
+  <div id="student-table" class="grid-wrap"></div>
+</section>
+
+<script src="app.js"></script>
+</body>
+</html>

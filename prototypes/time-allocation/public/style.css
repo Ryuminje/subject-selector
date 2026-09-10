@@ -1,0 +1,73 @@
+* { box-sizing: border-box; }
+body { margin: 0; font: 13px/1.4 "Malgun Gothic", system-ui, sans-serif; color: #222; background: #f6f7f9; }
+header { background: #fff; border-bottom: 1px solid #ddd; padding: 10px 16px 0; }
+h1 { font-size: 18px; margin: 0 0 8px; }
+.tabs { display: flex; gap: 4px; }
+.tab { border: 1px solid #ccc; border-bottom: none; background: #eee; padding: 6px 16px; cursor: pointer; border-radius: 6px 6px 0 0; }
+.tab.active { background: #fff; font-weight: bold; color: #1a5fb4; }
+.panel { display: none; padding: 12px 16px; }
+.panel.active { display: block; }
+.hint { color: #555; margin: 0 0 8px; }
+.hint.small { font-size: 12px; }
+textarea { width: 100%; height: 260px; font: 12px monospace; white-space: pre; }
+.row, .toolbar { display: flex; align-items: center; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+button { padding: 5px 12px; border: 1px solid #aaa; border-radius: 4px; background: #fff; cursor: pointer; }
+button:hover { filter: brightness(0.95); }
+button.primary { background: #1a5fb4; color: #fff; border-color: #1a5fb4; }
+button.orange { background: #f39c12; color: #fff; border-color: #f39c12; }
+button.green { background: #27ae60; color: #fff; border-color: #27ae60; }
+button.navy { background: #2c3e7a; color: #fff; border-color: #2c3e7a; }
+button.cyan { background: #17a2b8; color: #fff; border-color: #17a2b8; }
+button.purple { background: #8e6bd1; color: #fff; border-color: #8e6bd1; }
+.sep { width: 1px; height: 22px; background: #ccc; }
+.msg { color: #1a5fb4; }
+.msg.err { color: #c0392b; }
+input[type=number] { width: 56px; }
+.grid-wrap { overflow-x: auto; background: #fff; border: 1px solid #ccc; }
+table.grid { border-collapse: collapse; font-size: 12px; }
+table.grid th, table.grid td { border: 1px solid #d5d8dc; padding: 3px 4px; text-align: center; white-space: nowrap; }
+table.grid th { background: #f2f4f7; font-weight: normal; }
+table.grid th.grp1 { background: #dbeeff; }
+table.grid th.grp2 { background: #ffe3e3; }
+table.grid th.grp3 { background: #e5ffe0; }
+table.grid th.subj { writing-mode: vertical-rl; text-orientation: mixed; height: 150px; vertical-align: bottom; padding: 6px 2px; }
+table.grid th.subj.off { color: #999; }
+table.grid td.time-head { background: #f2f4f7; font-weight: bold; }
+table.grid td.time-head small { font-weight: normal; color: #666; }
+table.grid td.na { background: #ddd; }
+table.grid td.cell { cursor: pointer; color: #1a5fb4; }
+table.grid td.cell:hover { outline: 2px solid #1a5fb4; outline-offset: -2px; }
+table.grid td.cell.over { color: #c0392b; font-weight: bold; }
+table.grid td.cell.full { font-weight: bold; }
+table.grid td.na:hover { outline: 2px dashed #888; outline-offset: -2px; cursor: pointer; }
+table.grid tr.total td { background: #fafafa; }
+table.grid td.un { color: #c0392b; }
+table.grid tr.confirmed td.cell { cursor: default; }
+table.grid input.sec { width: 36px; text-align: center; }
+table.grid input.sec:disabled { background: #eee; color: #999; }
+table.grid td.left { text-align: left; }
+table.student th { position: sticky; top: 0; }
+table.student td.un { background: #ffe3e3; }
+#preview table.grid td { text-align: left; }
+table.grid th.grp4 { background: #fff3cd; }
+table.grid th.subj.com { background: #fff8e1; }
+table.grid td.com { background: #fffbea; }
+table.grid td.com.fixed { color: #8a6d00; font-weight: bold; line-height: 1.1; }
+table.grid td.com.fixed small { font-weight: normal; color: #666; }
+table.student td.com { background: #fffbea; color: #8a6d00; }
+.toolbar.common { background: #fff8e1; border: 1px solid #f0e2a0; border-radius: 4px; padding: 6px 10px; }
+.toolbar.common input[type=text] { width: 110px; }
+/* 2학점과 같은 구획(3시간을 2+1로 나눠 씀)임을 표시 */
+table.grid td.com.fixed.shared { border-left: 1px dashed #d8c98a; color: #a08a3a; }
+table.grid td.com.fixed.shared::before { content: "\21B3 "; color: #c0ad63; }
+/* 반 고정 공통과목 편집 */
+.common-box { background: #fff8e1; border: 1px solid #f0e2a0; border-radius: 4px; padding: 4px 10px 8px; margin: 8px 0; }
+.common-box .toolbar { margin: 4px 0; }
+.common-box input[type=number] { width: 56px; }
+table.common-table { border-collapse: collapse; font-size: 12px; background: #fff; }
+table.common-table th, table.common-table td { border: 1px solid #e0d9b8; padding: 2px 6px; text-align: center; }
+table.common-table th { background: #fdf5da; font-weight: normal; }
+table.common-table input[type=text] { width: 130px; }
+table.common-table input[type=number] { width: 52px; }
+table.common-table tr.bad td { background: #ffe3e3; }
+.common-box .hint { margin: 6px 0 0; }
