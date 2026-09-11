@@ -4,6 +4,15 @@
 
 ---
 
+### 2026-09-12
+
+**타임 배정(time-allocation) 학기 간 데이터 섞임 2건 + 반 고정 공통과목 배치를 "최대한 쪼개기"로 변경 + 백업 저장 fallback 복구:**
+- **학생별 결과 화면이 1학기/2학기를 한 배열에 합쳐서 덮어씀.** `studentRow()`가 `byT[t] = 과목명`처럼 타임 인덱스 하나로 모든 학기를 합쳤는데, 1학기 A타임과 2학기 A타임은 서로 다른 실제 시간이라 같은 인덱스에 둘 다 쓰면 나중 학기가 먼저 학기 걸 덮어씀(사용자가 "2학기만 반고정 지정했는데 1학기랑 섞여 나옴"으로 발견). `studentRowsBySemester()`(`lib/studentRows.ts`)를 새로 만들어 학기별로 별도 배열에 담도록 바꾸고, 화면(`StudentResultStep.tsx`)·엑셀 내보내기(`lib/exportExcel.ts`, 헤더 병합 포함)·TSV 복사 셋 다 이걸로 교체. 차단 타임 목록(`blockedBands`)도 학기별 로컬 인덱스라 학기별로 따로 계산해야 함.
+- **반 고정 공통과목의 "교사 수"가 배치 목표치처럼 쓰여 무조건 꽉 채움.** `lib/bands.ts`의 `chunk(n)`이 `k=ceil(반수/교사수)`로 그룹 수를 최소화하고 각 그룹을 교사 수까지 채웠음(예: 교사 3명·8개 반 → 무조건 3·3·2로 3개 타임). 사용자 요청대로 반을 하나씩 가장 한산한 타임부터 순서대로 배정하게 바꿔서, 교사 수는 "한 타임당 상한"으로만 쓰고 여유 타임이 있으면 자연스럽게 더 많은 타임으로 퍼지게 함(합성 데이터로 검증: 타임 여유 충분하면 8개 반이 8개 타임에 1반씩까지 퍼짐, 여유 없으면 필요한 만큼만 뭉침, 진짜 불가능하면 기존처럼 에러). `CommonSubjectEditor.tsx`의 미리보기 문구도 "N반 · M개 타임"(고정값처럼 보임) → "최대 N반 · M개 타임 이상"으로 정정.
+- **1학기 설정만 바꿨는데 배정 결과가 2학기 몫 타임까지 넘어감(선행 버그).** `lib/assign.ts`의 `pickTimes`/`optimize`가 배치 후보 타임 범위를 과목이 속한 학기가 아니라 전체 그리드 폭(`ctx.numTimes`, 학기 중 최대치)에서 골랐음. `SemesterAllocInfo`에 `ownTimes`(그 학기가 실제 쓰는 타임 수) 필드를 추가하고 두 함수 모두 그걸로 범위를 제한하도록 수정. 합성 데이터(1학기 5칸/2학기 8칸)로 `optimize()` 5000여 회 반복 후에도 경계 안 넘는 것 확인.
+- **저장(`showSaveFilePicker`)이 임베디드 미리보기(Claude Code 내장 브라우저 등, iframe 여부 체크로도 못 잡아내는 플랫폼 제약)에서 `createWritable`이 `NotAllowedError`로 실패.** 처음엔 실패 시 일반 다운로드로 자동 대체하게 고쳤는데, 그러면 저장 위치 고르는 창이 뜬 다음 실패하고 다운로드 창이 또 떠서 "두 번 눌러야 함" — `window.top===window.self`로 iframe 감지를 추가해봤지만 안 통했음(임베디드 브라우저가 최상위 프레임처럼 보고돼 있었던 것으로 추정). 사용자가 실제로 진짜 크롬 탭에서 테스트하기로 하면서, 최종적으로는 **원래 방식(`showSaveFilePicker` 우선 시도 → 실패 시 다운로드로 자동 대체)으로 복귀**했고 크롬에서 정상 확인됨. 참고로 이 실패는 저장된 파일이 0바이트로 남는 부작용이 있어서, 나중에 그 파일을 불러오면 "Unexpected end of JSON input"(`MainSurveyTab.tsx`의 `JSON.parse`)으로 나타남 — 두 증상이 한 원인이었음. `handleSaveBackup`의 이 패턴이 `MainSurveyTab`/`DemandSurveyTab`/`ChangeSurveyTab`/`TimeAllocationTab` 4곳에 복붙돼 있어서 4곳 다 동일하게 고침(참고: `exam-scheduler`의 `lib/io/saveFile.ts`엔 이미 이 fallback 패턴이 있었음 — 새로 비슷한 저장 로직을 짤 땐 그걸 참고).
+- `tsc --noEmit` 클린(매 수정 후). 학기 분리·반 쪼개기는 합성 데이터 스크립트(`_tmp_*.mts`, 실행 후 삭제)와 실제 본조사 샘플(`samples/sample6.xlsx`)로 브라우저 검증까지 했고, 저장 fallback은 코드 리뷰 + 사용자의 실제 크롬 테스트로 확인.
+
 ### 2026-09-10
 
 **타임(구획) 배정 프로토타입을 별도 대화에서 만들어 `prototypes/time-allocation/`에 반입 (브랜치 `feature/time-allocation-prototype`):**

@@ -79,7 +79,9 @@ export function CommonSubjectEditor({ api, semesterKey }: Props) {
               {common.subjects.map((s, i) => {
                 const b = bands.find((x) => x.key === s.band);
                 const perTime = b ? b.perTime : 1;
-                const times = classCount ? Math.ceil(classCount / perTime) : 0;
+                // 실제 배치는 여유가 있는 한 반을 최대한 나눠 넣으므로(교사 수는 한 타임당
+                // 상한일 뿐, 채우는 목표치가 아님) 필요한 타임 수는 최소 이 값 이상입니다.
+                const minTimes = classCount ? Math.ceil(classCount / perTime) : 0;
                 const bad = !!b && b.credits > common.hours;
                 return (
                   <tr key={i} className={bad ? "bg-rose-50" : ""}>
@@ -129,7 +131,7 @@ export function CommonSubjectEditor({ api, semesterKey }: Props) {
                       </select>
                     </td>
                     <td className="px-2 py-1 text-center text-stone-500">
-                      {perTime}반{times ? ` · ${times}개 타임` : ""}
+                      최대 {perTime}반{minTimes ? ` · ${minTimes}개 타임 이상` : ""}
                     </td>
                     <td className="px-2 py-1 text-center">
                       <button

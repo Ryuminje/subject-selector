@@ -92,23 +92,21 @@ export function computeFixedBands(args: {
   const bands = bandList(common);
   if (!bands.length) return { bandTimes: [], error: "" };
   const over = bands.filter((b) => b.credits > common.hours);
-  const C = classes.length;
   const sizeOf = (key: string) => students.filter((st) => classKey(st.id) === key).length;
-  const chunk = (n: number): string[][] => {
-    const k = Math.max(1, Math.ceil(C / n));
-    const out: string[][] = [];
-    for (let i = 0; i < k; i++) out.push(classes.filter((_, j) => j % k === i));
-    return out;
-  };
   const occ = new Array(T).fill(0); // 타임별 공통과목 점유 학생 수
   const used = new Map<string, Set<number>>(); // 반 키 → 이미 쓴 타임 Set
   const bandTimes: Array<Record<string, number>> = [];
   for (const band of bands) {
     const map: Record<string, number> = {};
-    for (const g of chunk(band.perTime)) {
+    // 반 하나씩 순서대로 가장 한산한 타임에 넣습니다(한 타임에 교사 수(perTime)를
+    // 넘게는 못 넣지만, 그걸 목표치로 꽉 채우지는 않습니다) — 그래서 여유 타임이
+    // 있는 한 큰 덩어리로 뭉치기보다 자연스럽게 여러 타임에 최대한 나뉘어 들어갑니다.
+    // 정말 여유가 없을 때만(다른 데 다 막혔을 때만) 한 타임에 perTime까지 채웁니다.
+    const slotCount = new Array(T).fill(0); // 이 구획이 각 타임에 이미 넣은 반 수
+    for (const c of classes) {
       const cand = [...Array(T).keys()]
-        .filter((t) => g.every((c) => !(used.get(c) || new Set()).has(t)))
-        .sort((a, b) => occ[a] - occ[b] || a - b);
+        .filter((t) => !(used.get(c) || new Set()).has(t) && slotCount[t] < band.perTime)
+        .sort((a, b) => occ[a] - occ[b] || slotCount[a] - slotCount[b] || a - b);
       if (!cand.length) {
         return {
           bandTimes: [],
@@ -116,12 +114,11 @@ export function computeFixedBands(args: {
         };
       }
       const t = cand[0];
-      g.forEach((c) => {
-        map[c] = t;
-        occ[t] += sizeOf(c);
-        if (!used.has(c)) used.set(c, new Set());
-        used.get(c)!.add(t);
-      });
+      map[c] = t;
+      slotCount[t]++;
+      occ[t] += sizeOf(c);
+      if (!used.has(c)) used.set(c, new Set());
+      used.get(c)!.add(t);
     }
     bandTimes.push(map);
   }
