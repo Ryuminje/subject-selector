@@ -273,17 +273,18 @@ export function useTimeAllocation(): TimeAllocationApi {
     [patch],
   );
 
+  // 체크 해제해도 배치(placement)는 지우지 않습니다 — 1학기 배정 결과를 남겨둔 채 2학기만
+  // 선택해서 따로 배정하고, 나중에 다시 체크하면 이전 배치가 복원되도록 하기 위함입니다.
+  // (배정과목 선택에서 빠진 과목은 매칭·그리드 표시에서만 제외되고 데이터는 그대로 남습니다.)
   const toggleSelected = useCallback(
     (idx: number) =>
       patch((g) => {
         if (g.confirmed || !g.roster) return g;
         const selected = g.selected.slice();
         selected[idx] = !selected[idx];
-        const placement = g.placement.slice();
         const sections = g.sections.slice();
-        if (!selected[idx]) placement[idx] = [];
-        else if (!sections[idx]) sections[idx] = defaultSections(g.roster.subjects[idx].count, g.cap);
-        return { ...g, selected, placement, sections };
+        if (selected[idx] && !sections[idx]) sections[idx] = defaultSections(g.roster.subjects[idx].count, g.cap);
+        return { ...g, selected, sections };
       }),
     [patch],
   );
@@ -294,14 +295,12 @@ export function useTimeAllocation(): TimeAllocationApi {
         if (g.confirmed || !g.roster) return g;
         const roster = g.roster;
         const selected = g.selected.slice();
-        const placement = g.placement.slice();
         const sections = g.sections.slice();
         roster.groups[groupIdx].cols.forEach((s) => {
           selected[s] = on;
-          if (!on) placement[s] = [];
-          else if (!sections[s]) sections[s] = defaultSections(roster.subjects[s].count, g.cap);
+          if (on && !sections[s]) sections[s] = defaultSections(roster.subjects[s].count, g.cap);
         });
-        return { ...g, selected, placement, sections };
+        return { ...g, selected, sections };
       }),
     [patch],
   );
