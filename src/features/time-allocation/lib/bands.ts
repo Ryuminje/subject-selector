@@ -78,15 +78,24 @@ export interface FixedBandsResult {
 }
 
 /**
- * 구획별 타임 고정: 교사 n명이면 한 타임에 최대 n개 반 → ceil(반수/n)개 타임에 분산.
- * 학생 점유가 가장 적은 타임부터 넣되, 같은 반이 두 구획에서 같은 타임을 쓰지 않게 합니다.
+ * 구획별 타임 고정: 교사 n명이면 한 타임에 최대 n개 반.
+ *
+ * mode:
+ *  - "spread"(기본) — 반을 하나씩 가장 한산한 타임부터 넣어, 여유가 있는 한 최대한 여러
+ *    타임에 나눠 배치합니다. 단 이러면 모든 타임이 이 구획으로 "조금씩" 막혀 선택과목
+ *    배정이 오히려 미배정을 낼 수 있습니다(실제로 겪음 — 사용자가 발견).
+ *  - "pack" — 이미 반이 들어간 타임부터 교사 수(perTime)까지 꽉 채운 뒤에만 새 타임을
+ *    엽니다. 쓰는 타임 수가 최소화돼 선택과목이 쓸 수 있는 "완전히 안 막힌" 타임이
+ *    더 많이 남습니다 — spread로 미배정이 나올 때 hooks/useTimeAllocation.ts의
+ *    runOptimize가 자동으로 이걸로 재시도합니다.
  */
 export function computeFixedBands(args: {
   common: CommonConfig;
   students: RosterStudent[];
   numTimes: number;
+  mode?: "spread" | "pack";
 }): FixedBandsResult {
-  const { common, students, numTimes: T } = args;
+  const { common, students, numTimes: T, mode = "spread" } = args;
   const classes = classKeysOf(students);
   if (!common.on || !classes.length) return { bandTimes: [], error: "" };
   const bands = bandList(common);
@@ -98,15 +107,19 @@ export function computeFixedBands(args: {
   const bandTimes: Array<Record<string, number>> = [];
   for (const band of bands) {
     const map: Record<string, number> = {};
-    // 반 하나씩 순서대로 가장 한산한 타임에 넣습니다(한 타임에 교사 수(perTime)를
-    // 넘게는 못 넣지만, 그걸 목표치로 꽉 채우지는 않습니다) — 그래서 여유 타임이
-    // 있는 한 큰 덩어리로 뭉치기보다 자연스럽게 여러 타임에 최대한 나뉘어 들어갑니다.
-    // 정말 여유가 없을 때만(다른 데 다 막혔을 때만) 한 타임에 perTime까지 채웁니다.
     const slotCount = new Array(T).fill(0); // 이 구획이 각 타임에 이미 넣은 반 수
     for (const c of classes) {
-      const cand = [...Array(T).keys()]
-        .filter((t) => !(used.get(c) || new Set()).has(t) && slotCount[t] < band.perTime)
-        .sort((a, b) => occ[a] - occ[b] || slotCount[a] - slotCount[b] || a - b);
+      const cand = [...Array(T).keys()].filter(
+        (t) => !(used.get(c) || new Set()).has(t) && slotCount[t] < band.perTime,
+      );
+      if (mode === "pack") {
+        // 이미 이 구획이 들어간(=slotCount>0) 타임 중 꽉 안 찬 곳부터 채우고, 그런 곳이
+        // 없을 때만 완전히 새 타임을 엽니다.
+        cand.sort((a, b) => slotCount[b] - slotCount[a] || occ[a] - occ[b] || a - b);
+      } else {
+        // 가장 한산한 타임부터 — 여유가 있는 한 새 타임을 먼저 엽니다.
+        cand.sort((a, b) => occ[a] - occ[b] || slotCount[a] - slotCount[b] || a - b);
+      }
       if (!cand.length) {
         return {
           bandTimes: [],

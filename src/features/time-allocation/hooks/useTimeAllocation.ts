@@ -192,6 +192,7 @@ export function useTimeAllocation(): TimeAllocationApi {
         common: settingsOf(state, key).common,
         students: state.roster!.students,
         numTimes,
+        mode: settingsOf(state, key).bandMode ?? "spread",
       });
     });
     return out;
@@ -472,15 +473,52 @@ export function useTimeAllocation(): TimeAllocationApi {
       err("확정 상태입니다. 확정취소 후 진행하세요.");
       return;
     }
-    if (!ctx) {
+    if (!ctx || !state.roster) {
       err("데이터가 없습니다.");
       return;
     }
+    const roster = state.roster;
     const res = optimize(ctx, state.sections, 2000, Math.random, state.placement);
-    patch((g) => ({ ...g, placement: res.placement }));
     const un = res.assign.unassigned.reduce((a, u) => a + u.length, 0);
+
+    // 반 고정 공통과목을 최대한 나눠(spread) 배치했더니 선택과목 쪽에 미배정이 남으면
+    // — 모든 타임이 조금씩 막혀 선택과목 배정이 빡빡해지는 게 원인 — "교사 수까지 꽉
+    // 채워 뭉치기"(pack)로 자동 재시도합니다. 사용자 요청: 최대한 펼치되, 미배정이 없는
+    // 선에서만 펼치고 안 되면 반을 뭉쳐도 됨.
+    const spreadKeys = semesterKeys.filter((key) => (settingsOf(state, key).bandMode ?? "spread") === "spread");
+    if (un > 0 && spreadKeys.length) {
+      const packBySemester: Record<string, SemesterAllocInfo> = {};
+      semesterKeys.forEach((key) => {
+        const s = settingsOf(state, key);
+        const mode = spreadKeys.includes(key) ? "pack" : (s.bandMode ?? "spread");
+        packBySemester[key] = {
+          cap: s.cap,
+          allowOver: s.allowOver,
+          common: s.common,
+          bandTimes: computeFixedBands({ common: s.common, students: roster.students, numTimes, mode }).bandTimes,
+          ownTimes: totalTimes(s.numElectiveTimes, s.common),
+        };
+      });
+      const packCtx: AllocContext = { ...ctx, bySemester: packBySemester };
+      const packRes = optimize(packCtx, state.sections, 2000, Math.random, state.placement);
+      const packUn = packRes.assign.unassigned.reduce((a, u) => a + u.length, 0);
+      if (packUn < un) {
+        patch((g) => ({
+          ...g,
+          placement: packRes.placement,
+          settingsBySemester: {
+            ...g.settingsBySemester,
+            ...Object.fromEntries(spreadKeys.map((key) => [key, { ...settingsOf(g, key), bandMode: "pack" as const }])),
+          },
+        }));
+        info(`최적화 완료 (${packRes.iter}회 탐색, 미배정 ${packUn}명 — 반 고정 공통과목을 조금 더 뭉쳐 배치했습니다)`);
+        return;
+      }
+    }
+
+    patch((g) => ({ ...g, placement: res.placement }));
     info(`최적화 완료 (${res.iter}회 탐색, 미배정 ${un}명)`);
-  }, [ctx, state.sections, state.placement, state.confirmed, patch, info, err]);
+  }, [ctx, state, numTimes, semesterKeys, patch, info, err]);
 
   const resetPlacement = useCallback(() => {
     if (state.confirmed) {

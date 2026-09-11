@@ -74,6 +74,14 @@ export interface SemesterSettings {
   /** "선택과목 타임 수"(수동 입력). 이 학기의 전체 타임 수 = 이 값 + 이 학기 구획 수. */
   numElectiveTimes: number;
   common: CommonConfig;
+  /**
+   * 반 고정 공통과목을 최대한 여러 타임에 나눠("spread", 기본값) 배치할지, 교사 수까지
+   * 꽉 채워 적은 타임에 뭉쳐("pack") 배치할지. 나눠 배치하면 선택과목 쪽 배정 최적화가
+   * 미배정을 낼 수 있어서(모든 타임이 조금씩 막히므로), ① 배정 최적화가 spread로 먼저
+   * 시도해보고 미배정이 남으면 자동으로 이 값을 pack으로 바꿔 다시 시도합니다
+   * (lib/bands.ts computeFixedBands, hooks/useTimeAllocation.ts runOptimize 참고).
+   */
+  bandMode?: "spread" | "pack";
 }
 
 export function defaultCommonConfig(): CommonConfig {
