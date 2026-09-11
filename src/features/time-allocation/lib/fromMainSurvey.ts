@@ -41,8 +41,9 @@ export function rosterFromMainSurvey(
     };
   }
 
-  // 그룹: subjectStats 의 group 문자열을 등장 순서대로
+  // 그룹: subjectStats 의 group 문자열을 등장 순서대로 (나중에 학기 우선으로 재정렬)
   const groups: RosterGroup[] = [];
+  const groupMeta: { label: string; semester: string }[] = []; // 재정렬용
   const groupIndex = new Map<string, number>();
   const subjects: RosterSubject[] = [];
   const subjectKey = new Map<string, number>(); // `${normSemester}|${normName}` → subj idx
@@ -54,6 +55,7 @@ export function rosterFromMainSurvey(
     if (!groupIndex.has(groupKey)) {
       groupIndex.set(groupKey, groups.length);
       groups.push({ name: `${st.group} · ${st.semester}`, pick: 0, cols: [] });
+      groupMeta.push({ label: st.group, semester: st.semester });
     }
     const g = groupIndex.get(groupKey)!;
     const idx = subjects.length;
@@ -110,9 +112,39 @@ export function rosterFromMainSurvey(
     };
   });
 
+  // 헤더 정렬: 학기가 1순위, 교과군 문자(A/B/C...)는 2순위가 되도록 그룹·과목 순서를 재배열.
+  const semesterRank = (s: string) => (s.startsWith("1학기") ? 0 : s.startsWith("2학기") ? 1 : 2);
+  const order = groups
+    .map((_, i) => i)
+    .sort((a, b) => {
+      const r = semesterRank(groupMeta[a].semester) - semesterRank(groupMeta[b].semester);
+      return r !== 0 ? r : groupMeta[a].label < groupMeta[b].label ? -1 : 1;
+    });
+
+  const oldToNewIdx = new Map<number, number>();
+  const newGroups: RosterGroup[] = [];
+  const newSubjects: RosterSubject[] = [];
+  order.forEach((oldGroupIdx) => {
+    const newGroupIdx = newGroups.length;
+    const newCols: number[] = [];
+    groups[oldGroupIdx].cols.forEach((oldSubjIdx) => {
+      const newIdx = newSubjects.length;
+      oldToNewIdx.set(oldSubjIdx, newIdx);
+      newSubjects.push({ ...subjects[oldSubjIdx], idx: newIdx, group: newGroupIdx, col: newIdx });
+      newCols.push(newIdx);
+    });
+    newGroups.push({ ...groups[oldGroupIdx], cols: newCols });
+  });
+  const newSectionHints: number[] = [];
+  oldToNewIdx.forEach((newIdx, oldIdx) => (newSectionHints[newIdx] = sectionHints[oldIdx]));
+  const remappedStudents = rosterStudents.map((st) => ({
+    ...st,
+    choices: st.choices.map((oldIdx) => oldToNewIdx.get(oldIdx)!).sort((a, b) => a - b),
+  }));
+
   // count 는 subjectStats.applicants 를 신뢰(이미 본조사에서 집계된 값)
   return {
-    roster: { groups, subjects, students: rosterStudents },
-    sectionHints,
+    roster: { groups: newGroups, subjects: newSubjects, students: remappedStudents },
+    sectionHints: newSectionHints,
   };
 }
