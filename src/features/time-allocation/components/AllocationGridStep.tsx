@@ -118,21 +118,14 @@ export function AllocationGridStep({ api }: Props) {
           disabled={dis}
           className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 text-white text-sm font-semibold rounded-xl"
         >
-          <Sparkles className="w-4 h-4" /> ① 최적화
-        </button>
-        <button
-          onClick={api.runAssignNow}
-          disabled={dis}
-          className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-sm font-semibold rounded-xl"
-        >
-          ② 배정
+          <Sparkles className="w-4 h-4" /> ① 배정 최적화
         </button>
         {!state.confirmed ? (
           <button
             onClick={() => api.setConfirmed(true)}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-stone-800 hover:bg-stone-700 text-white text-sm font-semibold rounded-xl"
           >
-            <CheckCircle2 className="w-4 h-4" /> ③ 확정
+            <CheckCircle2 className="w-4 h-4" /> ② 확정
           </button>
         ) : (
           <button
