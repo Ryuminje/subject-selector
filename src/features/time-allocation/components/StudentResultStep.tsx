@@ -28,8 +28,7 @@ export function StudentResultStep({ api, fileLabel }: Props) {
     startLetter: state.startLetter,
     subjects: rosterSubjects,
     students: state.roster.students,
-    common: state.common,
-    bandTimes: ctx.bandTimes,
+    bySemester: ctx.bySemester,
   };
 
   const copyTsv = async () => {
@@ -98,7 +97,9 @@ export function StudentResultStep({ api, fileLabel }: Props) {
               const u = assign.unassigned[i];
               if (onlyUnassigned && !u.length) return null;
               const row = studentRow(rowsCtx, assign, i);
-              const blocked = blockedBands(st.id, state.common, ctx.bandTimes);
+              const blocked = Object.values(ctx.bySemester).flatMap((info) =>
+                blockedBands(st.id, info.common, info.bandTimes),
+              );
               return (
                 <tr key={st.id + i}>
                   <td className="border border-stone-200 px-2 py-1 text-center">{st.no}</td>

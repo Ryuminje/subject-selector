@@ -4,8 +4,10 @@
 // ★ 이미 잡은 버그(README 6절): 한 구획의 과목들은 같은 타임을 시수로 나눠 쓰므로,
 //   타임별 인원·반 집계에서 **구획의 첫 과목에서만** 세고 나머지(shared)는 건너뜁니다.
 //   과목 단위로 각각 더하면 인원·반이 부풀려집니다.
+// 1학기/2학기는 반 고정 공통과목도 서로 독립이라, 공통과목 셀마다 어느 학기 설정인지
+// semesterKey 로 표시해 두고 그 학기의 bandTimes 로만 조회합니다.
 
-import type { Assignment, CommonConfig, RosterStudent, RosterSubject } from "../types";
+import type { Assignment, RosterStudent, RosterSubject, SemesterBandInfo } from "../types";
 import { bandList, classKey } from "./bands";
 
 export interface GridContext {
@@ -13,12 +15,13 @@ export interface GridContext {
   subjects: RosterSubject[];
   students: RosterStudent[];
   selected: boolean[];
-  common: CommonConfig;
-  bandTimes: Array<Record<string, number>>;
+  /** semesterKeyOf(subject) → 그 학기의 공통과목 설정 + 타임 고정 결과. */
+  bySemester: Record<string, SemesterBandInfo>;
 }
 
 /** 공통과목 셀 하나(구획 첫 과목만 shared=false). */
 export interface CommonCell {
+  semesterKey: string;
   name: string;
   bandIdx: number;
   credits: number;
@@ -26,24 +29,34 @@ export interface CommonCell {
   shared: boolean;
 }
 
-export function commonCells(common: CommonConfig): CommonCell[] {
+export function commonCells(bySemester: Record<string, SemesterBandInfo>): CommonCell[] {
   const out: CommonCell[] = [];
-  bandList(common).forEach((b, bi) =>
-    b.subjects.forEach((s, j) =>
-      out.push({ name: s.name, bandIdx: bi, credits: s.credits, teachers: s.teachers, shared: j > 0 }),
-    ),
-  );
+  Object.entries(bySemester).forEach(([semesterKey, info]) => {
+    bandList(info.common).forEach((b, bi) =>
+      b.subjects.forEach((s, j) =>
+        out.push({
+          semesterKey,
+          name: s.name,
+          bandIdx: bi,
+          credits: s.credits,
+          teachers: s.teachers,
+          shared: j > 0,
+        }),
+      ),
+    );
+  });
   return out;
 }
 
-/** 구획 bandIdx 가 타임 t 에 배치한 반 키 목록. */
+/** 구획 bandIdx 가 타임 t 에 배치한 반 키 목록(그 학기의 bandTimes 를 넘겨받음). */
 export function classesAt(
-  ctx: Pick<GridContext, "students" | "bandTimes">,
+  ctx: Pick<GridContext, "students">,
+  bandTimes: Array<Record<string, number>>,
   bandIdx: number,
   t: number,
 ): string[] {
   const classes = [...new Set(ctx.students.map((st) => classKey(st.id)))].sort();
-  return classes.filter((k) => (ctx.bandTimes[bandIdx] || {})[k] === t);
+  return classes.filter((k) => (bandTimes[bandIdx] || {})[k] === t);
 }
 
 export interface PerTimeRow {
@@ -58,7 +71,7 @@ export function perTimeRows(
   assign: Assignment | null,
   placement: number[][],
 ): PerTimeRow[] {
-  const com = commonCells(ctx.common);
+  const com = commonCells(ctx.bySemester);
   const rows: PerTimeRow[] = [];
   for (let t = 0; t < ctx.numTimes; t++) {
     let stu = 0;
@@ -71,7 +84,8 @@ export function perTimeRows(
     });
     com.forEach((c) => {
       if (c.shared) return; // 같은 구획의 다른 과목이므로 이미 셈에 들어가 있음
-      const ks = classesAt(ctx, c.bandIdx, t);
+      const bandTimes = ctx.bySemester[c.semesterKey]?.bandTimes ?? [];
+      const ks = classesAt(ctx, bandTimes, c.bandIdx, t);
       if (ks.length) {
         secs += ks.length;
         stu += ctx.students.filter((st) => ks.includes(classKey(st.id))).length;
@@ -85,7 +99,7 @@ export function perTimeRows(
 /**
  * 검증용 불변식 값.
  * left  = Σ(타임별 인원)  — perTimeRows 로 집계한 합(구획 단위)
- * right = Σ학생(배정된 선택과목 수 + 그 반이 점유한 구획 수)  — 실제로 학생이 채운 칸 수
+ * right = Σ학생(배정된 선택과목 수 + 그 반이 점유한 구획 수, 학기별 합산)  — 실제로 학생이 채운 칸 수
  * 이 둘이 같아야 합니다(학생은 한 타임에 한 수업만 듣기 때문).
  */
 export function invariantCheck(
@@ -94,13 +108,15 @@ export function invariantCheck(
   placement: number[][],
 ): { left: number; right: number; ok: boolean } {
   const left = perTimeRows(ctx, assign, placement).reduce((a, r) => a + r.students, 0);
-  const bandCount = ctx.common.on ? bandList(ctx.common).length : 0;
   const right = ctx.students.reduce((acc, st, i) => {
     const k = classKey(st.id);
-    const bandsForClass = ctx.common.on
-      ? ctx.bandTimes.filter((m) => m[k] !== undefined).length
-      : 0;
-    return acc + assign.byStudent[i].size + Math.min(bandsForClass, bandCount);
+    let bandsForClass = 0;
+    Object.values(ctx.bySemester).forEach((info) => {
+      const bandCount = info.common.on ? bandList(info.common).length : 0;
+      const occ = info.bandTimes.filter((m) => m[k] !== undefined).length;
+      bandsForClass += Math.min(occ, bandCount);
+    });
+    return acc + assign.byStudent[i].size + bandsForClass;
   }, 0);
   return { left, right, ok: left === right };
 }

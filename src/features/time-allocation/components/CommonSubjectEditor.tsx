@@ -7,12 +7,14 @@ import { bandList, classKeysOf } from "../lib/bands";
 
 interface Props {
   api: TimeAllocationApi;
+  /** 편집 대상 학기 키(semesterKeyOf 결과). 1학기/2학기는 서로 독립된 설정을 가집니다. */
+  semesterKey: string;
 }
 
 /** 반 고정 공통과목 편집표(과목명/학점/교사 수/구획/한 타임당 반/삭제). app.js renderCommonList 대응. */
-export function CommonSubjectEditor({ api }: Props) {
+export function CommonSubjectEditor({ api, semesterKey }: Props) {
   const { state, bandError } = api;
-  const common = state.common;
+  const common = api.settingsOf(semesterKey).common;
   const disabled = state.confirmed;
   const bands = bandList(common);
   const nBands = Math.max(bands.length, 1);
@@ -26,7 +28,7 @@ export function CommonSubjectEditor({ api }: Props) {
             type="checkbox"
             checked={common.on}
             disabled={disabled}
-            onChange={(e) => api.setCommonOn(e.target.checked)}
+            onChange={(e) => api.setCommonOn(semesterKey, e.target.checked)}
           />
           반 고정 공통과목
         </label>
@@ -38,20 +40,20 @@ export function CommonSubjectEditor({ api }: Props) {
             max={8}
             value={common.hours}
             disabled={disabled || !common.on}
-            onChange={(e) => api.setCommonHours(+e.target.value)}
+            onChange={(e) => api.setCommonHours(semesterKey, +e.target.value)}
             className="w-14 px-2 py-1 border border-stone-200 rounded-lg text-sm"
           />
           시수
         </label>
         <button
-          onClick={api.addCommonSubject}
+          onClick={() => api.addCommonSubject(semesterKey)}
           disabled={disabled || !common.on}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-200 hover:bg-stone-300 disabled:opacity-40 text-stone-800 text-xs font-semibold rounded-lg"
         >
           <Plus className="w-3.5 h-3.5" /> 과목 추가
         </button>
         <button
-          onClick={api.packCommon}
+          onClick={() => api.packCommon(semesterKey)}
           disabled={disabled || !common.on}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-200 hover:bg-stone-300 disabled:opacity-40 text-stone-800 text-xs font-semibold rounded-lg"
         >
@@ -86,7 +88,7 @@ export function CommonSubjectEditor({ api }: Props) {
                         type="text"
                         value={s.name}
                         disabled={disabled}
-                        onChange={(e) => api.updateCommonSubject(i, { name: e.target.value })}
+                        onChange={(e) => api.updateCommonSubject(semesterKey, i, { name: e.target.value })}
                         className="w-32 px-2 py-1 border border-stone-200 rounded-lg"
                       />
                     </td>
@@ -97,7 +99,7 @@ export function CommonSubjectEditor({ api }: Props) {
                         max={common.hours}
                         value={s.credits}
                         disabled={disabled}
-                        onChange={(e) => api.updateCommonSubject(i, { credits: +e.target.value })}
+                        onChange={(e) => api.updateCommonSubject(semesterKey, i, { credits: +e.target.value })}
                         className="w-14 px-2 py-1 border border-stone-200 rounded-lg text-center"
                       />
                     </td>
@@ -107,7 +109,7 @@ export function CommonSubjectEditor({ api }: Props) {
                         min={1}
                         value={s.teachers}
                         disabled={disabled}
-                        onChange={(e) => api.updateCommonSubject(i, { teachers: +e.target.value })}
+                        onChange={(e) => api.updateCommonSubject(semesterKey, i, { teachers: +e.target.value })}
                         className="w-14 px-2 py-1 border border-stone-200 rounded-lg text-center"
                       />
                     </td>
@@ -115,7 +117,7 @@ export function CommonSubjectEditor({ api }: Props) {
                       <select
                         value={s.band}
                         disabled={disabled}
-                        onChange={(e) => api.updateCommonSubject(i, { band: +e.target.value })}
+                        onChange={(e) => api.updateCommonSubject(semesterKey, i, { band: +e.target.value })}
                         className="px-2 py-1 border border-stone-200 rounded-lg"
                       >
                         {Array.from({ length: nBands + 1 }, (_, k) => (
@@ -131,7 +133,7 @@ export function CommonSubjectEditor({ api }: Props) {
                     </td>
                     <td className="px-2 py-1 text-center">
                       <button
-                        onClick={() => api.removeCommonSubject(i)}
+                        onClick={() => api.removeCommonSubject(semesterKey, i)}
                         disabled={disabled}
                         className="p-1 text-stone-400 hover:text-rose-600"
                         aria-label="삭제"

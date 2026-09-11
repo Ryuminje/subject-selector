@@ -5,39 +5,42 @@
 // 프로토타입과 달리 "인원설정 고정"은 타임 위치 고정이 아니라 **과목별 정원 고정**을
 // 뜻합니다(fixedCap). initialPlacement/optimize 는 모든 선택 과목의 배치를 자유롭게 다룹니다.
 
-import type { Assignment, CommonConfig, RosterStudent, RosterSubject } from "../types";
+import type { Assignment, RosterStudent, RosterSubject, SemesterBandInfo } from "../types";
+import { semesterKeyOf } from "../types";
 import { blockedBands } from "./bands";
+
+/** 학기 하나의 배정용 설정 — 정원·인원초과 허용 + 반 고정 공통과목(+그 타임 고정 결과). */
+export interface SemesterAllocInfo extends SemesterBandInfo {
+  cap: number;
+  allowOver: boolean;
+}
 
 export interface AllocContext {
   numTimes: number;
-  cap: number; // 전역 학급당 인원
-  allowOver: boolean;
   subjects: RosterSubject[];
   students: RosterStudent[];
   selected: boolean[];
   fixedCap: Record<number, number>;
-  common: CommonConfig;
-  bandTimes: Array<Record<string, number>>;
+  /** semesterKeyOf(subject) → 그 학기의 설정. 1학기/2학기는 서로 다른 설정으로 완전히 독립. */
+  bySemester: Record<string, SemesterAllocInfo>;
 }
 
-/** 과목의 실효 정원 — "인원설정 고정"이 켜진 과목은 지정값, 아니면 전역 cap. */
+const DEFAULT_CAP = 29;
+
+function infoFor(ctx: AllocContext, subjIdx: number): SemesterAllocInfo | undefined {
+  return ctx.bySemester[semesterKeyOf(ctx.subjects[subjIdx])];
+}
+
+/** 과목의 실효 정원 — "인원설정 고정"이 켜진 과목은 지정값, 아니면 그 학기의 cap. */
 export function capOf(ctx: AllocContext, subjIdx: number): number {
   const v = ctx.fixedCap[subjIdx];
-  return typeof v === "number" && v > 0 ? v : ctx.cap;
+  if (typeof v === "number" && v > 0) return v;
+  return infoFor(ctx, subjIdx)?.cap ?? DEFAULT_CAP;
 }
 
 /** 분반 수 기본값 = ceil(신청 인원 / 정원). */
 export function defaultSections(count: number, cap: number): number {
   return Math.max(1, Math.ceil(count / Math.max(1, cap)));
-}
-
-/**
- * 과목의 "학기 그룹" 키. 1학기 수업과 2학기 수업은 같은 해 안에서도 동시에 열리지 않으므로
- * 같은 타임을 각자 따로 쓸 수 있습니다(서로 겹침 취급 안 함) — 본조사 연동(semester 있음)
- * 경로에서만 의미가 있고, 붙여넣기(semester 없음) 경로는 전부 같은 키라 기존과 동일하게 동작.
- */
-function semesterKey(subj: RosterSubject): string {
-  return subj.semester ?? "__all__";
 }
 
 /** 학생별 "선택 과목 ↔ 타임" 이분 매칭(증가경로 DFS). placement 를 건드리지 않고 결과만 돌려줍니다. */
@@ -82,20 +85,22 @@ export function runAssign(ctx: AllocContext, placement: number[][]): Assignment 
 
   for (const i of order) {
     const subs = stuSubs[i];
-    const blocked = blockedBands(ctx.students[i].id, ctx.common, ctx.bandTimes);
     // 1학기/2학기 과목은 서로 다른 학기 그룹이면 같은 타임을 나눠 써도 충돌이 아니므로
-    // 그룹별로 독립된 매칭을 돌립니다(같은 학기 안에서는 기존처럼 한 타임에 하나만).
-    const bySemester = new Map<string, number[]>();
+    // 그룹(학기)별로 독립된 매칭을 돌립니다(같은 학기 안에서는 기존처럼 한 타임에 하나만).
+    // 각 그룹은 그 학기의 공통과목·인원초과 설정을 씁니다.
+    const bySemesterSubs = new Map<string, number[]>();
     for (const s of subs) {
-      const key = semesterKey(ctx.subjects[s]);
-      const arr = bySemester.get(key);
+      const key = semesterKeyOf(ctx.subjects[s]);
+      const arr = bySemesterSubs.get(key);
       if (arr) arr.push(s);
-      else bySemester.set(key, [s]);
+      else bySemesterSubs.set(key, [s]);
     }
     const res = new Map<number, number>();
-    for (const group of bySemester.values()) {
+    for (const [key, group] of bySemesterSubs) {
+      const info = ctx.bySemester[key];
+      const blocked = info ? blockedBands(ctx.students[i].id, info.common, info.bandTimes) : [];
       let m = match(group, true, blocked);
-      if (m.size < group.length && ctx.allowOver) m = match(group, false, blocked);
+      if (m.size < group.length && info?.allowOver) m = match(group, false, blocked);
       for (const [s, t] of m) res.set(s, t);
     }
     byStudent[i] = res;
@@ -146,12 +151,12 @@ export function pickTimes(
   exclude: Set<number>,
 ): number[] {
   const T = ctx.numTimes;
-  const sKey = semesterKey(ctx.subjects[s]);
+  const sKey = semesterKeyOf(ctx.subjects[s]);
   const seats = new Array(T).fill(0);
   const inT: number[][] = Array.from({ length: T }, () => []);
   ctx.subjects.forEach((u, uIdx) => {
     // 다른 학기 과목은 같은 타임을 써도 안 겹치므로 자리 혼잡도 계산에서 제외합니다.
-    if (uIdx === s || !ctx.selected[uIdx] || semesterKey(u) !== sKey) return;
+    if (uIdx === s || !ctx.selected[uIdx] || semesterKeyOf(u) !== sKey) return;
     for (const t of placement[uIdx]) {
       seats[t] += capOf(ctx, uIdx);
       inT[t].push(uIdx);
