@@ -141,9 +141,17 @@ export function pickTimes(
     .slice(0, k);
 }
 
-/** 신청 인원이 많은 과목부터 초기 배치. 새 placement 배열을 돌려줍니다. */
-export function initialPlacement(ctx: AllocContext, sections: number[], co: number[][]): number[][] {
-  const placement: number[][] = ctx.subjects.map(() => []);
+/**
+ * 신청 인원이 많은 과목부터 초기 배치. basePlacement 가 있으면 선택되지 않은(1학기 결과 등)
+ * 과목의 기존 배치를 그대로 들고 가고, 선택된 과목만 새로 배치합니다.
+ */
+export function initialPlacement(
+  ctx: AllocContext,
+  sections: number[],
+  co: number[][],
+  basePlacement?: number[][],
+): number[][] {
+  const placement: number[][] = ctx.subjects.map((_, i) => (basePlacement?.[i] ?? []).slice());
   const order = ctx.subjects
     .map((_, i) => i)
     .filter((i) => ctx.selected[i])
@@ -168,9 +176,10 @@ export function optimize(
   sections: number[],
   budgetMs = 2000,
   rand: () => number = Math.random,
+  basePlacement?: number[][],
 ): OptimizeResult {
   const co = coMatrix(ctx);
-  const placement = initialPlacement(ctx, sections, co);
+  const placement = initialPlacement(ctx, sections, co, basePlacement);
   let best = cost(ctx, placement).value;
   const movable = ctx.subjects
     .map((_, i) => i)
@@ -199,4 +208,17 @@ export function optimize(
 
 function now(): number {
   return typeof performance !== "undefined" ? performance.now() : Date.now();
+}
+
+/**
+ * 두 Assignment 를 합칩니다. 과목 idx 가 서로 겹치지 않는다는 전제(호출부에서 보장) —
+ * "배정과목 선택"에서 체크 해제해 매칭 대상에서 빠진 과목(1학기 결과 등)을, 다시 매칭한
+ * 활성 과목(2학기)과 합쳐서 학생별 결과에 그대로 보여주는 데 씁니다.
+ */
+export function mergeAssignments(a: Assignment, b: Assignment): Assignment {
+  return {
+    byStudent: a.byStudent.map((m, i) => new Map([...b.byStudent[i], ...m])),
+    unassigned: a.unassigned.map((u, i) => [...b.unassigned[i], ...u].sort((x, y) => x - y)),
+    load: a.load.map((row, s) => row.map((v, t) => v + b.load[s][t])),
+  };
 }

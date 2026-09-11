@@ -20,6 +20,7 @@ import { autoPackBands, computeFixedBands, totalTimes } from "../lib/bands";
 import {
   coMatrix,
   defaultSections,
+  mergeAssignments,
   optimize,
   pickTimes,
   runAssign,
@@ -79,6 +80,8 @@ export interface TimeAllocationApi {
   numTimes: number;
   bandError: string;
   assign: Assignment | null;
+  /** 학생별 결과(③단계) 전용 — 체크 해제됐지만 배치가 남은 과목까지 합친 값. */
+  studentAssign: Assignment | null;
   ctx: AllocContext | null;
   perTime: ReturnType<typeof perTimeRows>;
   totals: { assigned: number; unassigned: number; students: number };
@@ -169,6 +172,17 @@ export function useTimeAllocation(): TimeAllocationApi {
     if (!ctx || !state.placement.some((p) => p.length)) return null;
     return runAssign(ctx, state.placement);
   }, [ctx, state.placement]);
+
+  // 학생별 결과(③단계)용 — 체크 해제해서 매칭 대상에서 빠졌지만 배치가 남아 있는 과목(예:
+  // 1학기 결과)을 활성 과목(assign) 위에 합쳐서 보여줍니다. 그리드(②단계)·totals·perTime 은
+  // 여전히 active(선택된 과목)만 쓰는 assign 을 그대로 씁니다 — 이 값은 학생별 결과 전용.
+  const studentAssign: Assignment | null = useMemo(() => {
+    if (!ctx || !assign) return assign;
+    const frozenSelected = ctx.selected.map((sel, i) => !sel && (state.placement[i]?.length ?? 0) > 0);
+    if (!frozenSelected.some(Boolean)) return assign;
+    const frozen = runAssign({ ...ctx, selected: frozenSelected }, state.placement);
+    return mergeAssignments(assign, frozen);
+  }, [ctx, assign, state.placement]);
 
   const perTime = useMemo(() => {
     if (!ctx) return [];
@@ -391,11 +405,11 @@ export function useTimeAllocation(): TimeAllocationApi {
       err("데이터가 없습니다.");
       return;
     }
-    const res = optimize(ctx, state.sections, 2000);
+    const res = optimize(ctx, state.sections, 2000, Math.random, state.placement);
     patch((g) => ({ ...g, placement: res.placement }));
     const un = res.assign.unassigned.reduce((a, u) => a + u.length, 0);
     info(`최적화 완료 (${res.iter}회 탐색, 미배정 ${un}명)`);
-  }, [ctx, state.sections, state.confirmed, patch, info, err]);
+  }, [ctx, state.sections, state.placement, state.confirmed, patch, info, err]);
 
   const runAssignNow = useCallback(() => {
     if (state.confirmed) {
@@ -516,6 +530,7 @@ export function useTimeAllocation(): TimeAllocationApi {
     numTimes,
     bandError: fixedBands.error,
     assign,
+    studentAssign,
     ctx,
     perTime,
     totals,

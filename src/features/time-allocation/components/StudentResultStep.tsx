@@ -13,7 +13,8 @@ interface Props {
 }
 
 export function StudentResultStep({ api, fileLabel }: Props) {
-  const { state, ctx, assign, numTimes } = api;
+  // 체크 해제됐지만 배치가 남은 과목(1학기 결과 등)까지 합쳐진 값을 씁니다.
+  const { state, ctx, studentAssign: assign, numTimes } = api;
   const [onlyUnassigned, setOnlyUnassigned] = useState(false);
   const [msg, setMsg] = useState<string>("");
 
