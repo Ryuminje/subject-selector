@@ -1,18 +1,26 @@
 "use client";
 
 // 타임(구획) 배정 탭의 상태 컨테이너. 학년별(pre1/grade1/grade2) TimeAllocGradeState 를
-// 들고 있고, 파생값(numTimes/bandTimes/assign/grid)은 활성 학년에 대해 useMemo 로 계산합니다.
+// 들고 있고, 파생값(numTimes/ctx/assign/grid)은 활성 학년에 대해 useMemo 로 계산합니다.
+//
+// 1학기와 2학기는 서로 완전히 독립입니다(같은 타임을 겹쳐 써도 충돌 아님) — 그래서 정원·
+// 인원초과 허용·선택과목 타임 수·반 고정 공통과목도 학기마다 따로 설정합니다
+// (state.settingsBySemester, 키는 semesterKeyOf() 결과). 붙여넣기 경로처럼 학기 구분이
+// 없는 데이터는 전부 같은 키(NO_SEMESTER_KEY) 하나만 쓰므로 기존과 동일하게 동작합니다.
+//
 // 프로젝트 JSON 저장은 getBackup()/loadBackup() 로 노출합니다.
 
 import { useCallback, useMemo, useState } from "react";
 import type { GradeKey } from "../../../types";
 import {
   ALL_GRADE_KEYS,
+  defaultSemesterSettings,
   emptyGradeState,
+  semesterKeyOf,
   type Assignment,
-  type CommonConfig,
   type CommonSubject,
   type RosterModel,
+  type SemesterSettings,
   type TimeAllocGradeState,
 } from "../types";
 import { parseRoster } from "../lib/parseRoster";
@@ -25,6 +33,7 @@ import {
   pickTimes,
   runAssign,
   type AllocContext,
+  type SemesterAllocInfo,
 } from "../lib/assign";
 import { perTimeRows } from "../lib/gridModel";
 import { rosterFromMainSurvey, type MainSurveySnapshot } from "../lib/fromMainSurvey";
@@ -36,7 +45,16 @@ function freshGradeMap(): GradeMap {
   return { pre1: emptyGradeState(), grade1: emptyGradeState(), grade2: emptyGradeState() };
 }
 
-/** 로스터를 새로 불러왔을 때의 기본 상태(cap/common/startLetter 등 이전 설정은 유지). */
+function settingsOf(g: TimeAllocGradeState, key: string): SemesterSettings {
+  return g.settingsBySemester[key] ?? defaultSemesterSettings();
+}
+
+function capForSubjectIdx(g: TimeAllocGradeState, idx: number): number {
+  if (!g.roster) return 29;
+  return settingsOf(g, semesterKeyOf(g.roster.subjects[idx])).cap;
+}
+
+/** 로스터를 새로 불러왔을 때의 기본 상태. 이미 있던 학기 설정은 그대로 이어받습니다. */
 function stateForRoster(
   prev: TimeAllocGradeState,
   roster: RosterModel,
@@ -47,21 +65,34 @@ function stateForRoster(
   const anyPick = roster.groups.some((g) => g.pick > 0);
   const lastGroup = roster.groups.length - 1;
   const selected = roster.subjects.map((s) => (anyPick ? s.group === lastGroup : true));
-  const maxChoices = roster.students.reduce(
-    (m, st) => Math.max(m, st.choices.filter((c) => selected[c]).length),
-    0,
-  );
+
+  const keys = [...new Set(roster.subjects.map(semesterKeyOf))];
+  const settingsBySemester: Record<string, SemesterSettings> = {};
+  keys.forEach((key) => {
+    if (prev.settingsBySemester[key]) {
+      settingsBySemester[key] = prev.settingsBySemester[key];
+      return;
+    }
+    const maxChoices = roster.students.reduce((m, st) => {
+      const n = st.choices.filter((c) => selected[c] && semesterKeyOf(roster.subjects[c]) === key).length;
+      return Math.max(m, n);
+    }, 0);
+    settingsBySemester[key] = { ...defaultSemesterSettings(), numElectiveTimes: Math.max(1, maxChoices || 8) };
+  });
+
   const sections = roster.subjects.map((s, i) => {
     if (!selected[i]) return 0;
     const hint = sectionHints?.[i];
-    return hint !== undefined && hint > 0 ? hint : defaultSections(s.count, prev.cap);
+    if (hint !== undefined && hint > 0) return hint;
+    return defaultSections(s.count, settingsBySemester[semesterKeyOf(s)].cap);
   });
+
   return {
     ...prev,
     rawText,
     roster,
     source,
-    numElectiveTimes: Math.max(1, maxChoices || (anyPick ? roster.groups[lastGroup]?.pick : 8) || 8),
+    settingsBySemester,
     selected,
     sections,
     fixedCap: {},
@@ -76,6 +107,10 @@ export interface TimeAllocationApi {
   state: TimeAllocGradeState;
   message: Msg;
   clearMessage: () => void;
+
+  /** 지금 로스터에 실제로 있는 학기 키 목록(정렬됨). 붙여넣기 데이터는 보통 1개("__all__"). */
+  semesterKeys: string[];
+  settingsOf: (key: string) => SemesterSettings;
 
   numTimes: number;
   bandError: string;
@@ -92,11 +127,11 @@ export interface TimeAllocationApi {
   loadFromMain: (snap: MainSurveySnapshot) => void;
   loadSampleText: (t: string) => void;
 
-  // 그리드 설정
-  setCap: (n: number) => void;
-  setAllowOver: (v: boolean) => void;
+  // 그리드 설정 (학기별)
+  setCap: (key: string, n: number) => void;
+  setAllowOver: (key: string, v: boolean) => void;
   setStartLetter: (n: number) => void;
-  setNumElectiveTimes: (n: number) => void;
+  setNumElectiveTimes: (key: string, n: number) => void;
   toggleSelected: (idx: number) => void;
   toggleGroup: (groupIdx: number, on: boolean) => void;
   setSection: (idx: number, n: number) => void;
@@ -104,17 +139,16 @@ export interface TimeAllocationApi {
   setFixedCap: (idx: number, n: number) => void;
   toggleCell: (idx: number, t: number) => void;
   runOptimize: () => void;
-  runAssignNow: () => void;
   resetPlacement: () => void;
   setConfirmed: (v: boolean) => void;
 
-  // 공통과목
-  setCommonOn: (v: boolean) => void;
-  setCommonHours: (n: number) => void;
-  updateCommonSubject: (i: number, patch: Partial<CommonSubject>) => void;
-  addCommonSubject: () => void;
-  removeCommonSubject: (i: number) => void;
-  packCommon: () => void;
+  // 공통과목 (학기별)
+  setCommonOn: (key: string, v: boolean) => void;
+  setCommonHours: (key: string, n: number) => void;
+  updateCommonSubject: (key: string, i: number, patch: Partial<CommonSubject>) => void;
+  addCommonSubject: (key: string) => void;
+  removeCommonSubject: (key: string, i: number) => void;
+  packCommon: (key: string) => void;
 
   // 저장
   getBackup: () => GradeMap;
@@ -137,36 +171,53 @@ export function useTimeAllocation(): TimeAllocationApi {
   const info = useCallback((text: string) => setMessage({ text, kind: "info" }), []);
   const err = useCallback((text: string) => setMessage({ text, kind: "error" }), []);
 
-  const numTimes = state.roster ? totalTimes(state.numElectiveTimes, state.common) : 0;
+  const semesterKeys = useMemo(
+    () => (state.roster ? [...new Set(state.roster.subjects.map(semesterKeyOf))].sort() : []),
+    [state.roster],
+  );
 
-  const fixedBands = useMemo(() => {
-    if (!state.roster) return { bandTimes: [] as Array<Record<string, number>>, error: "" };
-    return computeFixedBands({ common: state.common, students: state.roster.students, numTimes });
-  }, [state.roster, state.common, numTimes]);
+  const numTimes = useMemo(() => {
+    if (!state.roster || !semesterKeys.length) return 0;
+    return Math.max(
+      1,
+      ...semesterKeys.map((key) => totalTimes(settingsOf(state, key).numElectiveTimes, settingsOf(state, key).common)),
+    );
+  }, [state, semesterKeys]);
+
+  const bandInfoByKey = useMemo(() => {
+    if (!state.roster) return {};
+    const out: Record<string, { bandTimes: Array<Record<string, number>>; error: string }> = {};
+    semesterKeys.forEach((key) => {
+      out[key] = computeFixedBands({
+        common: settingsOf(state, key).common,
+        students: state.roster!.students,
+        numTimes,
+      });
+    });
+    return out;
+  }, [state, semesterKeys, numTimes]);
+
+  const bandError = semesterKeys
+    .map((key) => bandInfoByKey[key]?.error)
+    .filter(Boolean)
+    .join(" / ");
 
   const ctx: AllocContext | null = useMemo(() => {
-    if (!state.roster) return null;
+    if (!state.roster || !semesterKeys.length) return null;
+    const bySemester: Record<string, SemesterAllocInfo> = {};
+    semesterKeys.forEach((key) => {
+      const s = settingsOf(state, key);
+      bySemester[key] = { cap: s.cap, allowOver: s.allowOver, common: s.common, bandTimes: bandInfoByKey[key]?.bandTimes ?? [] };
+    });
     return {
       numTimes,
-      cap: state.cap,
-      allowOver: state.allowOver,
       subjects: state.roster.subjects,
       students: state.roster.students,
       selected: state.selected,
       fixedCap: state.fixedCap,
-      common: state.common,
-      bandTimes: fixedBands.bandTimes,
+      bySemester,
     };
-  }, [
-    state.roster,
-    numTimes,
-    state.cap,
-    state.allowOver,
-    state.selected,
-    state.fixedCap,
-    state.common,
-    fixedBands.bandTimes,
-  ]);
+  }, [state, semesterKeys, bandInfoByKey, numTimes]);
 
   const assign: Assignment | null = useMemo(() => {
     if (!ctx || !state.placement.some((p) => p.length)) return null;
@@ -192,8 +243,7 @@ export function useTimeAllocation(): TimeAllocationApi {
         subjects: ctx.subjects,
         students: ctx.students,
         selected: ctx.selected,
-        common: ctx.common,
-        bandTimes: ctx.bandTimes,
+        bySemester: ctx.bySemester,
       },
       assign,
       state.placement,
@@ -272,24 +322,48 @@ export function useTimeAllocation(): TimeAllocationApi {
     [activeGrade],
   );
 
-  // ---------- 그리드 설정 ----------
-  const setCap = useCallback((n: number) => patch((g) => ({ ...g, cap: Math.max(1, n || 1) })), [patch]);
-  const setAllowOver = useCallback((v: boolean) => patch((g) => ({ ...g, allowOver: v })), [patch]);
+  // ---------- 그리드 설정 (학기별) ----------
+  const patchSemester = useCallback(
+    (key: string, mut: (s: SemesterSettings) => SemesterSettings) =>
+      patch((g) => ({
+        ...g,
+        settingsBySemester: {
+          ...g.settingsBySemester,
+          [key]: mut(g.settingsBySemester[key] ?? defaultSemesterSettings()),
+        },
+      })),
+    [patch],
+  );
+
+  const setCap = useCallback(
+    (key: string, n: number) => patchSemester(key, (s) => ({ ...s, cap: Math.max(1, n || 1) })),
+    [patchSemester],
+  );
+  const setAllowOver = useCallback(
+    (key: string, v: boolean) => patchSemester(key, (s) => ({ ...s, allowOver: v })),
+    [patchSemester],
+  );
   const setStartLetter = useCallback((n: number) => patch((g) => ({ ...g, startLetter: n })), [patch]);
 
   const setNumElectiveTimes = useCallback(
-    (n: number) =>
+    (key: string, n: number) =>
       patch((g) => {
+        if (!g.roster) return g;
         const v = Math.max(1, n || 1);
-        const nt = totalTimes(v, g.common);
-        return { ...g, numElectiveTimes: v, placement: g.placement.map((p) => p.filter((t) => t < nt)) };
+        const settings = {
+          ...g.settingsBySemester,
+          [key]: { ...(g.settingsBySemester[key] ?? defaultSemesterSettings()), numElectiveTimes: v },
+        };
+        const nt = totalTimes(v, settings[key].common);
+        // 이 학기 과목들만 새 범위로 잘라냅니다 — 다른 학기 배치는 그대로 둡니다.
+        const placement = g.placement.map((p, idx) =>
+          semesterKeyOf(g.roster!.subjects[idx]) === key ? p.filter((t) => t < nt) : p,
+        );
+        return { ...g, settingsBySemester: settings, placement };
       }),
     [patch],
   );
 
-  // 체크 해제해도 배치(placement)는 지우지 않습니다 — 1학기 배정 결과를 남겨둔 채 2학기만
-  // 선택해서 따로 배정하고, 나중에 다시 체크하면 이전 배치가 복원되도록 하기 위함입니다.
-  // (배정과목 선택에서 빠진 과목은 매칭·그리드 표시에서만 제외되고 데이터는 그대로 남습니다.)
   const toggleSelected = useCallback(
     (idx: number) =>
       patch((g) => {
@@ -297,7 +371,9 @@ export function useTimeAllocation(): TimeAllocationApi {
         const selected = g.selected.slice();
         selected[idx] = !selected[idx];
         const sections = g.sections.slice();
-        if (selected[idx] && !sections[idx]) sections[idx] = defaultSections(g.roster.subjects[idx].count, g.cap);
+        if (selected[idx] && !sections[idx]) {
+          sections[idx] = defaultSections(g.roster.subjects[idx].count, capForSubjectIdx(g, idx));
+        }
         return { ...g, selected, sections };
       }),
     [patch],
@@ -312,7 +388,7 @@ export function useTimeAllocation(): TimeAllocationApi {
         const sections = g.sections.slice();
         roster.groups[groupIdx].cols.forEach((s) => {
           selected[s] = on;
-          if (on && !sections[s]) sections[s] = defaultSections(roster.subjects[s].count, g.cap);
+          if (on && !sections[s]) sections[s] = defaultSections(roster.subjects[s].count, capForSubjectIdx(g, s));
         });
         return { ...g, selected, sections };
       }),
@@ -328,27 +404,16 @@ export function useTimeAllocation(): TimeAllocationApi {
         sections[idx] = k;
         let placement = g.placement;
         const cur = g.placement[idx] ?? [];
-        if (cur.length) {
-          const tmpCtx: AllocContext = {
-            numTimes,
-            cap: g.cap,
-            allowOver: g.allowOver,
-            subjects: g.roster.subjects,
-            students: g.roster.students,
-            selected: g.selected,
-            fixedCap: g.fixedCap,
-            common: g.common,
-            bandTimes: fixedBands.bandTimes,
-          };
-          const co = coMatrix(tmpCtx);
-          const a = runAssign(tmpCtx, g.placement);
+        if (cur.length && ctx) {
+          const co = coMatrix(ctx);
+          const a = runAssign(ctx, g.placement);
           let times = cur.slice();
           while (times.length > k) {
             times = times.sort((x, y) => a.load[idx][x] - a.load[idx][y]);
             times.shift();
           }
           if (times.length < k) {
-            const add = pickTimes(tmpCtx, g.placement, idx, k - times.length, co, new Set(times));
+            const add = pickTimes(ctx, g.placement, idx, k - times.length, co, new Set(times));
             times = [...times, ...add];
           }
           placement = g.placement.slice();
@@ -356,7 +421,7 @@ export function useTimeAllocation(): TimeAllocationApi {
         }
         return { ...g, sections, placement };
       }),
-    [patch, numTimes, fixedBands.bandTimes],
+    [patch, numTimes, ctx],
   );
 
   const toggleFixedCap = useCallback(
@@ -365,7 +430,7 @@ export function useTimeAllocation(): TimeAllocationApi {
         if (g.confirmed) return g;
         const fixedCap = { ...g.fixedCap };
         if (idx in fixedCap) delete fixedCap[idx];
-        else fixedCap[idx] = g.cap;
+        else fixedCap[idx] = capForSubjectIdx(g, idx);
         return { ...g, fixedCap };
       }),
     [patch],
@@ -411,24 +476,6 @@ export function useTimeAllocation(): TimeAllocationApi {
     info(`최적화 완료 (${res.iter}회 탐색, 미배정 ${un}명)`);
   }, [ctx, state.sections, state.placement, state.confirmed, patch, info, err]);
 
-  const runAssignNow = useCallback(() => {
-    if (state.confirmed) {
-      err("확정 상태입니다.");
-      return;
-    }
-    if (!ctx) {
-      err("데이터가 없습니다.");
-      return;
-    }
-    if (!state.placement.some((p) => p.length)) {
-      err("분반 배치가 없습니다. 먼저 최적화를 실행하거나 셀을 클릭해 분반을 배치하세요.");
-      return;
-    }
-    const a = runAssign(ctx, state.placement);
-    const un = a.unassigned.reduce((acc, u) => acc + u.length, 0);
-    info(`배정 완료 (미배정 ${un}명)`);
-  }, [ctx, state.placement, state.confirmed, info, err]);
-
   const resetPlacement = useCallback(() => {
     if (state.confirmed) {
       err("확정 상태입니다.");
@@ -450,61 +497,78 @@ export function useTimeAllocation(): TimeAllocationApi {
     [patch, assign, info, err],
   );
 
-  // ---------- 공통과목 ----------
-  const applyCommon = useCallback(
-    (next: CommonConfig) =>
+  // ---------- 공통과목 (학기별) ----------
+  const applySemesterCommon = useCallback(
+    (key: string, mut: (s: SemesterSettings) => SemesterSettings) =>
       patch((g) => {
-        const nt = totalTimes(g.numElectiveTimes, next);
-        return { ...g, common: next, placement: g.placement.map((p) => p.filter((t) => t < nt)) };
+        if (!g.roster) return g;
+        const next = mut(g.settingsBySemester[key] ?? defaultSemesterSettings());
+        const nt = totalTimes(next.numElectiveTimes, next.common);
+        const placement = g.placement.map((p, idx) =>
+          semesterKeyOf(g.roster!.subjects[idx]) === key ? p.filter((t) => t < nt) : p,
+        );
+        return { ...g, settingsBySemester: { ...g.settingsBySemester, [key]: next }, placement };
       }),
     [patch],
   );
 
   const setCommonOn = useCallback(
-    (v: boolean) => {
+    (key: string, v: boolean) => {
       if (state.confirmed) return err("확정 상태입니다.");
-      applyCommon({ ...state.common, on: v });
+      applySemesterCommon(key, (s) => ({ ...s, common: { ...s.common, on: v } }));
     },
-    [state.common, state.confirmed, applyCommon, err],
+    [state.confirmed, applySemesterCommon, err],
   );
   const setCommonHours = useCallback(
-    (n: number) => {
+    (key: string, n: number) => {
       if (state.confirmed) return err("확정 상태입니다.");
-      applyCommon(autoPackBands({ ...state.common, hours: Math.max(1, n || 1) }));
+      applySemesterCommon(key, (s) => ({ ...s, common: autoPackBands({ ...s.common, hours: Math.max(1, n || 1) }) }));
     },
-    [state.common, state.confirmed, applyCommon, err],
+    [state.confirmed, applySemesterCommon, err],
   );
   const updateCommonSubject = useCallback(
-    (i: number, p: Partial<CommonSubject>) => {
+    (key: string, i: number, p: Partial<CommonSubject>) => {
       if (state.confirmed) return err("확정 상태입니다.");
-      const subjects = state.common.subjects.map((s, j) => (j === i ? { ...s, ...p } : s));
-      applyCommon({ ...state.common, subjects });
+      applySemesterCommon(key, (s) => ({
+        ...s,
+        common: { ...s.common, subjects: s.common.subjects.map((sub, j) => (j === i ? { ...sub, ...p } : sub)) },
+      }));
     },
-    [state.common, state.confirmed, applyCommon, err],
+    [state.confirmed, applySemesterCommon, err],
   );
-  const addCommonSubject = useCallback(() => {
-    if (state.confirmed) return err("확정 상태입니다.");
-    const classCount = state.roster
-      ? new Set(state.roster.students.map((s) => s.classNum || s.id.slice(0, -2))).size
-      : 1;
-    const subjects = [
-      ...state.common.subjects,
-      { name: "새 공통과목", credits: 1, teachers: Math.max(1, classCount), band: 0 },
-    ];
-    applyCommon(autoPackBands({ ...state.common, subjects }));
-  }, [state.common, state.roster, state.confirmed, applyCommon, err]);
+  const addCommonSubject = useCallback(
+    (key: string) => {
+      if (state.confirmed) return err("확정 상태입니다.");
+      const classCount = state.roster
+        ? new Set(state.roster.students.map((s) => s.classNum || s.id.slice(0, -2))).size
+        : 1;
+      applySemesterCommon(key, (s) => ({
+        ...s,
+        common: autoPackBands({
+          ...s.common,
+          subjects: [...s.common.subjects, { name: "새 공통과목", credits: 1, teachers: Math.max(1, classCount), band: 0 }],
+        }),
+      }));
+    },
+    [state.confirmed, state.roster, applySemesterCommon, err],
+  );
   const removeCommonSubject = useCallback(
-    (i: number) => {
+    (key: string, i: number) => {
       if (state.confirmed) return err("확정 상태입니다.");
-      const subjects = state.common.subjects.filter((_, j) => j !== i);
-      applyCommon(autoPackBands({ ...state.common, subjects }));
+      applySemesterCommon(key, (s) => ({
+        ...s,
+        common: autoPackBands({ ...s.common, subjects: s.common.subjects.filter((_, j) => j !== i) }),
+      }));
     },
-    [state.common, state.confirmed, applyCommon, err],
+    [state.confirmed, applySemesterCommon, err],
   );
-  const packCommon = useCallback(() => {
-    if (state.confirmed) return err("확정 상태입니다.");
-    applyCommon(autoPackBands(state.common));
-  }, [state.common, state.confirmed, applyCommon, err]);
+  const packCommon = useCallback(
+    (key: string) => {
+      if (state.confirmed) return err("확정 상태입니다.");
+      applySemesterCommon(key, (s) => ({ ...s, common: autoPackBands(s.common) }));
+    },
+    [state.confirmed, applySemesterCommon, err],
+  );
 
   // ---------- 저장 ----------
   const getBackup = useCallback((): GradeMap => grades, [grades]);
@@ -527,8 +591,10 @@ export function useTimeAllocation(): TimeAllocationApi {
     state,
     message,
     clearMessage: () => setMessage(null),
+    semesterKeys,
+    settingsOf: (key: string) => settingsOf(state, key),
     numTimes,
-    bandError: fixedBands.error,
+    bandError,
     assign,
     studentAssign,
     ctx,
@@ -549,7 +615,6 @@ export function useTimeAllocation(): TimeAllocationApi {
     setFixedCap,
     toggleCell,
     runOptimize,
-    runAssignNow,
     resetPlacement,
     setConfirmed,
     setCommonOn,

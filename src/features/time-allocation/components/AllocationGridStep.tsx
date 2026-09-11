@@ -1,12 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { CheckCircle2, RotateCcw, Sparkles, Wand2, XCircle } from "lucide-react";
 import type { TimeAllocationApi } from "../hooks/useTimeAllocation";
 import { CommonSubjectEditor } from "./CommonSubjectEditor";
 import { classesAt, commonCells } from "../lib/gridModel";
 import { classKey, classLabel } from "../lib/bands";
 import { timeLabel } from "../lib/studentRows";
+import { NO_SEMESTER_KEY, semesterKeyOf } from "../types";
 
 interface Props {
   api: TimeAllocationApi;
@@ -16,18 +17,21 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const GROUP_TINT = ["bg-amber-50", "bg-sky-50", "bg-violet-50"];
 
 export function AllocationGridStep({ api }: Props) {
-  const { state, ctx, assign, numTimes, perTime, message } = api;
+  const { state, ctx, assign, numTimes, perTime, message, semesterKeys } = api;
   const roster = state.roster;
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const settingsKey = activeKey && semesterKeys.includes(activeKey) ? activeKey : semesterKeys[0];
 
-  if (!roster || !ctx) {
+  if (!roster || !ctx || !settingsKey) {
     return <p className="text-sm text-stone-500 py-8">먼저 ① 데이터 입력에서 자료를 불러오세요.</p>;
   }
 
   const subs = roster.subjects;
   const groups = roster.groups;
-  const com = commonCells(state.common);
+  const com = commonCells(ctx.bySemester);
   const N = roster.students.length;
   const dis = state.confirmed;
+  const settings = api.settingsOf(settingsKey);
 
   const studentsOf = (keys: string[]) =>
     roster.students.filter((st) => keys.includes(classKey(st.id))).length;
@@ -58,15 +62,34 @@ export function AllocationGridStep({ api }: Props) {
         타임 배정
       </h2>
 
+      {semesterKeys.length > 1 && (
+        <div className="flex gap-2">
+          {semesterKeys.map((key) => (
+            <button
+              key={key}
+              onClick={() => setActiveKey(key)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                key === settingsKey ? "bg-amber-500 text-white shadow" : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+              }`}
+            >
+              {key === NO_SEMESTER_KEY ? "설정" : key} 설정
+            </button>
+          ))}
+          <span className="text-xs text-stone-400 self-center">
+            학기마다 정원·타임 수·공통과목을 따로 설정합니다(서로 영향 없음).
+          </span>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-3 text-sm">
         <label className="inline-flex items-center gap-1.5">
           학급당
           <input
             type="number"
             min={1}
-            value={state.cap}
+            value={settings.cap}
             disabled={dis}
-            onChange={(e) => api.setCap(+e.target.value)}
+            onChange={(e) => api.setCap(settingsKey, +e.target.value)}
             className="w-16 px-2 py-1 border border-stone-200 rounded-lg text-center"
           />
           명
@@ -74,9 +97,9 @@ export function AllocationGridStep({ api }: Props) {
         <label className="inline-flex items-center gap-1.5">
           <input
             type="checkbox"
-            checked={state.allowOver}
+            checked={settings.allowOver}
             disabled={dis}
-            onChange={(e) => api.setAllowOver(e.target.checked)}
+            onChange={(e) => api.setAllowOver(settingsKey, e.target.checked)}
           />
           인원초과 허용
         </label>
@@ -101,16 +124,16 @@ export function AllocationGridStep({ api }: Props) {
           <input
             type="number"
             min={1}
-            value={state.numElectiveTimes}
+            value={settings.numElectiveTimes}
             disabled={dis}
-            onChange={(e) => api.setNumElectiveTimes(+e.target.value)}
+            onChange={(e) => api.setNumElectiveTimes(settingsKey, +e.target.value)}
             className="w-16 px-2 py-1 border border-stone-200 rounded-lg text-center"
           />
-          <span className="text-stone-400">(+구획 → 전체 {numTimes}타임)</span>
+          <span className="text-stone-400">(+구획 → 전체 {numTimes}타임, 학기 중 최대치 기준)</span>
         </label>
       </div>
 
-      <CommonSubjectEditor api={api} />
+      <CommonSubjectEditor api={api} semesterKey={settingsKey} />
 
       <div className="flex flex-wrap items-center gap-2">
         <button
@@ -323,7 +346,7 @@ export function AllocationGridStep({ api }: Props) {
                       );
                     }
                     const n = assign ? assign.load[i][t] : 0;
-                    const cap = state.fixedCap[i] ?? state.cap;
+                    const cap = state.fixedCap[i] ?? ctx.bySemester[semesterKeyOf(s)]?.cap ?? 29;
                     const tone =
                       n > cap ? "bg-rose-100 text-rose-700" : n === cap ? "bg-amber-100" : "bg-emerald-50";
                     return (
@@ -337,11 +360,8 @@ export function AllocationGridStep({ api }: Props) {
                     );
                   })}
                   {com.map((c, ci) => {
-                    const ks = classesAt(
-                      { students: roster.students, bandTimes: ctx.bandTimes },
-                      c.bandIdx,
-                      t,
-                    );
+                    const bandTimes = ctx.bySemester[c.semesterKey]?.bandTimes ?? [];
+                    const ks = classesAt({ students: roster.students }, bandTimes, c.bandIdx, t);
                     if (!ks.length) return <td key={ci} className="border border-stone-200 bg-stone-50/50" />;
                     return (
                       <td
