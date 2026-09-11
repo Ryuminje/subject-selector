@@ -4,8 +4,8 @@
 // 3단계(데이터 입력 / 타임 배정 / 학생별 결과) + 학년 전환(pre1/grade1/grade2).
 // 저장은 기존 탭들의 "저장/불러오기" 번들에 window.getTimeAllocBackup/loadTimeAllocBackup 로 합류.
 
-import React from "react";
-import { CalendarClock } from "lucide-react";
+import React, { useRef } from "react";
+import { CalendarClock, FolderOpen, Save } from "lucide-react";
 import type { GradeKey } from "../../types";
 import { GradeTabs } from "../../features/main-survey/components/GradeTabs";
 import { useTimeAllocation } from "../../features/time-allocation/hooks/useTimeAllocation";
@@ -51,6 +51,89 @@ export function TimeAllocationTab() {
     api.loadFromMain(getMain() ?? {});
   };
 
+  // 다른 탭들과 동일한 저장/불러오기 번들 — MainSurveyTab.tsx 의 handleSaveBackup/handleLoadBackup 과 같은 로직.
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSaveBackup = async () => {
+    const w = window as unknown as Record<string, () => unknown>;
+    const fullBackup = {
+      version: 3,
+      demand: w.getDemandBackup?.() || {},
+      main: w.getMainBackup?.() || {},
+      change: w.getChangeBackup?.() || {},
+      timeAlloc: w.getTimeAllocBackup?.() || {},
+    };
+
+    const jsonString = JSON.stringify(fullBackup, null, 2);
+    const suggestedName = "2026학년도 타임(구획) 배정.json";
+
+    try {
+      if ("showSaveFilePicker" in window) {
+        const showSaveFilePicker = (
+          window as unknown as {
+            showSaveFilePicker: (opts: unknown) => Promise<{
+              createWritable: () => Promise<{ write: (s: string) => Promise<void>; close: () => Promise<void> }>;
+            }>;
+          }
+        ).showSaveFilePicker;
+        const handle = await showSaveFilePicker({
+          suggestedName,
+          types: [{ description: "JSON 파일", accept: { "application/json": [".json"] } }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(jsonString);
+        await writable.close();
+      } else {
+        const blob = new Blob([jsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = suggestedName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        console.error("Failed to save file:", err);
+        window.alert("파일 저장 중 오류가 발생했습니다.");
+      }
+    }
+  };
+
+  const handleLoadBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const content = evt.target?.result as string;
+        const parsed = JSON.parse(content);
+        const w = window as unknown as Record<string, (obj: unknown) => void>;
+
+        if (parsed.version >= 2) {
+          w.loadDemandBackup?.(parsed.demand || {});
+          w.loadMainBackup?.(parsed.main || {});
+          w.loadChangeBackup?.(parsed.change || {});
+          w.loadTimeAllocBackup?.(parsed.timeAlloc || {});
+        } else {
+          w.loadDemandBackup?.(parsed);
+          w.loadMainBackup?.(parsed);
+          w.loadChangeBackup?.(parsed);
+        }
+
+        window.alert("작업 내역을 성공적으로 불러왔습니다.");
+      } catch (err) {
+        console.error("Failed to parse file:", err);
+        window.alert("파일 형식이 잘못되었습니다.");
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   return (
     <>
       <header className="flex-none px-10 py-5 border-b border-stone-200 bg-white/60 backdrop-blur-sm flex flex-col gap-4">
@@ -59,6 +142,29 @@ export function TimeAllocationTab() {
             <CalendarClock className="w-6 h-6 text-amber-600 shrink-0" />
             선택과목 타임(구획) 배정
           </h1>
+          <div className="flex gap-2 shrink-0">
+            <input
+              type="file"
+              accept=".json"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleLoadBackup}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-medium rounded-xl transition-all border border-stone-300 shadow-sm"
+            >
+              <FolderOpen className="w-4 h-4" />
+              불러오기
+            </button>
+            <button
+              onClick={handleSaveBackup}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-xl transition-all border border-amber-500/50 shadow-md shadow-amber-500/20"
+            >
+              <Save className="w-4 h-4" />
+              저장하기
+            </button>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           {STEPS.map((s) => (
