@@ -49,11 +49,13 @@ export function rosterFromMainSurvey(
   const sectionHints: number[] = [];
 
   stats.forEach((st, i) => {
-    if (!groupIndex.has(st.group)) {
-      groupIndex.set(st.group, groups.length);
-      groups.push({ name: st.group, pick: 0, cols: [] });
+    // 같은 교과군이라도 1학기/2학기는 서로 다른 택N 제약이라 그룹을 분리합니다.
+    const groupKey = `${st.group}|${st.semester}`;
+    if (!groupIndex.has(groupKey)) {
+      groupIndex.set(groupKey, groups.length);
+      groups.push({ name: `${st.group} · ${st.semester}`, pick: 0, cols: [] });
     }
-    const g = groupIndex.get(st.group)!;
+    const g = groupIndex.get(groupKey)!;
     const idx = subjects.length;
     subjects.push({
       idx,
