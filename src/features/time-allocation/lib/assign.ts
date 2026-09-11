@@ -31,6 +31,15 @@ export function defaultSections(count: number, cap: number): number {
   return Math.max(1, Math.ceil(count / Math.max(1, cap)));
 }
 
+/**
+ * 과목의 "학기 그룹" 키. 1학기 수업과 2학기 수업은 같은 해 안에서도 동시에 열리지 않으므로
+ * 같은 타임을 각자 따로 쓸 수 있습니다(서로 겹침 취급 안 함) — 본조사 연동(semester 있음)
+ * 경로에서만 의미가 있고, 붙여넣기(semester 없음) 경로는 전부 같은 키라 기존과 동일하게 동작.
+ */
+function semesterKey(subj: RosterSubject): string {
+  return subj.semester ?? "__all__";
+}
+
 /** 학생별 "선택 과목 ↔ 타임" 이분 매칭(증가경로 DFS). placement 를 건드리지 않고 결과만 돌려줍니다. */
 export function runAssign(ctx: AllocContext, placement: number[][]): Assignment {
   const T = ctx.numTimes;
@@ -74,8 +83,21 @@ export function runAssign(ctx: AllocContext, placement: number[][]): Assignment 
   for (const i of order) {
     const subs = stuSubs[i];
     const blocked = blockedBands(ctx.students[i].id, ctx.common, ctx.bandTimes);
-    let res = match(subs, true, blocked);
-    if (res.size < subs.length && ctx.allowOver) res = match(subs, false, blocked);
+    // 1학기/2학기 과목은 서로 다른 학기 그룹이면 같은 타임을 나눠 써도 충돌이 아니므로
+    // 그룹별로 독립된 매칭을 돌립니다(같은 학기 안에서는 기존처럼 한 타임에 하나만).
+    const bySemester = new Map<string, number[]>();
+    for (const s of subs) {
+      const key = semesterKey(ctx.subjects[s]);
+      const arr = bySemester.get(key);
+      if (arr) arr.push(s);
+      else bySemester.set(key, [s]);
+    }
+    const res = new Map<number, number>();
+    for (const group of bySemester.values()) {
+      let m = match(group, true, blocked);
+      if (m.size < group.length && ctx.allowOver) m = match(group, false, blocked);
+      for (const [s, t] of m) res.set(s, t);
+    }
     byStudent[i] = res;
     unassigned[i] = subs.filter((s) => !res.has(s));
     for (const [s, t] of res) load[s][t]++;
@@ -124,13 +146,15 @@ export function pickTimes(
   exclude: Set<number>,
 ): number[] {
   const T = ctx.numTimes;
+  const sKey = semesterKey(ctx.subjects[s]);
   const seats = new Array(T).fill(0);
   const inT: number[][] = Array.from({ length: T }, () => []);
-  ctx.subjects.forEach((_, u) => {
-    if (u === s || !ctx.selected[u]) return;
-    for (const t of placement[u]) {
-      seats[t] += capOf(ctx, u);
-      inT[t].push(u);
+  ctx.subjects.forEach((u, uIdx) => {
+    // 다른 학기 과목은 같은 타임을 써도 안 겹치므로 자리 혼잡도 계산에서 제외합니다.
+    if (uIdx === s || !ctx.selected[uIdx] || semesterKey(u) !== sKey) return;
+    for (const t of placement[uIdx]) {
+      seats[t] += capOf(ctx, uIdx);
+      inT[t].push(uIdx);
     }
   });
   const score = (t: number) =>
