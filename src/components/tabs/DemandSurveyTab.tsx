@@ -106,10 +106,11 @@ export function DemandSurveyTab() {
 
   const handleSaveBackup = async () => {
     const fullBackup = {
-      version: 2,
+      version: 3,
       demand: (window as any).getDemandBackup?.() || {},
       main: (window as any).getMainBackup?.() || {},
-      change: (window as any).getChangeBackup?.() || {}
+      change: (window as any).getChangeBackup?.() || {},
+      timeAlloc: (window as any).getTimeAllocBackup?.() || {}
     };
     
     const jsonString = JSON.stringify(fullBackup, null, 2);
@@ -155,10 +156,11 @@ export function DemandSurveyTab() {
       try {
         const content = evt.target?.result as string;
         const parsed = JSON.parse(content);
-        if (parsed.version === 2) {
+        if (parsed.version >= 2) {
           (window as any).loadDemandBackup?.(parsed.demand || {});
           (window as any).loadMainBackup?.(parsed.main || {});
           (window as any).loadChangeBackup?.(parsed.change || {});
+          (window as any).loadTimeAllocBackup?.(parsed.timeAlloc || {});
         } else {
           (window as any).loadDemandBackup?.(parsed);
           (window as any).loadMainBackup?.(parsed);
