@@ -13,6 +13,11 @@ import { blockedBands } from "./bands";
 export interface SemesterAllocInfo extends SemesterBandInfo {
   cap: number;
   allowOver: boolean;
+  /** 이 학기가 실제로 쓰는 타임 수(선택과목 타임 수 + 이 학기 구획 수, lib/bands.ts의 totalTimes).
+   *  그리드 전체 폭(ctx.numTimes)은 학기 중 최대치라 다른 학기가 더 넓게 잡히면 그보다 클 수
+   *  있습니다 — 선택과목 배치(pickTimes/optimize)는 반드시 이 값으로 학기 범위를 제한해야
+   *  1학기 배정이 2학기 몫 타임까지 넘어가지 않습니다. */
+  ownTimes: number;
 }
 
 export interface AllocContext {
@@ -150,8 +155,10 @@ export function pickTimes(
   co: number[][],
   exclude: Set<number>,
 ): number[] {
-  const T = ctx.numTimes;
   const sKey = semesterKeyOf(ctx.subjects[s]);
+  // 이 과목이 속한 학기 몫의 타임 수로만 후보를 제한합니다 — ctx.numTimes(전체 폭)는 학기 중
+  // 최대치라, 그대로 쓰면 더 적게 필요한 학기의 과목이 다른 학기 몫 타임까지 배치될 수 있습니다.
+  const T = ctx.bySemester[sKey]?.ownTimes ?? ctx.numTimes;
   const seats = new Array(T).fill(0);
   const inT: number[][] = Array.from({ length: T }, () => []);
   ctx.subjects.forEach((u, uIdx) => {
@@ -210,9 +217,12 @@ export function optimize(
   const co = coMatrix(ctx);
   const placement = initialPlacement(ctx, sections, co, basePlacement);
   let best = cost(ctx, placement).value;
+  // ownTimes(그 과목이 속한 학기 몫의 타임 수)로 제한합니다 — ctx.numTimes(전체 폭)를 그대로
+  // 쓰면 더 적게 필요한 학기의 과목이 옮겨다니다 다른 학기 몫 타임까지 넘어갈 수 있습니다.
+  const ownTimesOf = (i: number) => ctx.bySemester[semesterKeyOf(ctx.subjects[i])]?.ownTimes ?? ctx.numTimes;
   const movable = ctx.subjects
     .map((_, i) => i)
-    .filter((i) => ctx.selected[i] && placement[i].length > 0 && placement[i].length < ctx.numTimes);
+    .filter((i) => ctx.selected[i] && placement[i].length > 0 && placement[i].length < ownTimesOf(i));
   const t0 = now();
   let iter = 0;
   while (movable.length && now() - t0 < budgetMs) {
@@ -220,7 +230,7 @@ export function optimize(
     const s = movable[Math.floor(rand() * movable.length)];
     const set = new Set(placement[s]);
     const t1 = placement[s][Math.floor(rand() * placement[s].length)];
-    const free = [...Array(ctx.numTimes).keys()].filter((t) => !set.has(t));
+    const free = [...Array(ownTimesOf(s)).keys()].filter((t) => !set.has(t));
     if (!free.length) continue;
     const t2 = free[Math.floor(rand() * free.length)];
     placement[s] = placement[s].map((t) => (t === t1 ? t2 : t));

@@ -207,7 +207,13 @@ export function useTimeAllocation(): TimeAllocationApi {
     const bySemester: Record<string, SemesterAllocInfo> = {};
     semesterKeys.forEach((key) => {
       const s = settingsOf(state, key);
-      bySemester[key] = { cap: s.cap, allowOver: s.allowOver, common: s.common, bandTimes: bandInfoByKey[key]?.bandTimes ?? [] };
+      bySemester[key] = {
+        cap: s.cap,
+        allowOver: s.allowOver,
+        common: s.common,
+        bandTimes: bandInfoByKey[key]?.bandTimes ?? [],
+        ownTimes: totalTimes(s.numElectiveTimes, s.common),
+      };
     });
     return {
       numTimes,

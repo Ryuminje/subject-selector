@@ -67,8 +67,13 @@ export function TimeAllocationTab() {
     const jsonString = JSON.stringify(fullBackup, null, 2);
     const suggestedName = "2026학년도 타임(구획) 배정.json";
 
-    try {
-      if ("showSaveFilePicker" in window) {
+    // 저장 위치를 직접 고르게 showSaveFilePicker를 먼저 시도합니다. 이게 실패하는
+    // 환경(임베디드 미리보기 등, iframe 여부로는 못 잡아내는 플랫폼 제약)에서는 사용자가
+    // 취소한 게 아닌 한 일반 다운로드로 자동 대체합니다 — 실패한 저장이 빈 파일을 남기고
+    // 그 빈 파일을 나중에 불러오면 JSON 파싱 오류가 나는 걸 막기 위함입니다(실제로 겪음).
+    let savedViaPicker = false;
+    if ("showSaveFilePicker" in window) {
+      try {
         const showSaveFilePicker = (
           window as unknown as {
             showSaveFilePicker: (opts: unknown) => Promise<{
@@ -83,7 +88,14 @@ export function TimeAllocationTab() {
         const writable = await handle.createWritable();
         await writable.write(jsonString);
         await writable.close();
-      } else {
+        savedViaPicker = true;
+      } catch (err) {
+        if ((err as Error).name === "AbortError") return; // 사용자가 대화상자를 닫음 — 조용히 종료
+        console.warn("showSaveFilePicker 저장 실패, 다운로드로 대체합니다:", err);
+      }
+    }
+    if (!savedViaPicker) {
+      try {
         const blob = new Blob([jsonString], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -93,9 +105,7 @@ export function TimeAllocationTab() {
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-      }
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") {
+      } catch (err) {
         console.error("Failed to save file:", err);
         window.alert("파일 저장 중 오류가 발생했습니다.");
       }

@@ -55,6 +55,43 @@ export function AllocationGridStep({ api }: Props) {
     });
   }
 
+  // 학기가 여럿이면 열 순서를 학기별로 묶습니다 — 그 학기의 과목 그룹들 바로 다음에 그
+  // 학기의 반 고정 공통과목을 붙여서(예: … C·1학기 → 반고정공통(1학기) → B·2학기 …),
+  // 반 고정 공통과목 전부가 맨 끝에 뭉뚱그려 붙어 어느 학기 것인지 헷갈리는 문제를 없앱니다.
+  // 학기가 하나뿐이면(또는 없으면) 구분할 의미가 없어 기존처럼 그냥 맨 끝에 한 덩어리로 둡니다.
+  const groupSemesterKey = (g: (typeof groups)[number]) =>
+    g.cols.length ? semesterKeyOf(subs[g.cols[0]]) : NO_SEMESTER_KEY;
+
+  type SubjectHeaderGroup = { kind: "subject"; gi: number; name: string; cols: number[] };
+  type CommonHeaderGroup = { kind: "common"; semesterKey: string; items: { cell: (typeof com)[number]; ci: number }[] };
+  const headerGroups: (SubjectHeaderGroup | CommonHeaderGroup)[] = [];
+
+  if (semesterKeys.length > 1) {
+    semesterKeys.forEach((key) => {
+      groups.forEach((g, gi) => {
+        if (groupSemesterKey(g) === key) headerGroups.push({ kind: "subject", gi, name: g.name, cols: g.cols });
+      });
+      const items = com.map((cell, ci) => ({ cell, ci })).filter(({ cell }) => cell.semesterKey === key);
+      if (items.length) headerGroups.push({ kind: "common", semesterKey: key, items });
+    });
+  } else {
+    groups.forEach((g, gi) => headerGroups.push({ kind: "subject", gi, name: g.name, cols: g.cols }));
+    if (com.length) {
+      headerGroups.push({ kind: "common", semesterKey: com[0]?.semesterKey ?? "", items: com.map((cell, ci) => ({ cell, ci })) });
+    }
+  }
+
+  type OrderedColumn = { kind: "subject"; idx: number } | { kind: "common"; cell: (typeof com)[number]; ci: number };
+  const orderedColumns: OrderedColumn[] = headerGroups.flatMap((hg): OrderedColumn[] =>
+    hg.kind === "subject"
+      ? hg.cols.map((idx): OrderedColumn => ({ kind: "subject", idx }))
+      : hg.items.map(({ cell, ci }): OrderedColumn => ({ kind: "common", cell, ci }))
+  );
+
+  const isGroupAllSelected = (cols: number[]) => cols.every((s) => state.selected[s]);
+  const allSubjectsSelected = subs.length > 0 && subs.every((s) => state.selected[s.idx]);
+  const toggleAllGroups = (on: boolean) => groups.forEach((_, gi) => api.toggleGroup(gi, on));
+
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
@@ -172,9 +209,20 @@ export function AllocationGridStep({ api }: Props) {
         )}
       </div>
 
-      <p className="text-xs text-stone-500">
-        셀을 클릭하면 그 타임에 분반을 추가/제거합니다(수동 조정). 조정하면 자동으로 다시 배정됩니다.
-      </p>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-xs text-stone-500">
+          셀을 클릭하면 그 타임에 분반을 추가/제거합니다(수동 조정). 조정하면 자동으로 다시 배정됩니다.
+        </p>
+        <label className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-600">
+          <input
+            type="checkbox"
+            checked={allSubjectsSelected}
+            disabled={dis}
+            onChange={(e) => toggleAllGroups(e.target.checked)}
+          />
+          전체 선택
+        </label>
+      </div>
 
       <div className="overflow-auto border border-stone-200 rounded-xl">
         <table className="text-[11px] border-collapse whitespace-nowrap">
@@ -186,103 +234,105 @@ export function AllocationGridStep({ api }: Props) {
               <th className="bg-stone-100 border border-stone-200 px-2 py-1" rowSpan={2}>
                 인원(반)<br />학생 {N}명
               </th>
-              {groups.map((g, gi) => {
-                const all = g.cols.every((s) => state.selected[s]);
-                return (
+              {headerGroups.map((hg, hgi) =>
+                hg.kind === "subject" ? (
                   <th
-                    key={gi}
-                    className={`border border-stone-200 px-2 py-1 ${GROUP_TINT[gi % 3]}`}
-                    colSpan={g.cols.length}
+                    key={`g-${hg.gi}`}
+                    className={`border border-stone-200 px-2 py-1 ${GROUP_TINT[hg.gi % 3]}`}
+                    colSpan={hg.cols.length}
                   >
                     <label className="inline-flex items-center gap-1">
-                      {g.name}
+                      {hg.name}
                       <input
                         type="checkbox"
-                        checked={all}
+                        checked={isGroupAllSelected(hg.cols)}
                         disabled={dis}
-                        onChange={(e) => api.toggleGroup(gi, e.target.checked)}
+                        onChange={(e) => api.toggleGroup(hg.gi, e.target.checked)}
                       />
                     </label>
                   </th>
-                );
-              })}
-              {com.length > 0 && (
-                <th className="border border-stone-200 px-2 py-1 bg-emerald-50" colSpan={com.length}>
-                  반 고정 공통
-                </th>
+                ) : (
+                  <th key={`com-${hgi}`} className="border border-stone-200 px-2 py-1 bg-emerald-50" colSpan={hg.items.length}>
+                    반 고정 공통{semesterKeys.length > 1 ? ` (${hg.semesterKey})` : ""}
+                  </th>
+                )
               )}
             </tr>
             <tr>
-              {subs.map((s) => (
-                <th
-                  key={s.idx}
-                  className={`border border-stone-200 px-2 py-1 font-medium ${state.selected[s.idx] ? "" : "text-stone-300"}`}
-                >
-                  {s.name}
-                </th>
-              ))}
-              {com.map((c, i) => (
-                <th key={i} className="border border-stone-200 px-2 py-1 font-medium bg-emerald-50/60">
-                  {c.name}
-                </th>
-              ))}
+              {orderedColumns.map((col) =>
+                col.kind === "subject" ? (
+                  <th
+                    key={`s-${col.idx}`}
+                    className={`border border-stone-200 px-2 py-1 font-medium ${state.selected[col.idx] ? "" : "text-stone-300"}`}
+                  >
+                    {subs[col.idx].name}
+                  </th>
+                ) : (
+                  <th key={`c-${col.ci}`} className="border border-stone-200 px-2 py-1 font-medium bg-emerald-50/60">
+                    {col.cell.name}
+                  </th>
+                )
+              )}
             </tr>
           </thead>
           <tbody>
             <tr className="bg-stone-50 font-semibold">
               <td className="sticky left-0 bg-stone-50 border border-stone-200 px-2 py-1">전체합계</td>
               <td className="border border-stone-200 px-2 py-1 text-center">{N}</td>
-              {subs.map((s) => (
-                <td key={s.idx} className="border border-stone-200 px-2 py-1 text-center tabular-nums">
-                  {s.count}
-                </td>
-              ))}
-              {com.map((_, i) => (
-                <td key={i} className="border border-stone-200 px-2 py-1 text-center">
-                  {N}
-                </td>
-              ))}
+              {orderedColumns.map((col) =>
+                col.kind === "subject" ? (
+                  <td key={`s-${col.idx}`} className="border border-stone-200 px-2 py-1 text-center tabular-nums">
+                    {subs[col.idx].count}
+                  </td>
+                ) : (
+                  <td key={`c-${col.ci}`} className="border border-stone-200 px-2 py-1 text-center">
+                    {N}
+                  </td>
+                )
+              )}
             </tr>
             <tr>
               <td className="sticky left-0 bg-white border border-stone-200 px-2 py-1">분반 설정</td>
               <td className="border border-stone-200" />
-              {subs.map((s) => (
-                <td key={s.idx} className="border border-stone-200 px-1 py-1 text-center">
-                  <input
-                    type="number"
-                    min={0}
-                    max={numTimes}
-                    value={state.sections[s.idx] ?? 0}
-                    disabled={dis || !state.selected[s.idx]}
-                    onChange={(e) => api.setSection(s.idx, +e.target.value)}
-                    className="w-12 px-1 py-0.5 border border-stone-200 rounded text-center"
-                  />
-                </td>
-              ))}
-              {com.map((c, i) => (
-                <td key={i} className="border border-stone-200 px-2 py-1 text-center text-stone-400">
-                  구획{c.bandIdx + 1}·{c.credits}학점
-                </td>
-              ))}
+              {orderedColumns.map((col) =>
+                col.kind === "subject" ? (
+                  <td key={`s-${col.idx}`} className="border border-stone-200 px-1 py-1 text-center">
+                    <input
+                      type="number"
+                      min={0}
+                      max={numTimes}
+                      value={state.sections[col.idx] ?? 0}
+                      disabled={dis || !state.selected[col.idx]}
+                      onChange={(e) => api.setSection(col.idx, +e.target.value)}
+                      className="w-12 px-1 py-0.5 border border-stone-200 rounded text-center"
+                    />
+                  </td>
+                ) : (
+                  <td key={`c-${col.ci}`} className="border border-stone-200 px-2 py-1 text-center text-stone-400">
+                    구획{col.cell.bandIdx + 1}·{col.cell.credits}학점
+                  </td>
+                )
+              )}
             </tr>
             <tr>
               <td className="sticky left-0 bg-white border border-stone-200 px-2 py-1">배정과목 선택</td>
               <td className="border border-stone-200" />
-              {subs.map((s) => (
-                <td key={s.idx} className="border border-stone-200 px-1 py-1 text-center">
-                  <input
-                    type="checkbox"
-                    checked={state.selected[s.idx]}
-                    disabled={dis}
-                    onChange={() => api.toggleSelected(s.idx)}
-                  />
-                </td>
-              ))}
-              {com.map((_, i) => (
-                <td key={i} className="border border-stone-200 px-2 py-1 text-center text-stone-400">
-                  반 고정
-                </td>
-              ))}
+              {orderedColumns.map((col) =>
+                col.kind === "subject" ? (
+                  <td key={`s-${col.idx}`} className="border border-stone-200 px-1 py-1 text-center">
+                    <input
+                      type="checkbox"
+                      checked={state.selected[col.idx]}
+                      disabled={dis}
+                      onChange={() => api.toggleSelected(col.idx)}
+                    />
+                  </td>
+                ) : (
+                  <td key={`c-${col.ci}`} className="border border-stone-200 px-2 py-1 text-center text-stone-400">
+                    반 고정
+                  </td>
+                )
+              )}
             </tr>
             <tr>
               <td className="sticky left-0 bg-white border border-stone-200 px-2 py-1">
@@ -290,34 +340,36 @@ export function AllocationGridStep({ api }: Props) {
                 <span className="block text-[10px] text-stone-400">체크 시 정원 강제</span>
               </td>
               <td className="border border-stone-200" />
-              {subs.map((s) => {
-                const fixed = s.idx in state.fixedCap;
+              {orderedColumns.map((col) => {
+                if (col.kind === "common") {
+                  return (
+                    <td key={`c-${col.ci}`} className="border border-stone-200 px-2 py-1 text-center text-stone-400">
+                      고정
+                    </td>
+                  );
+                }
+                const fixed = col.idx in state.fixedCap;
                 return (
-                  <td key={s.idx} className="border border-stone-200 px-1 py-1 text-center">
+                  <td key={`s-${col.idx}`} className="border border-stone-200 px-1 py-1 text-center">
                     <input
                       type="checkbox"
                       checked={fixed}
-                      disabled={dis || !state.selected[s.idx]}
-                      onChange={() => api.toggleFixedCap(s.idx)}
+                      disabled={dis || !state.selected[col.idx]}
+                      onChange={() => api.toggleFixedCap(col.idx)}
                     />
                     {fixed && (
                       <input
                         type="number"
                         min={1}
-                        value={state.fixedCap[s.idx]}
+                        value={state.fixedCap[col.idx]}
                         disabled={dis}
-                        onChange={(e) => api.setFixedCap(s.idx, +e.target.value)}
+                        onChange={(e) => api.setFixedCap(col.idx, +e.target.value)}
                         className="mt-0.5 w-12 px-1 py-0.5 border border-amber-300 rounded text-center block mx-auto"
                       />
                     )}
                   </td>
                 );
               })}
-              {com.map((_, i) => (
-                <td key={i} className="border border-stone-200 px-2 py-1 text-center text-stone-400">
-                  고정
-                </td>
-              ))}
             </tr>
             {Array.from({ length: numTimes }, (_, t) => {
               const row = perTime[t];
@@ -329,15 +381,33 @@ export function AllocationGridStep({ api }: Props) {
                   <td className="border border-stone-200 px-2 py-1 text-center tabular-nums">
                     {row ? `${row.students}(${row.sections})` : ""}
                   </td>
-                  {subs.map((s) => {
-                    const i = s.idx;
+                  {orderedColumns.map((col) => {
+                    if (col.kind === "common") {
+                      const c = col.cell;
+                      const bandTimes = ctx.bySemester[c.semesterKey]?.bandTimes ?? [];
+                      const ks = classesAt({ students: roster.students }, bandTimes, c.bandIdx, t);
+                      if (!ks.length) return <td key={`c-${col.ci}`} className="border border-stone-200 bg-stone-50/50" />;
+                      return (
+                        <td
+                          key={`c-${col.ci}`}
+                          className={`border border-stone-200 px-2 py-1 text-center ${c.shared ? "bg-emerald-50/40 text-stone-400" : "bg-emerald-50"}`}
+                        >
+                          {studentsOf(ks)}
+                          <span className="block text-[10px] text-stone-500">
+                            {ks.map(classLabel).join(",")}
+                          </span>
+                        </td>
+                      );
+                    }
+                    const i = col.idx;
+                    const s = subs[i];
                     if (!state.selected[i])
-                      return <td key={i} className="border border-stone-200 bg-stone-50/50" />;
+                      return <td key={`s-${i}`} className="border border-stone-200 bg-stone-50/50" />;
                     const has = state.placement[i]?.includes(t);
                     if (!has) {
                       return (
                         <td
-                          key={i}
+                          key={`s-${i}`}
                           onClick={() => !dis && api.toggleCell(i, t)}
                           className="border border-stone-200 px-2 py-1 text-center text-stone-200 hover:bg-amber-50 cursor-pointer"
                         >
@@ -351,27 +421,11 @@ export function AllocationGridStep({ api }: Props) {
                       n > cap ? "bg-rose-100 text-rose-700" : n === cap ? "bg-amber-100" : "bg-emerald-50";
                     return (
                       <td
-                        key={i}
+                        key={`s-${i}`}
                         onClick={() => !dis && api.toggleCell(i, t)}
                         className={`border border-stone-200 px-2 py-1 text-center tabular-nums cursor-pointer ${tone}`}
                       >
                         {n}
-                      </td>
-                    );
-                  })}
-                  {com.map((c, ci) => {
-                    const bandTimes = ctx.bySemester[c.semesterKey]?.bandTimes ?? [];
-                    const ks = classesAt({ students: roster.students }, bandTimes, c.bandIdx, t);
-                    if (!ks.length) return <td key={ci} className="border border-stone-200 bg-stone-50/50" />;
-                    return (
-                      <td
-                        key={ci}
-                        className={`border border-stone-200 px-2 py-1 text-center ${c.shared ? "bg-emerald-50/40 text-stone-400" : "bg-emerald-50"}`}
-                      >
-                        {studentsOf(ks)}
-                        <span className="block text-[10px] text-stone-500">
-                          {ks.map(classLabel).join(",")}
-                        </span>
                       </td>
                     );
                   })}
@@ -383,35 +437,37 @@ export function AllocationGridStep({ api }: Props) {
               <td className="border border-stone-200 px-2 py-1 text-center">
                 {asgTot}({fullStu})
               </td>
-              {subs.map((s) => (
-                <td key={s.idx} className="border border-stone-200 px-2 py-1 text-center tabular-nums">
-                  {state.selected[s.idx] ? asg[s.idx] : ""}
-                </td>
-              ))}
-              {com.map((_, i) => (
-                <td key={i} className="border border-stone-200 px-2 py-1 text-center">
-                  {N}
-                </td>
-              ))}
+              {orderedColumns.map((col) =>
+                col.kind === "subject" ? (
+                  <td key={`s-${col.idx}`} className="border border-stone-200 px-2 py-1 text-center tabular-nums">
+                    {state.selected[col.idx] ? asg[col.idx] : ""}
+                  </td>
+                ) : (
+                  <td key={`c-${col.ci}`} className="border border-stone-200 px-2 py-1 text-center">
+                    {N}
+                  </td>
+                )
+              )}
             </tr>
             <tr className="bg-stone-50">
               <td className="sticky left-0 bg-stone-50 border border-stone-200 px-2 py-1">미배정(명)</td>
               <td className="border border-stone-200 px-2 py-1 text-center text-rose-600">
                 {unTot}({unStu})
               </td>
-              {subs.map((s) => (
-                <td
-                  key={s.idx}
-                  className={`border border-stone-200 px-2 py-1 text-center tabular-nums ${un[s.idx] ? "text-rose-600" : ""}`}
-                >
-                  {state.selected[s.idx] ? un[s.idx] : ""}
-                </td>
-              ))}
-              {com.map((_, i) => (
-                <td key={i} className="border border-stone-200 px-2 py-1 text-center">
-                  0
-                </td>
-              ))}
+              {orderedColumns.map((col) =>
+                col.kind === "subject" ? (
+                  <td
+                    key={`s-${col.idx}`}
+                    className={`border border-stone-200 px-2 py-1 text-center tabular-nums ${un[col.idx] ? "text-rose-600" : ""}`}
+                  >
+                    {state.selected[col.idx] ? un[col.idx] : ""}
+                  </td>
+                ) : (
+                  <td key={`c-${col.ci}`} className="border border-stone-200 px-2 py-1 text-center">
+                    0
+                  </td>
+                )
+              )}
             </tr>
           </tbody>
         </table>

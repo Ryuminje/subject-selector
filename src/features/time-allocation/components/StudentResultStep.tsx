@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { ClipboardCopy, Download, Users } from "lucide-react";
 import type { TimeAllocationApi } from "../hooks/useTimeAllocation";
 import { blockedBands, classKey, classLabel } from "../lib/bands";
-import { studentRow, studentsTSV, timeLabel, type StudentRowsContext } from "../lib/studentRows";
+import { studentRowsBySemester, studentsTSV, timeLabel, type StudentRowsContext } from "../lib/studentRows";
 import { exportStudentTimesXlsx } from "../lib/exportExcel";
 
 interface Props {
@@ -14,7 +14,7 @@ interface Props {
 
 export function StudentResultStep({ api, fileLabel }: Props) {
   // 체크 해제됐지만 배치가 남은 과목(1학기 결과 등)까지 합쳐진 값을 씁니다.
-  const { state, ctx, studentAssign: assign, numTimes } = api;
+  const { state, ctx, studentAssign: assign, numTimes, semesterKeys } = api;
   const [onlyUnassigned, setOnlyUnassigned] = useState(false);
   const [msg, setMsg] = useState<string>("");
 
@@ -28,8 +28,10 @@ export function StudentResultStep({ api, fileLabel }: Props) {
     startLetter: state.startLetter,
     subjects: rosterSubjects,
     students: state.roster.students,
+    semesterKeys,
     bySemester: ctx.bySemester,
   };
+  const multiSemester = semesterKeys.length > 1;
 
   const copyTsv = async () => {
     try {
@@ -79,16 +81,29 @@ export function StudentResultStep({ api, fileLabel }: Props) {
       <div className="overflow-auto border border-stone-200 rounded-xl">
         <table className="text-[11px] border-collapse whitespace-nowrap">
           <thead className="bg-stone-100">
+            {multiSemester && (
+              <tr>
+                <th className="border border-stone-200 px-2 py-1" colSpan={4} />
+                {semesterKeys.map((key) => (
+                  <th key={key} className="border border-stone-200 px-2 py-1 bg-amber-50" colSpan={ctx.bySemester[key]?.ownTimes ?? numTimes}>
+                    {key}
+                  </th>
+                ))}
+                <th className="border border-stone-200 px-2 py-1" />
+              </tr>
+            )}
             <tr>
               <th className="border border-stone-200 px-2 py-1">순번</th>
               <th className="border border-stone-200 px-2 py-1">학번</th>
               <th className="border border-stone-200 px-2 py-1">반</th>
               <th className="border border-stone-200 px-2 py-1">이름</th>
-              {Array.from({ length: numTimes }, (_, t) => (
-                <th key={t} className="border border-stone-200 px-2 py-1">
-                  {timeLabel({ startLetter: state.startLetter }, t)}
-                </th>
-              ))}
+              {semesterKeys.flatMap((key) =>
+                Array.from({ length: ctx.bySemester[key]?.ownTimes ?? numTimes }, (_, t) => (
+                  <th key={`${key}-${t}`} className="border border-stone-200 px-2 py-1">
+                    {timeLabel({ startLetter: state.startLetter }, t)}
+                  </th>
+                )),
+              )}
               <th className="border border-stone-200 px-2 py-1">미배정</th>
             </tr>
           </thead>
@@ -96,10 +111,14 @@ export function StudentResultStep({ api, fileLabel }: Props) {
             {state.roster.students.map((st, i) => {
               const u = assign.unassigned[i];
               if (onlyUnassigned && !u.length) return null;
-              const row = studentRow(rowsCtx, assign, i);
-              const blocked = Object.values(ctx.bySemester).flatMap((info) =>
-                blockedBands(st.id, info.common, info.bandTimes),
-              );
+              const bySem = studentRowsBySemester(rowsCtx, assign, i);
+              // 학기별 로컬 타임 인덱스라 차단 목록도 학기별로 따로 둡니다 — 합쳐서 보면
+              // 2학기의 막힌 t가 1학기의 같은 번호 칸까지 잘못 물들일 수 있습니다.
+              const blockedBySem: Record<string, number[]> = {};
+              semesterKeys.forEach((key) => {
+                const info = ctx.bySemester[key];
+                blockedBySem[key] = info ? blockedBands(st.id, info.common, info.bandTimes) : [];
+              });
               return (
                 <tr key={st.id + i}>
                   <td className="border border-stone-200 px-2 py-1 text-center">{st.no}</td>
@@ -108,14 +127,16 @@ export function StudentResultStep({ api, fileLabel }: Props) {
                     {classLabel(classKey(st.id))}
                   </td>
                   <td className="border border-stone-200 px-2 py-1">{st.name}</td>
-                  {row.map((name, t) => (
-                    <td
-                      key={t}
-                      className={`border border-stone-200 px-2 py-1 ${blocked.includes(t) ? "bg-emerald-50" : ""}`}
-                    >
-                      {name}
-                    </td>
-                  ))}
+                  {semesterKeys.flatMap((key) =>
+                    (bySem[key] ?? []).map((name, t) => (
+                      <td
+                        key={`${key}-${t}`}
+                        className={`border border-stone-200 px-2 py-1 ${blockedBySem[key]?.includes(t) ? "bg-emerald-50" : ""}`}
+                      >
+                        {name}
+                      </td>
+                    )),
+                  )}
                   <td className={`border border-stone-200 px-2 py-1 ${u.length ? "text-rose-600" : ""}`}>
                     {u.map((s) => rosterSubjects[s].name).join(", ")}
                   </td>
