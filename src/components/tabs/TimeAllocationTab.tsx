@@ -51,6 +51,12 @@ export function TimeAllocationTab() {
     api.loadFromMain(getMain() ?? {});
   };
 
+  // 리로스쿨용 내보내기는 본조사 탭이 들고 있는 "원본 업로드 파일"을 그대로 다시 엽니다.
+  const mainFileData = () => {
+    const getMain = (window as unknown as { getMainBackup?: () => MainSurveySnapshot }).getMainBackup;
+    return getMain?.()?.uploadedFiles?.[api.activeGrade]?.data;
+  };
+
   // 다른 탭들과 동일한 저장/불러오기 번들 — MainSurveyTab.tsx 의 handleSaveBackup/handleLoadBackup 과 같은 로직.
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -196,7 +202,11 @@ export function TimeAllocationTab() {
         {step === "input" && <DataInputStep api={api} onLoadFromMain={loadFromMain} />}
         {step === "alloc" && <AllocationGridStep api={api} />}
         {step === "student" && (
-          <StudentResultStep api={api} fileLabel={GRADE_FILE_LABEL[api.activeGrade]} />
+          <StudentResultStep
+            api={api}
+            fileLabel={GRADE_FILE_LABEL[api.activeGrade]}
+            getMainFileData={mainFileData}
+          />
         )}
       </div>
     </>
