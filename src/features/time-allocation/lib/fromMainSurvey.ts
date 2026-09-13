@@ -9,6 +9,8 @@ export interface MainSurveySnapshot {
   processedData?: Partial<Record<GradeKey, ProcessedStudent[]>>;
   subjectStats?: Partial<Record<GradeKey, SubjectStat[]>>;
   manualStep5Classes?: Record<string, string>;
+  /** 업로드했던 원본 수강신청 엑셀(data URL) — 리로스쿨용 내보내기가 이걸 그대로 다시 엽니다. */
+  uploadedFiles?: Partial<Record<GradeKey, { name: string; size: number; data: string } | null>>;
 }
 
 export interface MainSurveyRosterResult {

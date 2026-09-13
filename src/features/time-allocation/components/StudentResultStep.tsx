@@ -6,13 +6,16 @@ import type { TimeAllocationApi } from "../hooks/useTimeAllocation";
 import { blockedBands, classKey, classLabel } from "../lib/bands";
 import { studentRowsBySemester, studentsTSV, timeLabel, type StudentRowsContext } from "../lib/studentRows";
 import { exportStudentTimesXlsx } from "../lib/exportExcel";
+import { exportRiroschoolXlsx } from "../lib/exportRiroschool";
 
 interface Props {
   api: TimeAllocationApi;
   fileLabel: string;
+  /** 본조사 탭에 업로드된 원본 엑셀(data URL) — 리로스쿨용 내보내기에만 씁니다. */
+  getMainFileData?: () => string | undefined;
 }
 
-export function StudentResultStep({ api, fileLabel }: Props) {
+export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
   // 체크 해제됐지만 배치가 남은 과목(1학기 결과 등)까지 합쳐진 값을 씁니다.
   const { state, ctx, studentAssign: assign, numTimes, semesterKeys } = api;
   const [onlyUnassigned, setOnlyUnassigned] = useState(false);
@@ -47,6 +50,24 @@ export function StudentResultStep({ api, fileLabel }: Props) {
     setMsg("엑셀 파일을 내려받았습니다.");
   };
 
+  const exportRiro = () => {
+    const data = getMainFileData?.();
+    if (!data) {
+      setMsg("본조사 탭에 업로드된 원본 엑셀이 없습니다. 본조사 탭에서 파일을 먼저 올리세요.");
+      return;
+    }
+    try {
+      const r = exportRiroschoolXlsx(data, rowsCtx, assign, `${fileLabel}_리로스쿨_업로드용`);
+      setMsg(
+        `리로스쿨용 엑셀을 내려받았습니다 (학생 ${r.rows}명 · ${r.filled}칸 채움` +
+          (r.unassigned ? ` · 미배정 ${r.unassigned}칸은 원본 값 유지)` : ")"),
+      );
+    } catch (e) {
+      console.error(e);
+      setMsg((e as Error).message || "엑셀 생성 중 오류가 발생했습니다.");
+    }
+  };
+
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
@@ -60,6 +81,13 @@ export function StudentResultStep({ api, fileLabel }: Props) {
           className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl"
         >
           <Download className="w-4 h-4" /> Excel 내보내기
+        </button>
+        <button
+          onClick={exportRiro}
+          title="본조사 원본 파일의 선택 표시(1)를 배정된 타임 문자로 바꿔 내려받습니다."
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold rounded-xl"
+        >
+          <Download className="w-4 h-4" /> 리로스쿨용 엑셀
         </button>
         <button
           onClick={copyTsv}
