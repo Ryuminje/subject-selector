@@ -26,11 +26,11 @@ import {
 import { parseRoster } from "../lib/parseRoster";
 import { autoPackBands, computeFixedBands, totalTimes } from "../lib/bands";
 import {
+  assignSectionTimes,
   coMatrix,
   defaultSections,
   mergeAssignments,
   optimize,
-  pickTimes,
   runAssign,
   type AllocContext,
   type SemesterAllocInfo,
@@ -137,7 +137,7 @@ export interface TimeAllocationApi {
   setSection: (idx: number, n: number) => void;
   toggleFixedCap: (idx: number) => void;
   setFixedCap: (idx: number, n: number) => void;
-  toggleCell: (idx: number, t: number) => void;
+  toggleCell: (idx: number, t: number, mode?: "add" | "remove") => void;
   runOptimize: () => void;
   resetPlacement: () => void;
   setConfirmed: (v: boolean) => void;
@@ -406,29 +406,32 @@ export function useTimeAllocation(): TimeAllocationApi {
     (idx: number, n: number) =>
       patch((g) => {
         if (g.confirmed || !g.roster) return g;
-        const k = Math.max(0, Math.min(numTimes, n || 0));
+        // 타임 수보다 많이 잡아도 됩니다 — 넘치는 분반은 assignSectionTimes 가 가장 한산한
+        // 타임에 겹쳐 채웁니다("A1"/"A2" 로 화면·내보내기에 표시됨).
+        const k = Math.max(0, n || 0);
         const sections = g.sections.slice();
         sections[idx] = k;
         let placement = g.placement;
         const cur = g.placement[idx] ?? [];
         if (cur.length && ctx) {
           const co = coMatrix(ctx);
-          const a = runAssign(ctx, g.placement);
-          let times = cur.slice();
-          while (times.length > k) {
-            times = times.sort((x, y) => a.load[idx][x] - a.load[idx][y]);
-            times.shift();
+          if (k < cur.length) {
+            const a = runAssign(ctx, g.placement);
+            let times = cur.slice();
+            while (times.length > k) {
+              times = times.sort((x, y) => a.load[idx][x] - a.load[idx][y]);
+              times.shift();
+            }
+            placement = g.placement.slice();
+            placement[idx] = times.sort((x, y) => x - y);
+          } else if (k > cur.length) {
+            placement = g.placement.slice();
+            placement[idx] = assignSectionTimes(ctx, g.placement, idx, k, co).sort((x, y) => x - y);
           }
-          if (times.length < k) {
-            const add = pickTimes(ctx, g.placement, idx, k - times.length, co, new Set(times));
-            times = [...times, ...add];
-          }
-          placement = g.placement.slice();
-          placement[idx] = times.sort((x, y) => x - y);
         }
         return { ...g, sections, placement };
       }),
-    [patch, numTimes, ctx],
+    [patch, ctx],
   );
 
   const toggleFixedCap = useCallback(
@@ -452,15 +455,22 @@ export function useTimeAllocation(): TimeAllocationApi {
     [patch],
   );
 
+  // mode 없이 부르면(빈 칸 클릭) 자동으로 add/remove 를 판단 — 채워진 칸이면 겹친 분반 중
+  // 하나만 제거(전부 지우지 않음), 비어 있으면 추가. "+" 컨트롤은 채워진 칸에서도 항상
+  // "add"를 명시해 분반을 겹쳐 넣습니다.
   const toggleCell = useCallback(
-    (idx: number, t: number) =>
+    (idx: number, t: number, mode?: "add" | "remove") =>
       patch((g) => {
         if (g.confirmed) return g;
         const placement = g.placement.slice();
         const cur = placement[idx] ?? [];
-        placement[idx] = cur.includes(t)
-          ? cur.filter((x) => x !== t)
-          : [...cur, t].sort((a, b) => a - b);
+        const action = mode ?? (cur.includes(t) ? "remove" : "add");
+        if (action === "remove") {
+          const at = cur.indexOf(t);
+          placement[idx] = at >= 0 ? [...cur.slice(0, at), ...cur.slice(at + 1)] : cur;
+        } else {
+          placement[idx] = [...cur, t].sort((a, b) => a - b);
+        }
         const sections = g.sections.slice();
         sections[idx] = placement[idx].length;
         return { ...g, placement, sections };

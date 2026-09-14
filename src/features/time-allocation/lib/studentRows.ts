@@ -58,6 +58,7 @@ export function studentRowsBySemester(
   ctx: StudentRowsContext,
   assign: Assignment,
   i: number,
+  sectionLabels?: Map<string, string>,
 ): Record<string, string[]> {
   const st = ctx.students[i];
   const k = classKey(st.id);
@@ -68,7 +69,11 @@ export function studentRowsBySemester(
   for (const [s, t] of assign.byStudent[i]) {
     const subj = ctx.subjects[s];
     const row = out[semesterKeyOf(subj)];
-    if (row && t < row.length) row[t] = subj.name;
+    if (!row || t >= row.length) continue;
+    // 분반이 겹친(A1/A2) 칸이면 라벨을 과목명 뒤에 붙여 구분합니다. plain "A"면(안 겹침) 그대로.
+    const label = sectionLabels?.get(`${i}|${s}`);
+    const plain = timeLabel(ctx, t);
+    row[t] = label && label !== plain ? `${subj.name} (${label})` : subj.name;
   }
   ctx.semesterKeys.forEach((key) => {
     const info = ctx.bySemester[key];
@@ -89,7 +94,11 @@ function timeColumnLabel(ctx: StudentRowsContext, key: string, t: number): strin
 }
 
 /** 엑셀에 붙여넣을 TSV(순번/학번/반/이름 + 학기별 타임열 + 미배정). */
-export function studentsTSV(ctx: StudentRowsContext, assign: Assignment): string {
+export function studentsTSV(
+  ctx: StudentRowsContext,
+  assign: Assignment,
+  sectionLabels?: Map<string, string>,
+): string {
   const header = [
     "순번",
     "학번",
@@ -101,7 +110,7 @@ export function studentsTSV(ctx: StudentRowsContext, assign: Assignment): string
     "미배정",
   ].join("\t");
   const lines = ctx.students.map((st, i) => {
-    const bySem = studentRowsBySemester(ctx, assign, i);
+    const bySem = studentRowsBySemester(ctx, assign, i, sectionLabels);
     return [
       st.no,
       st.id,

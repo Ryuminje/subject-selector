@@ -7,6 +7,7 @@ import { CommonSubjectEditor } from "./CommonSubjectEditor";
 import { classesAt, commonCells } from "../lib/gridModel";
 import { classKey, classLabel } from "../lib/bands";
 import { timeLabel } from "../lib/studentRows";
+import { countAt, sectionLabel, splitSectionStudents } from "../lib/assign";
 import { NO_SEMESTER_KEY, semesterKeyOf } from "../types";
 
 interface Props {
@@ -300,7 +301,7 @@ export function AllocationGridStep({ api }: Props) {
                     <input
                       type="number"
                       min={0}
-                      max={numTimes}
+                      title="타임 수보다 많이 넣으면 남는 분반은 가장 한산한 타임에 겹쳐 열립니다(A1/A2로 표시)."
                       value={state.sections[col.idx] ?? 0}
                       disabled={dis || !state.selected[col.idx]}
                       onChange={(e) => api.setSection(col.idx, +e.target.value)}
@@ -403,29 +404,53 @@ export function AllocationGridStep({ api }: Props) {
                     const s = subs[i];
                     if (!state.selected[i])
                       return <td key={`s-${i}`} className="border border-stone-200 bg-stone-50/50" />;
-                    const has = state.placement[i]?.includes(t);
-                    if (!has) {
+                    const count = countAt(state.placement[i] ?? [], t);
+                    if (count === 0) {
                       return (
                         <td
                           key={`s-${i}`}
-                          onClick={() => !dis && api.toggleCell(i, t)}
+                          onClick={() => !dis && api.toggleCell(i, t, "add")}
                           className="border border-stone-200 px-2 py-1 text-center text-stone-200 hover:bg-amber-50 cursor-pointer"
                         >
                           +
                         </td>
                       );
                     }
-                    const n = assign ? assign.load[i][t] : 0;
                     const cap = state.fixedCap[i] ?? ctx.bySemester[semesterKeyOf(s)]?.cap ?? 29;
-                    const tone =
-                      n > cap ? "bg-rose-100 text-rose-700" : n === cap ? "bg-amber-100" : "bg-emerald-50";
+                    // 분반이 겹친 칸(count>1)은 실제 배정 인원을 분반별로 나눠 "A1"/"A2" 로
+                    // 구분해 보여줍니다 — 합계만 보이면 어느 학생이 어느 교실인지 알 수 없습니다.
+                    const groups = assign
+                      ? splitSectionStudents(ctx, state.placement, assign, i, t)
+                      : Array.from({ length: count }, () => []);
+                    const base = timeLabel({ startLetter: state.startLetter }, t);
                     return (
-                      <td
-                        key={`s-${i}`}
-                        onClick={() => !dis && api.toggleCell(i, t)}
-                        className={`border border-stone-200 px-2 py-1 text-center tabular-nums cursor-pointer ${tone}`}
-                      >
-                        {n}
+                      <td key={`s-${i}`} className="border border-stone-200 px-1 py-1 text-center tabular-nums">
+                        {groups.map((g, gi) => {
+                          const n = g.length;
+                          const tone = n > cap ? "text-rose-700" : n === cap ? "text-amber-700" : "";
+                          return (
+                            <div
+                              key={gi}
+                              onClick={() => !dis && api.toggleCell(i, t, "remove")}
+                              className={`cursor-pointer hover:bg-amber-50 ${tone}`}
+                            >
+                              {count > 1 ? `${sectionLabel(base, gi + 1, count)} ` : ""}
+                              {n}
+                            </div>
+                          );
+                        })}
+                        {!dis && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              api.toggleCell(i, t, "add");
+                            }}
+                            title="이 타임에 분반 하나 더 겹쳐 열기"
+                            className="text-[10px] text-emerald-600 hover:underline"
+                          >
+                            ＋분반
+                          </button>
+                        )}
                       </td>
                     );
                   })}
