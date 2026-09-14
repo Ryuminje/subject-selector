@@ -65,13 +65,7 @@ export function runAssign(ctx: AllocContext, placement: number[][]): Assignment 
   const T = ctx.numTimes;
   const S = ctx.subjects.length;
   const load: number[][] = Array.from({ length: S }, () => new Array(T).fill(0));
-  const byStudent: Array<Map<number, number>> = [];
-  const unassigned: number[][] = [];
-
-  const stuSubs = ctx.students.map((st) => st.choices.filter((s) => ctx.selected[s]));
-  const order = ctx.students.map((_, i) => i);
-  const optCount = (i: number) => stuSubs[i].reduce((a, s) => a + placement[s].length, 0);
-  order.sort((a, b) => optCount(a) - optCount(b) || a - b);
+  const byStudent: Array<Map<number, number>> = ctx.students.map(() => new Map());
 
   const match = (subs: number[], useCap: boolean, blocked: number[]): Map<number, number> => {
     const matchR = new Array(T).fill(-1);
@@ -106,30 +100,35 @@ export function runAssign(ctx: AllocContext, placement: number[][]): Assignment 
     return res;
   };
 
-  for (const i of order) {
-    const subs = stuSubs[i];
-    // 1학기/2학기 과목은 서로 다른 학기 그룹이면 같은 타임을 나눠 써도 충돌이 아니므로
-    // 그룹(학기)별로 독립된 매칭을 돌립니다(같은 학기 안에서는 기존처럼 한 타임에 하나만).
-    // 각 그룹은 그 학기의 공통과목·인원초과 설정을 씁니다.
-    const bySemesterSubs = new Map<string, number[]>();
-    for (const s of subs) {
-      const key = semesterKeyOf(ctx.subjects[s]);
-      const arr = bySemesterSubs.get(key);
-      if (arr) arr.push(s);
-      else bySemesterSubs.set(key, [s]);
-    }
-    const res = new Map<number, number>();
-    for (const [key, group] of bySemesterSubs) {
-      const info = ctx.bySemester[key];
+  // 1학기/2학기는 애초에 같은 시간에 공존할 수 없는 별개 배정이라, 처리 순서까지 학기별로
+  // 따로 계산해 완전히 독립된 패스로 돌립니다. (이전엔 학생 처리 순서를 두 학기 과목 총
+  // 개수로 한 번만 정렬해서, 다른 학기를 추가로 선택하면 그 순서가 바뀌어 그리디 매칭
+  // 결과인 이 학기 배정까지 덩달아 바뀌는 문제가 있었습니다.)
+  const semesterKeys = [...new Set(ctx.subjects.filter((_, i) => ctx.selected[i]).map((s) => semesterKeyOf(s)))];
+  for (const key of semesterKeys) {
+    const info = ctx.bySemester[key];
+    const stuSubs = ctx.students.map((st) =>
+      st.choices.filter((s) => ctx.selected[s] && semesterKeyOf(ctx.subjects[s]) === key),
+    );
+    const order = ctx.students.map((_, i) => i);
+    const optCount = (i: number) => stuSubs[i].reduce((a, s) => a + placement[s].length, 0);
+    order.sort((a, b) => optCount(a) - optCount(b) || a - b);
+    for (const i of order) {
+      const subs = stuSubs[i];
+      if (!subs.length) continue;
       const blocked = info ? blockedBands(ctx.students[i].id, info.common, info.bandTimes) : [];
-      let m = match(group, true, blocked);
-      if (m.size < group.length && info?.allowOver) m = match(group, false, blocked);
-      for (const [s, t] of m) res.set(s, t);
+      let m = match(subs, true, blocked);
+      if (m.size < subs.length && info?.allowOver) m = match(subs, false, blocked);
+      for (const [s, t] of m) {
+        byStudent[i].set(s, t);
+        load[s][t]++;
+      }
     }
-    byStudent[i] = res;
-    unassigned[i] = subs.filter((s) => !res.has(s));
-    for (const [s, t] of res) load[s][t]++;
   }
+  const unassigned: number[][] = ctx.students.map((st, i) => {
+    const subs = st.choices.filter((s) => ctx.selected[s]);
+    return subs.filter((s) => !byStudent[i].has(s));
+  });
   return { byStudent, unassigned, load };
 }
 
@@ -256,7 +255,16 @@ export interface OptimizeResult {
   assign: Assignment;
 }
 
-/** 초기 배치 후 제한 시간 동안 타임 위치를 무작위로 바꿔가며 비용을 낮춥니다. */
+/**
+ * 초기 배치 후 제한 시간 동안 타임 위치를 무작위로 바꿔가며 비용을 낮춥니다.
+ *
+ * 1학기/2학기는 같은 시간에 공존할 수 없는 완전히 별개의 배정이라, 학기별로 나눠 각자
+ * budgetMs 전체를 씁니다(선택 과목만 `selected`를 가린 임시 컨텍스트로 한 학기씩 처리).
+ * 한 번에 다 돌리면 ① 다른 학기 과목이 늘어날수록 같은 시간 예산을 더 많은 과목이 나눠
+ * 써서 탐색 횟수가 희석되고, ② cost()가 전체 과목을 합쳐 계산해 반복마다 더 느려집니다 —
+ * 그 결과 다른 학기를 추가로 선택하기만 해도 이 학기의 배정 품질(그래서 실제 배정 결과)이
+ * 흔들리는 문제가 있었습니다.
+ */
 export function optimize(
   ctx: AllocContext,
   sections: number[],
@@ -264,35 +272,41 @@ export function optimize(
   rand: () => number = Math.random,
   basePlacement?: number[][],
 ): OptimizeResult {
-  const co = coMatrix(ctx);
-  const placement = initialPlacement(ctx, sections, co, basePlacement);
-  let best = cost(ctx, placement).value;
-  // ownTimes(그 과목이 속한 학기 몫의 타임 수)로 제한합니다 — ctx.numTimes(전체 폭)를 그대로
-  // 쓰면 더 적게 필요한 학기의 과목이 옮겨다니다 다른 학기 몫 타임까지 넘어갈 수 있습니다.
-  const ownTimesOf = (i: number) => ctx.bySemester[semesterKeyOf(ctx.subjects[i])]?.ownTimes ?? ctx.numTimes;
-  const movable = ctx.subjects
-    .map((_, i) => i)
-    .filter((i) => ctx.selected[i] && placement[i].length > 0 && placement[i].length < ownTimesOf(i));
-  const t0 = now();
+  const semesterKeys = [...new Set(ctx.subjects.filter((_, i) => ctx.selected[i]).map((s) => semesterKeyOf(s)))];
+  let placement = ctx.subjects.map((_, i) => (basePlacement?.[i] ?? []).slice());
   let iter = 0;
-  while (movable.length && now() - t0 < budgetMs) {
-    iter++;
-    const s = movable[Math.floor(rand() * movable.length)];
-    const set = new Set(placement[s]);
-    const t1 = placement[s][Math.floor(rand() * placement[s].length)];
-    const free = [...Array(ownTimesOf(s)).keys()].filter((t) => !set.has(t));
-    if (!free.length) continue;
-    const t2 = free[Math.floor(rand() * free.length)];
-    placement[s] = placement[s].map((t) => (t === t1 ? t2 : t));
-    const c = cost(ctx, placement).value;
-    if (c <= best) {
-      best = c;
-    } else {
-      placement[s] = placement[s].map((t) => (t === t2 ? t1 : t));
+  for (const key of semesterKeys) {
+    const semCtx: AllocContext = {
+      ...ctx,
+      selected: ctx.subjects.map((s, i) => ctx.selected[i] && semesterKeyOf(s) === key),
+    };
+    const co = coMatrix(semCtx);
+    placement = initialPlacement(semCtx, sections, co, placement);
+    let best = cost(semCtx, placement).value;
+    const ownTimes = ctx.bySemester[key]?.ownTimes ?? ctx.numTimes;
+    const movable = semCtx.subjects
+      .map((_, i) => i)
+      .filter((i) => semCtx.selected[i] && placement[i].length > 0 && placement[i].length < ownTimes);
+    const t0 = now();
+    while (movable.length && now() - t0 < budgetMs) {
+      iter++;
+      const s = movable[Math.floor(rand() * movable.length)];
+      const set = new Set(placement[s]);
+      const t1 = placement[s][Math.floor(rand() * placement[s].length)];
+      const free = [...Array(ownTimes).keys()].filter((t) => !set.has(t));
+      if (!free.length) continue;
+      const t2 = free[Math.floor(rand() * free.length)];
+      placement[s] = placement[s].map((t) => (t === t1 ? t2 : t));
+      const c = cost(semCtx, placement).value;
+      if (c <= best) {
+        best = c;
+      } else {
+        placement[s] = placement[s].map((t) => (t === t2 ? t1 : t));
+      }
     }
   }
   const finalCost = cost(ctx, placement);
-  return { placement, best, iter, assign: finalCost.assign };
+  return { placement, best: finalCost.value, iter, assign: finalCost.assign };
 }
 
 function now(): number {
