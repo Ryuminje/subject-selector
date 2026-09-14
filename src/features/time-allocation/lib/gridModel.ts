@@ -9,6 +9,7 @@
 
 import type { Assignment, RosterStudent, RosterSubject, SemesterBandInfo } from "../types";
 import { bandList, classKey } from "./bands";
+import { countAt } from "./assign";
 
 export interface GridContext {
   numTimes: number;
@@ -78,7 +79,7 @@ export function perTimeRows(
     let secs = 0;
     ctx.subjects.forEach((s) => {
       if (ctx.selected[s.idx] && placement[s.idx]?.includes(t)) {
-        secs++;
+        secs += countAt(placement[s.idx], t);
         stu += assign ? assign.load[s.idx][t] : 0;
       }
     });

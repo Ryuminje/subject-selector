@@ -29,6 +29,7 @@ export function exportRiroschoolXlsx(
   ctx: StudentRowsContext,
   assign: Assignment,
   fileName: string,
+  sectionLabels?: Map<string, string>,
 ): RiroschoolResult {
   const base64 = fileDataUrl.slice(fileDataUrl.indexOf(",") + 1);
   const wb = XLSX.read(base64, { type: "base64", cellStyles: true });
@@ -105,7 +106,8 @@ export function exportRiroschoolXlsx(
         res.unassigned++;
         return;
       }
-      ws[XLSX.utils.encode_cell({ r, c })] = { t: "s", v: timeLabel(ctx, t) };
+      const label = sectionLabels?.get(`${i}|${subjIdx}`) ?? timeLabel(ctx, t);
+      ws[XLSX.utils.encode_cell({ r, c })] = { t: "s", v: label };
       res.filled++;
       touched = true;
     });

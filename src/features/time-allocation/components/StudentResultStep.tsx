@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ClipboardCopy, Download, Users } from "lucide-react";
 import type { TimeAllocationApi } from "../hooks/useTimeAllocation";
 import { blockedBands, classKey, classLabel } from "../lib/bands";
 import { studentRowsBySemester, studentsTSV, timeLabel, type StudentRowsContext } from "../lib/studentRows";
+import { buildSectionLabels } from "../lib/assign";
 import { exportStudentTimesXlsx } from "../lib/exportExcel";
 import { exportRiroschoolXlsx } from "../lib/exportRiroschool";
 
@@ -20,6 +21,14 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
   const { state, ctx, studentAssign: assign, numTimes, semesterKeys } = api;
   const [onlyUnassigned, setOnlyUnassigned] = useState(false);
   const [msg, setMsg] = useState<string>("");
+
+  // 분반이 타임 수보다 많아 겹친(A1/A2) 칸의 라벨 — 학생 루프 밖에서 한 번만 계산해 아래
+  // 화면·TSV·Excel·리로스쿨 내보내기가 전부 같은 값을 공유합니다. 데이터가 없으면 빈 맵
+  // (Hook 은 조건 없이 항상 호출해야 하므로 early return 보다 앞에 둡니다).
+  const sectionLabels = useMemo(
+    () => (ctx && assign ? buildSectionLabels(ctx, state.placement, assign, state.startLetter) : new Map<string, string>()),
+    [ctx, state.placement, assign, state.startLetter],
+  );
 
   if (!state.roster || !ctx || !assign) {
     return <p className="text-sm text-stone-500 py-8">타임 배정을 먼저 실행하세요.</p>;
@@ -38,7 +47,7 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
 
   const copyTsv = async () => {
     try {
-      await navigator.clipboard.writeText(studentsTSV(rowsCtx, assign));
+      await navigator.clipboard.writeText(studentsTSV(rowsCtx, assign, sectionLabels));
       setMsg("복사되었습니다. 엑셀에 붙여넣으세요.");
     } catch {
       setMsg("클립보드 접근이 거부되었습니다.");
@@ -46,7 +55,7 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
   };
 
   const exportXlsx = () => {
-    exportStudentTimesXlsx(rowsCtx, assign, `${fileLabel}_타임배정`);
+    exportStudentTimesXlsx(rowsCtx, assign, `${fileLabel}_타임배정`, sectionLabels);
     setMsg("엑셀 파일을 내려받았습니다.");
   };
 
@@ -57,7 +66,7 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
       return;
     }
     try {
-      const r = exportRiroschoolXlsx(data, rowsCtx, assign, `${fileLabel}_리로스쿨_업로드용`);
+      const r = exportRiroschoolXlsx(data, rowsCtx, assign, `${fileLabel}_리로스쿨_업로드용`, sectionLabels);
       setMsg(
         `리로스쿨용 엑셀을 내려받았습니다 (학생 ${r.rows}명 · ${r.filled}칸 채움` +
           (r.unassigned ? ` · 미배정 ${r.unassigned}칸은 원본 값 유지)` : ")"),
@@ -139,7 +148,7 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
             {state.roster.students.map((st, i) => {
               const u = assign.unassigned[i];
               if (onlyUnassigned && !u.length) return null;
-              const bySem = studentRowsBySemester(rowsCtx, assign, i);
+              const bySem = studentRowsBySemester(rowsCtx, assign, i, sectionLabels);
               // 학기별 로컬 타임 인덱스라 차단 목록도 학기별로 따로 둡니다 — 합쳐서 보면
               // 2학기의 막힌 t가 1학기의 같은 번호 칸까지 잘못 물들일 수 있습니다.
               const blockedBySem: Record<string, number[]> = {};

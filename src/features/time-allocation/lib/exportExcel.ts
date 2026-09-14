@@ -17,6 +17,7 @@ export function exportStudentTimesXlsx(
   ctx: StudentRowsContext,
   assign: Assignment,
   fileName: string,
+  sectionLabels?: Map<string, string>,
 ): void {
   const multiSemester = ctx.semesterKeys.length > 1;
   const widthOf = (key: string) => ctx.bySemester[key]?.ownTimes ?? ctx.numTimes;
@@ -42,7 +43,7 @@ export function exportStudentTimesXlsx(
   aoa.push(timeHeader);
 
   ctx.students.forEach((st, i) => {
-    const bySem = studentRowsBySemester(ctx, assign, i);
+    const bySem = studentRowsBySemester(ctx, assign, i, sectionLabels);
     aoa.push([
       st.no,
       st.id,
