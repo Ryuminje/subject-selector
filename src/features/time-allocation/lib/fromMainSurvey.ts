@@ -4,11 +4,14 @@
 
 import type { GradeKey, ProcessedStudent, SubjectStat } from "../../../types";
 import type { RosterGroup, RosterModel, RosterStudent, RosterSubject } from "../types";
+import { getClassRecommendation } from "../../main-survey/hooks/useMainClassSummary";
 
 export interface MainSurveySnapshot {
   processedData?: Partial<Record<GradeKey, ProcessedStudent[]>>;
   subjectStats?: Partial<Record<GradeKey, SubjectStat[]>>;
   manualStep5Classes?: Record<string, string>;
+  /** 5단계(과목 개설 여부) 자동 추천이 기준으로 삼는 학급당 인원. 없으면 25명(ClassOpeningStep 기본값과 동일). */
+  standardClassSize?: Partial<Record<GradeKey, number>>;
   /** 업로드했던 원본 수강신청 엑셀(data URL) — 리로스쿨용 내보내기가 이걸 그대로 다시 엽니다. */
   uploadedFiles?: Partial<Record<GradeKey, { name: string; size: number; data: string } | null>>;
 }
@@ -73,9 +76,14 @@ export function rosterFromMainSurvey(
     const semNorm = normalize(st.semester).replace("~", "").replace("-", "");
     subjectKey.set(`${semNorm}|${normalize(st.subject)}`, idx);
 
+    // 5단계(과목 개설 여부)에 실제로 표시되는 값과 같은 규칙으로 뽑습니다 — 수동으로
+    // 고친 값이 있으면 그 값, 없으면 자동 추천값(ClassOpeningStep의 baseRemark)을 그대로.
+    // "폐강"/"논의"/"2~3" 같은 범위 표기는 확정된 반 수가 아니라 Number()가 NaN이 돼
+    // 자동으로 힌트 없음(-1) 처리됩니다(ClassOpeningStep의 "확정" 판정과 동일 규칙).
     const manualKey = `${grade}_${st.semester}_${st.subject}`;
-    const raw = snap.manualStep5Classes?.[manualKey];
-    const n = raw !== undefined ? parseInt(raw, 10) : NaN;
+    const baseRemark = getClassRecommendation(st.applicants, snap.standardClassSize?.[grade] ?? 25);
+    const raw = snap.manualStep5Classes?.[manualKey] ?? baseRemark;
+    const n = Number(raw);
     sectionHints[idx] = Number.isFinite(n) && n > 0 ? n : -1;
   });
 
