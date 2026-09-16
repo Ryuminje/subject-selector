@@ -1,12 +1,13 @@
 "use client";
 
 import React from "react";
-import { FileText, Download, Lock, CheckCircle2, Undo2 } from "lucide-react";
+import { FileText, Download, Lock, CheckCircle2, Undo2, Trash2 } from "lucide-react";
 import type { ChangeGradeKey, ElectiveChange, GradeStringArrays, TimetableData } from "../types";
 import type { StudentTimeData } from "../../../types";
 import { ElectiveChangeTable } from "./ElectiveChangeTable";
+import { changeSubjectOptionsOf } from "../lib/subjectMatch";
 
-type AdjustmentLog = Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary'; pinned?: boolean }[]>;
+type AdjustmentLog = Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary'; pinned?: boolean; chain?: 3 }[]>;
 
 interface ApplicationStepProps {
   changeActiveGrade: ChangeGradeKey;
@@ -25,6 +26,7 @@ interface ApplicationStepProps {
   classCols: GradeStringArrays;
   confirmedBaseSchedules: Record<string, Record<string, Record<string, string>>>;
   canUndoConfirm: Record<ChangeGradeKey, boolean>;
+  onClearConfirmed: (grade: ChangeGradeKey) => void;
   onConfirm: (grade: ChangeGradeKey) => void;
   onUndoConfirm: (grade: ChangeGradeKey) => void;
 }
@@ -46,15 +48,22 @@ export function ApplicationStep({
   classCols,
   confirmedBaseSchedules,
   canUndoConfirm,
+  onClearConfirmed,
   onConfirm,
   onUndoConfirm,
 }: ApplicationStepProps) {
+  const subjectOptions = changeSubjectOptionsOf(parsedSampleData[changeActiveGrade] || [], timetableData[changeActiveGrade] || {});
   const confirmedCount = Object.keys(confirmedBaseSchedules[changeActiveGrade] || {}).length;
   const hasPending = (electiveChanges[changeActiveGrade] || []).length > 0 || (electiveChangesArbitrary[changeActiveGrade] || []).length > 0;
 
   const handleConfirmClick = () => {
     if (!window.confirm("지금까지의 변경 결과를 확정할까요?\n확정하면 이 결과는 고정되고, 신청 표는 비워집니다. 이후 새로 입력하는 신청만 계산에 반영되며 확정된 학생은 다시 건드리지 않습니다.")) return;
     onConfirm(changeActiveGrade);
+  };
+  const handleClearConfirmedClick = () => {
+    const gradeLabel = changeActiveGrade === "grade2" ? "2학년" : "3학년";
+    if (!window.confirm(`${gradeLabel} 확정 내역(${confirmedCount}명)을 삭제할까요?\n확정된 변경 결과가 모두 지워지고 "확정 취소"로도 되돌릴 수 없습니다. 필요하면 먼저 "저장하기"로 백업하세요.\n아직 확정하지 않은 신청 표는 그대로 남습니다.`)) return;
+    onClearConfirmed(changeActiveGrade);
   };
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -90,6 +99,7 @@ export function ApplicationStep({
 
         <div className="flex flex-col gap-6 w-full min-w-0">
           <ElectiveChangeTable
+            subjectOptions={subjectOptions}
             title="변경 신청 입력(신청자)"
             titleColorClass="text-stone-800"
             changeActiveGrade={changeActiveGrade}
@@ -100,6 +110,7 @@ export function ApplicationStep({
             classCols={classCols}
           />
           <ElectiveChangeTable
+            subjectOptions={subjectOptions}
             title="인원 균등 분배를 위한 임의 변경"
             titleColorClass="text-emerald-700"
             changeActiveGrade={changeActiveGrade}
@@ -136,6 +147,16 @@ export function ApplicationStep({
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   {confirmedCount}명 확정됨
                 </span>
+              )}
+              {confirmedCount > 0 && (
+                <button
+                  onClick={handleClearConfirmedClick}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-rose-50 text-rose-700 text-xs font-medium rounded-lg border border-rose-300 shadow-sm transition-all"
+                  title="이 학년의 확정된 변경 결과를 모두 삭제합니다."
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  확정 내역 삭제
+                </button>
               )}
               <button
                 onClick={handleConfirmClick}
@@ -180,8 +201,7 @@ export function ApplicationStep({
 
                   // 학생 목록은 (지금 입력 중인 표가 아니라) 확정분까지 합쳐진 adjustmentLog 기준으로
                   // 뽑아야, 확정 후 입력 표가 비워져도 확정된 결과가 계속 보인다.
-                  // adjustmentLog는 학년 구분 없이 학번으로만 저장되므로, 현재 학년 명단에
-                  // 속한 학번만 걸러내야 다른 학년 학생이 함께 뜨지 않는다.
+                  // adjustmentLog는 이미 현재 학년 것만 담기지만, 명단에 없는 학번(오타 등)은 계속 걸러낸다.
                   const gradeStudentIds = new Set(gradeRoster.map(s => String(s.id)));
 
                   if (Object.keys(adjustmentLog).length === 0) {
@@ -240,6 +260,14 @@ export function ApplicationStep({
                                     title={log.pinned ? `고정된 타임(1순위)${log.reason ? ` — ${log.reason}` : ''}` : log.reason}
                                   >
                                     {log.pinned && <Lock className="w-3 h-3 text-amber-600 shrink-0" />}
+                                    {log.chain === 3 && (
+                                      <span
+                                        className="px-1 rounded bg-violet-600 text-white text-[10px] font-bold shrink-0"
+                                        title="2단계 교체가 불가능해 과목 3개를 함께 옮긴 3단계 교체입니다"
+                                      >
+                                        3단계
+                                      </span>
+                                    )}
                                     {log.beforeStr} → {log.afterStr}
                                     {log.status === 'failed' && <span className="ml-1 font-bold">(불가)</span>}
                                   </div>

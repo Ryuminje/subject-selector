@@ -1,14 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeGradeKey, ElectiveChange, GradeStringArrays, TimetableData } from "../types";
 import type { StudentTimeData } from "../../../types";
-
-const normalizeSubject = (subject: string): string => {
-  return subject.replace(/\s+/g, '')
-    .replace(/Ⅰ/g, 'I')
-    .replace(/Ⅱ/g, 'II')
-    .replace(/Ⅲ/g, 'III')
-    .replace(/Ⅳ/g, 'IV');
-};
+import { normalizeSubject, sameSubject } from "../lib/subjectMatch";
 
 export interface ChangeLogEntry {
   beforeStr: string;
@@ -17,6 +10,8 @@ export interface ChangeLogEntry {
   reason?: string;
   source?: 'applicant' | 'arbitrary';
   pinned?: boolean;
+  /** 3단계 교체(과목 3개가 함께 움직임)로 성공한 묶음이면 3 — 결과 내역에 "3단계" 표시. */
+  chain?: 3;
 }
 
 interface PreConfirmSnapshot {
@@ -73,11 +68,7 @@ export function useElectiveChanges(
     const subjectExistsInSlot = (subject: string, slot: string) => {
       const subjects = subjectsInTimeSlot[slot];
       if (!subjects) return false;
-      const clean = normalizeSubject(subject);
-      for (const s of subjects) {
-        const cleanS = normalizeSubject(s);
-        if (cleanS === clean || cleanS.includes(clean) || clean.includes(cleanS)) return true;
-      }
+      for (const s of subjects) if (sameSubject(s, subject)) return true;
       return false;
     };
 
@@ -256,13 +247,16 @@ export function useElectiveChanges(
   }, [enableOptimization, electiveChanges, parsedSampleData, timetableData, timeSlots, classCols, changeActiveGrade, confirmedBaseSchedules]);
 
   const pendingResult = useMemo(() => {
-    const log: Record<string, ChangeLogEntry[]> = {};
+    // 학년별로 따로 담습니다 — 학번이 두 학년 명단에 겹치면(예: 학년 초 학번 미갱신) 한 맵에
+    // 합칠 경우 3학년 신청 결과가 2학년 화면·명단·내보내기에도 섞여 나옵니다(실제로 겪음).
+    const logByGrade: Record<ChangeGradeKey, Record<string, ChangeLogEntry[]>> = { grade2: {}, grade3: {} };
     const finalSchedules: Record<ChangeGradeKey, Record<string, Record<string, string>>> = { grade2: {}, grade3: {} };
     if (!parsedSampleData || (!parsedSampleData.grade2.length && !parsedSampleData.grade3.length) || !electiveChanges) {
-      return { log, finalSchedules };
+      return { log: logByGrade, finalSchedules };
     }
 
     (['grade2', 'grade3'] as ('grade2' | 'grade3')[]).forEach(grade => {
+      const log = logByGrade[grade];
       const gradeConfirmedSchedules = confirmedBaseSchedules[grade] || {};
       const upperChanges = (electiveChanges[grade] || []).map(c => ({ ...c, source: 'applicant' as const }));
       const lowerChanges = (electiveChangesArbitrary[grade] || []).map(c => ({ ...c, source: 'arbitrary' as const }));
@@ -287,11 +281,7 @@ export function useElectiveChanges(
       const subjectExistsInSlot = (subject: string, slot: string): boolean => {
         const subjects = subjectsInTimeSlot[slot];
         if (!subjects) return false;
-        const clean = normalizeSubject(subject);
-        for (const s of subjects) {
-          const cleanS = normalizeSubject(s);
-          if (cleanS === clean || cleanS.includes(clean) || clean.includes(cleanS)) return true;
-        }
+        for (const s of subjects) if (sameSubject(s, subject)) return true;
         return false;
       };
 
@@ -302,6 +292,29 @@ export function useElectiveChanges(
         }
         return slots;
       };
+
+      // 3단계 교체 — 2단계(Y타임 과목을 X타임으로)가 막혔을 때만 씁니다.
+      // X(변경전 자리) ← Z타임 과목, Y ← 변경후 과목, Z ← Y타임 과목. Z는 X·Y가 아닌 타임.
+      const findThreeStepSwaps = (sched: Record<string, string>, beforeSlot: string, afterSlot: string) => {
+        const subjY = sched[afterSlot];
+        if (!subjY) return [];
+        return gradeTimeSlots
+          .filter((z: string) =>
+            z !== beforeSlot && z !== afterSlot && !!sched[z] &&
+            subjectExistsInSlot(subjY, z) && subjectExistsInSlot(sched[z], beforeSlot))
+          .map((z: string) => ({ zSlot: z, subjY, subjZ: sched[z] }));
+      };
+      const threeStepLogs = (
+        c: { beforeSubject: string; afterSubject: string; source?: 'applicant' | 'arbitrary' },
+        beforeSlot: string, afterSlot: string,
+        m: { zSlot: string; subjY: string; subjZ: string },
+        pinned: boolean,
+      ): ChangeLogEntry[] => [
+        // 이 순서(옮겨지는 과목 먼저, 신청 과목 마지막)를 리로스쿨/명단 내보내기가 전제합니다.
+        { beforeStr: `${m.subjZ}(${m.zSlot})`, afterStr: `${m.subjZ}(${beforeSlot})`, status: 'success', source: c.source, pinned, chain: 3 },
+        { beforeStr: `${m.subjY}(${afterSlot})`, afterStr: `${m.subjY}(${m.zSlot})`, status: 'success', source: c.source, pinned, chain: 3 },
+        { beforeStr: `${c.beforeSubject}(${beforeSlot})`, afterStr: `${c.afterSubject}(${afterSlot})`, status: 'success', source: c.source, pinned, chain: 3 },
+      ];
 
       if (!enableOptimization[grade]) {
         // --- 기존 순차 매칭 알고리즘 (Original sequential greedy matching) ---
@@ -331,10 +344,8 @@ export function useElectiveChanges(
           const currentSchedule = studentSchedules[c.studentId];
 
           let beforeSlot: string | null = null;
-          const cleanBefore = normalizeSubject(c.beforeSubject);
           for (const [slot, subject] of Object.entries(currentSchedule)) {
-            const cleanSubject = normalizeSubject(subject as string);
-            if (cleanSubject === cleanBefore || cleanSubject.includes(cleanBefore) || cleanBefore.includes(cleanSubject)) {
+            if (sameSubject(subject as string, c.beforeSubject)) {
               beforeSlot = slot;
               break;
             }
@@ -415,14 +426,29 @@ export function useElectiveChanges(
           }
 
           if (!swapSuccess) {
+            for (const afterSlot of afterSlots) {
+              if (afterSlot === beforeSlot) continue;
+              const m = findThreeStepSwaps(currentSchedule, beforeSlot, afterSlot)[0];
+              if (!m) continue;
+              if (!log[c.studentId]) log[c.studentId] = [];
+              log[c.studentId].push(...threeStepLogs(c, beforeSlot, afterSlot, m, !!pinnedSlot));
+              currentSchedule[beforeSlot] = m.subjZ;
+              currentSchedule[afterSlot] = c.afterSubject;
+              currentSchedule[m.zSlot] = m.subjY;
+              swapSuccess = true;
+              break;
+            }
+          }
+
+          if (!swapSuccess) {
             if (!log[c.studentId]) log[c.studentId] = [];
             log[c.studentId].push({
               beforeStr: c.beforeSubject,
               afterStr: c.afterSubject,
               status: 'failed',
               reason: pinnedSlot
-                ? `고정한 ${pinnedSlot} 타임으로 변경 불가: ${lastFailedReason}`
-                : (afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 2단계 교환 실패` : lastFailedReason),
+                ? `고정한 ${pinnedSlot} 타임으로 변경 불가(2·3단계 교체 모두 불가): ${lastFailedReason}`
+                : (afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 2·3단계 교체 모두 불가` : `2·3단계 교체 모두 불가 (${lastFailedReason})`),
               source: c.source,
               pinned: !!pinnedSlot
             });
@@ -501,10 +527,8 @@ export function useElectiveChanges(
 
               const c = studentChanges[changeIndex];
               let beforeSlot: string | null = null;
-              const cleanBefore = normalizeSubject(c.beforeSubject);
               for (const [slot, subject] of Object.entries(currentSched)) {
-                const cleanSubject = normalizeSubject(subject as string);
-                if (cleanSubject === cleanBefore || cleanSubject.includes(cleanBefore) || cleanBefore.includes(cleanSubject)) {
+                if (sameSubject(subject as string, c.beforeSubject)) {
                   beforeSlot = slot;
                   break;
                 }
@@ -579,13 +603,29 @@ export function useElectiveChanges(
               }
 
               if (!validChoiceFound) {
+                for (const afterSlot of afterSlots) {
+                  if (afterSlot === beforeSlot) continue;
+                  for (const m of findThreeStepSwaps(currentSched, beforeSlot, afterSlot)) {
+                    const cost = Math.max(
+                      classSizes[`${afterSlot}::${normalizeSubject(c.afterSubject)}`] || 0,
+                      classSizes[`${m.zSlot}::${normalizeSubject(m.subjY)}`] || 0,
+                      classSizes[`${beforeSlot}::${normalizeSubject(m.subjZ)}`] || 0,
+                    );
+                    const nextSched = { ...currentSched, [beforeSlot]: m.subjZ, [afterSlot]: c.afterSubject, [m.zSlot]: m.subjY };
+                    validChoiceFound = true;
+                    dfs(changeIndex + 1, nextSched, [...currentLogs, ...threeStepLogs(c, beforeSlot, afterSlot, m, !!pinnedSlot)], Math.max(currentMaxCost, cost), successCount + 1);
+                  }
+                }
+              }
+
+              if (!validChoiceFound) {
                  dfs(changeIndex + 1, currentSched, [...currentLogs, {
                    beforeStr: c.beforeSubject,
                    afterStr: c.afterSubject,
                    status: 'failed',
                    reason: pinnedSlot
-                     ? `고정한 ${pinnedSlot} 타임으로 변경 불가: ${lastFailedReason}`
-                     : (afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 교환 실패` : lastFailedReason),
+                     ? `고정한 ${pinnedSlot} 타임으로 변경 불가(2·3단계 교체 모두 불가): ${lastFailedReason}`
+                     : (afterSlots.length > 1 ? `모든 가능한 타임(${afterSlots.join(', ')})에서 2·3단계 교체 모두 불가` : `2·3단계 교체 모두 불가 (${lastFailedReason})`),
                    source: c.source,
                    pinned: !!pinnedSlot
                  }], currentMaxCost, successCount);
@@ -631,22 +671,23 @@ export function useElectiveChanges(
       }
     });
 
-    return { log, finalSchedules };
+    return { log: logByGrade, finalSchedules };
   }, [parsedSampleData, electiveChanges, electiveChangesArbitrary, timetableData, timeSlots, classCols, enableOptimization, confirmedBaseSchedules]);
 
-  // 확정된(얼려둔) 로그와, 지금 표에 남아있는 신청을 계산한 결과를 합쳐서 보여준다.
-  const adjustmentLog = useMemo(() => {
-    const merged: Record<string, ChangeLogEntry[]> = {};
+  // 확정된(얼려둔) 로그와, 지금 표에 남아있는 신청을 계산한 결과를 학년별로 합쳐서 보여준다.
+  const adjustmentLogByGrade = useMemo(() => {
+    const out: Record<ChangeGradeKey, Record<string, ChangeLogEntry[]>> = { grade2: {}, grade3: {} };
     (['grade2', 'grade3'] as ChangeGradeKey[]).forEach(grade => {
-      Object.entries(confirmedLog[grade] || {}).forEach(([sid, entries]) => {
-        merged[sid] = [...(merged[sid] || []), ...entries];
+      const merged = out[grade];
+      [confirmedLog[grade] || {}, pendingResult.log[grade]].forEach(src => {
+        Object.entries(src).forEach(([sid, entries]) => {
+          merged[sid] = [...(merged[sid] || []), ...entries];
+        });
       });
     });
-    Object.entries(pendingResult.log).forEach(([sid, entries]) => {
-      merged[sid] = [...(merged[sid] || []), ...entries];
-    });
-    return merged;
+    return out;
   }, [pendingResult, confirmedLog]);
+  const adjustmentLog = adjustmentLogByGrade[changeActiveGrade];
 
   const handleConfirm = (grade: ChangeGradeKey) => {
     const gradeChanges = electiveChanges[grade] || [];
@@ -681,7 +722,7 @@ export function useElectiveChanges(
     setConfirmedLog(prev => {
       const nextGrade = { ...prev[grade] };
       touchedIds.forEach(id => {
-        const entries = pendingResult.log[id];
+        const entries = pendingResult.log[grade][id];
         if (entries && entries.length > 0) {
           nextGrade[id] = [...(nextGrade[id] || []), ...entries];
         }
@@ -708,11 +749,21 @@ export function useElectiveChanges(
     setConfirmHistory(prev => ({ ...prev, [grade]: stack.slice(0, -1) }));
   };
 
+  // 이 학년의 확정 내역을 통째로 지웁니다. 확정 취소 스택도 함께 비워야 나중에 "확정 취소"가
+  // 지운 내역을 되살리지 않습니다. 아직 확정 안 한 신청 표는 건드리지 않습니다.
+  const handleClearConfirmed = (grade: ChangeGradeKey) => {
+    setConfirmedLog(prev => ({ ...prev, [grade]: {} }));
+    setConfirmedBaseSchedules(prev => ({ ...prev, [grade]: {} }));
+    setConfirmHistory(prev => ({ ...prev, [grade]: [] }));
+  };
+
   return {
+    handleClearConfirmed,
     electiveChanges, setElectiveChanges,
     electiveChangesArbitrary, setElectiveChangesArbitrary,
     enableOptimization, setEnableOptimization,
     adjustmentLog,
+    adjustmentLogByGrade,
     confirmedBaseSchedules, setConfirmedBaseSchedules,
     confirmedLog, setConfirmedLog,
     confirmHistory, setConfirmHistory,

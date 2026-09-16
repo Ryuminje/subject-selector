@@ -131,7 +131,24 @@ export function useTimetableData(changeActiveGrade: ChangeGradeKey) {
     }));
   };
 
+  // 칸 내용(과목명·교사명)만 비웁니다 — 타임/반 자체를 없애는 removeTimeSlot·removeClassCol과 다릅니다.
+  // row만 주면 그 타임 행, col만 주면 그 반 열, 둘 다 없으면 이 학년 시간표 전체.
+  const clearTimetable = ({ row, col }: { row?: string; col?: string } = {}) => {
+    setTimetableData(prev => {
+      const grade = { ...prev[changeActiveGrade] };
+      Object.keys(grade).forEach(r => {
+        if (row && r !== row) return;
+        grade[r] = { ...grade[r] };
+        Object.keys(grade[r]).forEach(c => {
+          if (!col || c === col) delete grade[r][c];
+        });
+      });
+      return { ...prev, [changeActiveGrade]: grade };
+    });
+  };
+
   return {
+    clearTimetable,
     timeSlots,
     setTimeSlots,
     classCols,

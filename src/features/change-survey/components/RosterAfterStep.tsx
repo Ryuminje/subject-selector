@@ -4,6 +4,7 @@ import React, { Fragment } from "react";
 import { Users, Download } from "lucide-react";
 import type { StudentTimeData } from "../../../types";
 import type { ChangeGradeKey, TimetableData, GradeStringArrays } from "../types";
+import { sameSubject } from "../lib/subjectMatch";
 
 type AdjustmentLog = Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary' }[]>;
 
@@ -306,12 +307,7 @@ export function RosterAfterStep({
 
                           if (effectiveSubject === '__REMOVED__') return;
 
-                          let matchedBase = Object.keys(bases).find(base => {
-                            const cleanChosen = effectiveSubject.replace(/\s+/g, '');
-                            const cleanBase = base.replace(/\s+/g, '');
-                            if (!cleanBase) return false;
-                            return cleanChosen === cleanBase || cleanChosen.includes(cleanBase) || cleanBase.includes(cleanChosen);
-                          });
+                          const matchedBase = Object.keys(bases).find(base => sameSubject(base, effectiveSubject));
 
                           if (matchedBase) {
                             if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
