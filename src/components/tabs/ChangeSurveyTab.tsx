@@ -16,6 +16,7 @@ import { RosterStep } from "../../features/change-survey/components/RosterStep";
 import { RosterAfterStep } from "../../features/change-survey/components/RosterAfterStep";
 import { AnalysisStep } from "../../features/change-survey/components/AnalysisStep";
 import { RiroschoolStep } from "../../features/change-survey/components/RiroschoolStep";
+import { subjectOptionsOf } from "../../features/change-survey/lib/subjectMatch";
 
 export function ChangeSurveyTab() {
   const [changeActiveTab, setChangeActiveTab] = useState<"basic" | "upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis" | "riroschool">("basic");
@@ -36,6 +37,7 @@ export function ChangeSurveyTab() {
     removeTimeSlot,
     removeClassCol,
     updateTimetableCell,
+    clearTimetable,
   } = useTimetableData(changeActiveGrade);
 
   const {
@@ -56,13 +58,15 @@ export function ChangeSurveyTab() {
     electiveChangesArbitrary, setElectiveChangesArbitrary,
     enableOptimization, setEnableOptimization,
     adjustmentLog,
+    adjustmentLogByGrade,
     confirmedBaseSchedules, setConfirmedBaseSchedules,
     confirmedLog, setConfirmedLog,
     confirmHistory, setConfirmHistory,
     canUndoConfirm,
     handleConfirm,
     handleUndoConfirm,
-  } = useElectiveChanges(changeActiveGrade, parsedSampleData, timetableData, timeSlots, classCols);
+    handleClearConfirmed,
+  } =useElectiveChanges(changeActiveGrade, parsedSampleData, timetableData, timeSlots, classCols);
 
   const {
     changeParsedCurriculumList, setChangeParsedCurriculumList,
@@ -280,7 +284,7 @@ export function ChangeSurveyTab() {
     timetableData,
     timeSlots,
     classCols,
-    adjustmentLog,
+    adjustmentLogByGrade,
     electiveChanges,
     electiveChangesArbitrary,
     step6Data,
@@ -370,6 +374,7 @@ export function ChangeSurveyTab() {
 
                   {changeActiveTab === "timetable" && (
                     <TimetableStep
+                      subjectOptions={subjectOptionsOf(parsedSampleData[changeActiveGrade] || [])}
                       changeActiveGrade={changeActiveGrade}
                       setChangeActiveGrade={setChangeActiveGrade}
                       handleExportTimetable={handleExportTimetable}
@@ -377,6 +382,7 @@ export function ChangeSurveyTab() {
                       addClassCol={addClassCol}
                       removeClassCol={removeClassCol}
                       removeTimeSlot={removeTimeSlot}
+                      clearTimetable={clearTimetable}
                       classCols={classCols}
                       timeSlots={timeSlots}
                       timetableData={timetableData}
@@ -405,6 +411,7 @@ export function ChangeSurveyTab() {
                       canUndoConfirm={canUndoConfirm}
                       onConfirm={handleConfirm}
                       onUndoConfirm={handleUndoConfirm}
+                      onClearConfirmed={handleClearConfirmed}
                     />
                   )}
 

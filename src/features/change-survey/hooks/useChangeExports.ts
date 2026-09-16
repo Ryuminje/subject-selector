@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx-js-style";
 import type { ChangeGradeKey, GradeStringArrays, Step6Row, TimetableData } from "../types";
 import type { StudentTimeData } from "../../../types";
+import { sameSubject } from "../lib/subjectMatch";
 
 interface AdjustmentLogEntry {
   beforeStr: string;
@@ -24,7 +25,7 @@ export function useChangeExports(
   timetableData: TimetableData,
   timeSlots: GradeStringArrays,
   classCols: GradeStringArrays,
-  adjustmentLog: Record<string, AdjustmentLogEntry[]>,
+  adjustmentLogByGrade: Record<ChangeGradeKey, Record<string, AdjustmentLogEntry[]>>,
   electiveChanges: Record<string, any[]>,
   electiveChangesArbitrary: Record<string, any[]>,
   step6Data: Step6Row[],
@@ -32,6 +33,7 @@ export function useChangeExports(
   const handleExportRoster = (isAfter: boolean) => {
     const wb = XLSX.utils.book_new();
     const grade = changeActiveGrade;
+    const adjustmentLog = adjustmentLogByGrade[grade];
     const allStudents = parsedSampleData[grade] || [];
     const tSlots = timeSlots[grade] || [];
     const cols = classCols[grade] || [];
@@ -102,26 +104,7 @@ export function useChangeExports(
         }
         if (effectiveSubject === '__REMOVED__') return;
 
-        const cleanChosen = effectiveSubject.replace(/[\sⅠⅡⅢⅣ1234]/g, '').toLowerCase();
-
-        let matchedBase = null;
-        let matchedPriority = 999;
-
-        for (const base of Object.keys(subjectGroups)) {
-          const cleanBase = base.replace(/[\sⅠⅡⅢⅣ1234]/g, '').toLowerCase();
-          if (cleanBase === cleanChosen) {
-            matchedBase = base;
-            matchedPriority = 1;
-            break;
-          }
-          if (cleanChosen.includes(cleanBase)) {
-            matchedBase = base;
-            matchedPriority = 2;
-          } else if (cleanBase.includes(cleanChosen) && matchedPriority > 2) {
-            matchedBase = base;
-            matchedPriority = 3;
-          }
-        }
+        const matchedBase = Object.keys(subjectGroups).find(base => sameSubject(base, effectiveSubject));
 
         if (matchedBase) {
           if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
@@ -236,6 +219,7 @@ export function useChangeExports(
   const handleExportAttendanceRoster = () => {
     const wb = XLSX.utils.book_new();
     const grade = changeActiveGrade;
+    const adjustmentLog = adjustmentLogByGrade[grade];
     const allStudents = parsedSampleData[grade] || [];
     const tSlots = timeSlots[grade] || [];
     const cols = classCols[grade] || [];
@@ -315,25 +299,7 @@ export function useChangeExports(
         }
         if (effectiveSubject === '__REMOVED__') return;
 
-        const cleanChosen = effectiveSubject.replace(/[\sⅠⅡⅢⅣ1234]/g, '').toLowerCase();
-        let matchedBase = null;
-        let matchedPriority = 999;
-
-        for (const base of Object.keys(subjectGroups)) {
-          const cleanBase = base.replace(/[\sⅠⅡⅢⅣ1234]/g, '').toLowerCase();
-          if (cleanBase === cleanChosen) {
-            matchedBase = base;
-            matchedPriority = 1;
-            break;
-          }
-          if (cleanChosen.includes(cleanBase)) {
-            matchedBase = base;
-            matchedPriority = 2;
-          } else if (cleanBase.includes(cleanChosen) && matchedPriority > 2) {
-            matchedBase = base;
-            matchedPriority = 3;
-          }
-        }
+        const matchedBase = Object.keys(subjectGroups).find(base => sameSubject(base, effectiveSubject));
 
         if (matchedBase) {
           if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
@@ -441,6 +407,7 @@ export function useChangeExports(
 
   const handleExportChanges = () => {
     const grade = changeActiveGrade;
+    const adjustmentLog = adjustmentLogByGrade[grade];
     const gradeNum = grade === 'grade2' ? '2' : '3';
 
     const dataApplicant = electiveChanges[grade] || [];
@@ -542,6 +509,7 @@ export function useChangeExports(
   };
 
   const handleDownloadRiroschool = (grade: "grade2" | "grade3") => {
+    const adjustmentLog = adjustmentLogByGrade[grade];
     const rawData = sampleRawData[grade];
     if (!rawData) {
       alert("원본 엑셀 데이터가 없습니다. 2단계에서 파일을 다시 업로드해주세요.");

@@ -1,10 +1,13 @@
 "use client";
 
 import React from "react";
-import { Settings, Download, Plus, Trash2 } from "lucide-react";
+import { Settings, Download, Plus, Trash2, Eraser } from "lucide-react";
 import type { ChangeGradeKey, TimetableData, GradeStringArrays } from "../types";
+import { isKnownSubject } from "../lib/subjectMatch";
 
 interface TimetableStepProps {
+  /** 2단계 학생 데이터에 나오는 과목명 — 자동완성 후보이자 "일치하지 않음" 판정 기준. */
+  subjectOptions: string[];
   changeActiveGrade: ChangeGradeKey;
   setChangeActiveGrade: (grade: ChangeGradeKey) => void;
   handleExportTimetable: () => void;
@@ -12,6 +15,8 @@ interface TimetableStepProps {
   addClassCol: () => void;
   removeClassCol: (idx: number) => void;
   removeTimeSlot: (idx: number) => void;
+  /** 칸 내용만 비움 — row/col 없으면 전체. */
+  clearTimetable: (target?: { row?: string; col?: string }) => void;
   classCols: GradeStringArrays;
   timeSlots: GradeStringArrays;
   timetableData: TimetableData;
@@ -20,6 +25,7 @@ interface TimetableStepProps {
 }
 
 export function TimetableStep({
+  subjectOptions,
   changeActiveGrade,
   setChangeActiveGrade,
   handleExportTimetable,
@@ -27,12 +33,27 @@ export function TimetableStep({
   addClassCol,
   removeClassCol,
   removeTimeSlot,
+  clearTimetable,
   classCols,
   timeSlots,
   timetableData,
   updateTimetableCell,
   handleTimetablePaste,
 }: TimetableStepProps) {
+  const unknownCount = timeSlots[changeActiveGrade].reduce(
+    (n, row) =>
+      n +
+      classCols[changeActiveGrade].filter(
+        (col) => !isKnownSubject(timetableData[changeActiveGrade]?.[row]?.[col]?.subject || "", subjectOptions),
+      ).length,
+    0,
+  );
+
+  const gradeLabel = changeActiveGrade === "grade2" ? "2학년" : "3학년";
+  const confirmClear = (message: string, target?: { row?: string; col?: string }) => {
+    if (window.confirm(`${message}\n과목명·교사명이 지워지며 되돌릴 수 없습니다.`)) clearTimetable(target);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* BasicStep.tsx와 같은 이유로 flex-wrap·break-keep을 둡니다 — 자세한 설명은 그쪽 주석 참고. */}
@@ -68,6 +89,11 @@ export function TimetableStep({
         <div className="p-4 border-b border-stone-200 bg-stone-100 flex justify-between items-center">
           <div className="text-sm text-stone-600">
             엑셀에서 복사한 데이터를 칸에 클릭 후 붙여넣기(Ctrl+V) 하시면 한 번에 자동으로 채워집니다.
+            {unknownCount > 0 && (
+              <span className="block mt-1 font-semibold text-rose-600">
+                학생 데이터에 없는 과목명 {unknownCount}칸(빨간색) — 명단·자동 변경에서 이 칸은 어떤 학생과도 연결되지 않습니다.
+              </span>
+            )}
           </div>
           <div className="flex gap-2">
             <button
@@ -75,6 +101,12 @@ export function TimetableStep({
               className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/20 text-emerald-700 hover:bg-emerald-500/30 rounded-lg font-medium text-sm transition-colors border border-emerald-500/30"
             >
               <Download className="w-4 h-4" /> 엑셀 다운로드
+            </button>
+            <button
+              onClick={() => confirmClear(`${gradeLabel} 시간표 전체 내용을 지울까요?`)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white text-stone-700 hover:bg-stone-200 rounded-lg font-medium text-sm transition-colors border border-stone-300"
+            >
+              <Eraser className="w-4 h-4" /> 전체 지우기
             </button>
             <button
               onClick={addTimeSlot}
@@ -100,6 +132,13 @@ export function TimetableStep({
                   <th key={cIdx} className="px-4 py-3 border-r border-stone-300 min-w-[100px] text-center relative group">
                     {col}
                     <button
+                      onClick={() => confirmClear(`${col} 열 내용을 지울까요?`, { col })}
+                      className="absolute top-1/2 -translate-y-1/2 left-2 text-stone-500 opacity-0 group-hover:opacity-100 hover:text-amber-700 transition-opacity"
+                      title="열 내용 지우기"
+                    >
+                      <Eraser className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={() => removeClassCol(cIdx)}
                       className="absolute top-1/2 -translate-y-1/2 right-2 text-rose-700 opacity-0 group-hover:opacity-100 hover:text-rose-700 transition-opacity"
                       title="열 삭제"
@@ -116,6 +155,13 @@ export function TimetableStep({
                   <th className="px-4 py-3 border-r border-stone-300 font-medium text-stone-600 text-center bg-stone-50 relative group">
                     {row}타임
                     <button
+                      onClick={() => confirmClear(`${row}타임 행 내용을 지울까요?`, { row })}
+                      className="absolute top-1/2 -translate-y-1/2 left-1 text-stone-500 opacity-0 group-hover:opacity-100 hover:text-amber-700 transition-opacity"
+                      title="행 내용 지우기"
+                    >
+                      <Eraser className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={() => removeTimeSlot(rIdx)}
                       className="absolute top-1/2 -translate-y-1/2 right-2 text-rose-700 opacity-0 group-hover:opacity-100 hover:text-rose-700 transition-opacity"
                       title="행 삭제"
@@ -123,16 +169,24 @@ export function TimetableStep({
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </th>
-                  {classCols[changeActiveGrade].map((col, cIdx) => (
+                  {classCols[changeActiveGrade].map((col, cIdx) => {
+                    const subject = timetableData[changeActiveGrade]?.[row]?.[col]?.subject || "";
+                    const unknown = !isKnownSubject(subject, subjectOptions);
+                    return (
                     <td key={`${rIdx}-${cIdx}`} className="p-0 border-r border-stone-200 relative">
                       <div className="flex flex-col h-full min-h-[64px]">
                         <input
                           type="text"
-                          className="w-full flex-1 bg-transparent text-stone-900 px-2 text-center text-sm font-medium focus:outline-none focus:bg-amber-50 focus:ring-1 focus:ring-amber-500/50 border-b border-stone-200"
-                          value={timetableData[changeActiveGrade]?.[row]?.[col]?.subject || ""}
+                          list="change-subject-options"
+                          className={`w-full flex-1 px-2 text-center text-sm font-medium focus:outline-none focus:ring-1 border-b border-stone-200 ${unknown
+                              ? "bg-rose-50 text-rose-700 focus:ring-rose-500/50"
+                              : "bg-transparent text-stone-900 focus:bg-amber-50 focus:ring-amber-500/50"
+                            }`}
+                          value={subject}
                           onChange={(e) => updateTimetableCell(row, col, "subject", e.target.value)}
                           onPaste={(e) => handleTimetablePaste(e, rIdx, cIdx, "subject")}
                           placeholder="과목명"
+                          title={unknown ? `'${subject}'은(는) 학생 데이터에 없는 과목명입니다` : undefined}
                         />
                         <input
                           type="text"
@@ -144,11 +198,17 @@ export function TimetableStep({
                         />
                       </div>
                     </td>
-                  ))}
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
           </table>
+          <datalist id="change-subject-options">
+            {subjectOptions.map((s) => (
+              <option key={s} value={s} />
+            ))}
+          </datalist>
         </div>
       </div>
     </div>
