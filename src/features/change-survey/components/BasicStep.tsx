@@ -74,7 +74,16 @@ export function BasicStep({
               선택하신 학년이 기준이 됩니다. 수요조사와 독립적으로 검증에 사용될 교육과정 엑셀 파일을 업로드해 주세요.
             </p>
 
-            <div className="relative group mb-6 shrink-0">
+            <div
+              className="relative group mb-6 shrink-0"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (e.dataTransfer.files?.[0]) {
+                  handleChangeCurriculumUpload({ target: { files: e.dataTransfer.files } } as unknown as React.ChangeEvent<HTMLInputElement>);
+                }
+              }}
+            >
               <input
                 type="file"
                 accept=".xlsx, .xls"
