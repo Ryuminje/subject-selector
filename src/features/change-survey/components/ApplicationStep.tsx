@@ -1,13 +1,13 @@
 "use client";
 
 import React from "react";
-import { FileText, Download, Lock, CheckCircle2, Undo2, Trash2 } from "lucide-react";
+import { FileText, Download, Lock, CheckCircle2, Undo2, Trash2, AlertTriangle } from "lucide-react";
 import type { ChangeGradeKey, ElectiveChange, GradeStringArrays, TimetableData } from "../types";
 import type { StudentTimeData } from "../../../types";
 import { ElectiveChangeTable } from "./ElectiveChangeTable";
 import { changeSubjectOptionsOf } from "../lib/subjectMatch";
 
-type AdjustmentLog = Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary'; pinned?: boolean; chain?: 3 }[]>;
+type AdjustmentLog = Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary'; pinned?: boolean; chain?: 3; warning?: string }[]>;
 
 interface ApplicationStepProps {
   changeActiveGrade: ChangeGradeKey;
@@ -253,13 +253,16 @@ export function ApplicationStep({
                                 {filteredLogs.map((log, i) => (
                                   <div
                                     key={i}
-                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-xs mr-2 mb-1 ${log.status === 'success'
-                                        ? 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20'
-                                        : 'text-rose-700 bg-rose-600/10 border-rose-500/20 cursor-help'
+                                    className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-xs mr-2 mb-1 ${log.status === 'failed'
+                                        ? 'text-rose-700 bg-rose-600/10 border-rose-500/20 cursor-help'
+                                        : log.warning
+                                          ? 'text-amber-700 bg-amber-500/10 border-amber-500/30 cursor-help'
+                                          : 'text-emerald-700 bg-emerald-500/10 border-emerald-500/20'
                                       }`}
-                                    title={log.pinned ? `고정된 타임(1순위)${log.reason ? ` — ${log.reason}` : ''}` : log.reason}
+                                    title={[log.pinned && '고정된 타임(1순위)', log.reason, log.warning].filter(Boolean).join(' — ') || undefined}
                                   >
                                     {log.pinned && <Lock className="w-3 h-3 text-amber-600 shrink-0" />}
+                                    {log.warning && <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />}
                                     {log.chain === 3 && (
                                       <span
                                         className="px-1 rounded bg-violet-600 text-white text-[10px] font-bold shrink-0"
@@ -270,6 +273,7 @@ export function ApplicationStep({
                                     )}
                                     {log.beforeStr} → {log.afterStr}
                                     {log.status === 'failed' && <span className="ml-1 font-bold">(불가)</span>}
+                                    {log.warning && <span className="ml-1 font-bold">(경고: {log.warning})</span>}
                                   </div>
                                 ))}
                               </div>

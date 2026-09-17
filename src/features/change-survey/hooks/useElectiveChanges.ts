@@ -12,6 +12,8 @@ export interface ChangeLogEntry {
   pinned?: boolean;
   /** 3단계 교체(과목 3개가 함께 움직임)로 성공한 묶음이면 3 — 결과 내역에 "3단계" 표시. */
   chain?: 3;
+  /** 신청한 변경후 과목을 이 학생이 다른 타임에 이미 듣고 있었던 경우의 경고 문구. */
+  warning?: string;
 }
 
 interface PreConfirmSnapshot {
@@ -293,6 +295,21 @@ export function useElectiveChanges(
         return slots;
       };
 
+      // 학생이 beforeSlot 이 아닌 다른 타임에 이미 신청한 afterSubject 를 듣고 있으면 그
+      // 타임을 돌려줍니다. 매칭 알고리즘은 "한 타임에 한 과목"만 보고 동작해서, 이미 다른
+      // 타임에 같은 과목을 듣는 학생이 그 과목으로 변경 신청해도 그냥 정상 처리해버립니다
+      // (그 학생이 같은 과목을 두 타임에 걸쳐 듣게 됨) — 이걸 잡아 경고로 보여주는 용도.
+      const findExistingSlot = (sched: Record<string, string>, subject: string, excludeSlot: string): string | null => {
+        for (const [slot, subj] of Object.entries(sched)) {
+          if (slot !== excludeSlot && subj && sameSubject(subj, subject)) return slot;
+        }
+        return null;
+      };
+      const dupWarningFor = (sched: Record<string, string>, subject: string, excludeSlot: string): string | undefined => {
+        const dupSlot = findExistingSlot(sched, subject, excludeSlot);
+        return dupSlot ? `이미 ${dupSlot}타임에 같은 과목을 수강 중입니다` : undefined;
+      };
+
       // 3단계 교체 — 2단계(Y타임 과목을 X타임으로)가 막혔을 때만 씁니다.
       // X(변경전 자리) ← Z타임 과목, Y ← 변경후 과목, Z ← Y타임 과목. Z는 X·Y가 아닌 타임.
       const findThreeStepSwaps = (sched: Record<string, string>, beforeSlot: string, afterSlot: string) => {
@@ -309,11 +326,12 @@ export function useElectiveChanges(
         beforeSlot: string, afterSlot: string,
         m: { zSlot: string; subjY: string; subjZ: string },
         pinned: boolean,
+        warning?: string,
       ): ChangeLogEntry[] => [
         // 이 순서(옮겨지는 과목 먼저, 신청 과목 마지막)를 리로스쿨/명단 내보내기가 전제합니다.
         { beforeStr: `${m.subjZ}(${m.zSlot})`, afterStr: `${m.subjZ}(${beforeSlot})`, status: 'success', source: c.source, pinned, chain: 3 },
         { beforeStr: `${m.subjY}(${afterSlot})`, afterStr: `${m.subjY}(${m.zSlot})`, status: 'success', source: c.source, pinned, chain: 3 },
-        { beforeStr: `${c.beforeSubject}(${beforeSlot})`, afterStr: `${c.afterSubject}(${afterSlot})`, status: 'success', source: c.source, pinned, chain: 3 },
+        { beforeStr: `${c.beforeSubject}(${beforeSlot})`, afterStr: `${c.afterSubject}(${afterSlot})`, status: 'success', source: c.source, pinned, chain: 3, warning },
       ];
 
       if (!enableOptimization[grade]) {
@@ -357,6 +375,7 @@ export function useElectiveChanges(
           }
 
           const pinnedSlot = c.pinnedSlot || c._targetSlot;
+          const dupWarning = dupWarningFor(currentSchedule, c.afterSubject, beforeSlot);
 
           if ((!pinnedSlot || pinnedSlot === beforeSlot) && subjectExistsInSlot(c.afterSubject, beforeSlot)) {
             if (!log[c.studentId]) log[c.studentId] = [];
@@ -365,7 +384,8 @@ export function useElectiveChanges(
               afterStr: `${c.afterSubject}(${beforeSlot})`,
               status: 'success',
               source: c.source,
-              pinned: !!pinnedSlot
+              pinned: !!pinnedSlot,
+              warning: dupWarning
             });
             currentSchedule[beforeSlot] = c.afterSubject;
             return;
@@ -412,7 +432,8 @@ export function useElectiveChanges(
                 afterStr: `${c.afterSubject}(${afterSlot})`,
                 status: 'success',
                 source: c.source,
-                pinned: !!pinnedSlot
+                pinned: !!pinnedSlot,
+                warning: dupWarning
               });
 
               currentSchedule[beforeSlot] = studentSubjectInAfterSlot;
@@ -431,7 +452,7 @@ export function useElectiveChanges(
               const m = findThreeStepSwaps(currentSchedule, beforeSlot, afterSlot)[0];
               if (!m) continue;
               if (!log[c.studentId]) log[c.studentId] = [];
-              log[c.studentId].push(...threeStepLogs(c, beforeSlot, afterSlot, m, !!pinnedSlot));
+              log[c.studentId].push(...threeStepLogs(c, beforeSlot, afterSlot, m, !!pinnedSlot, dupWarning));
               currentSchedule[beforeSlot] = m.subjZ;
               currentSchedule[afterSlot] = c.afterSubject;
               currentSchedule[m.zSlot] = m.subjY;
@@ -540,6 +561,7 @@ export function useElectiveChanges(
               }
 
               const pinnedSlot = c.pinnedSlot || c._targetSlot;
+              const dupWarning = dupWarningFor(currentSched, c.afterSubject, beforeSlot);
 
               let afterSlots = findSlotsWithSubject(c.afterSubject);
               if (pinnedSlot) {
@@ -569,7 +591,7 @@ export function useElectiveChanges(
                    nextSched[beforeSlot] = c.afterSubject;
                    const nextLogs = [...currentLogs];
                    if (c.beforeSubject !== c.afterSubject) {
-                     nextLogs.push({ beforeStr: `${c.beforeSubject}(${beforeSlot})`, afterStr: `${c.afterSubject}(${beforeSlot})`, status: 'success', source: c.source, pinned: !!pinnedSlot });
+                     nextLogs.push({ beforeStr: `${c.beforeSubject}(${beforeSlot})`, afterStr: `${c.afterSubject}(${beforeSlot})`, status: 'success', source: c.source, pinned: !!pinnedSlot, warning: dupWarning });
                    }
                    validChoiceFound = true;
                    dfs(changeIndex + 1, nextSched, nextLogs, Math.max(currentMaxCost, cost), successCount + 1);
@@ -593,7 +615,7 @@ export function useElectiveChanges(
 
                    const nextLogs = [...currentLogs];
                    nextLogs.push({ beforeStr: `${studentSubjectInAfterSlot}(${afterSlot})`, afterStr: `${studentSubjectInAfterSlot}(${beforeSlot})`, status: 'success', source: c.source, pinned: !!pinnedSlot });
-                   nextLogs.push({ beforeStr: `${c.beforeSubject}(${beforeSlot})`, afterStr: `${c.afterSubject}(${afterSlot})`, status: 'success', source: c.source, pinned: !!pinnedSlot });
+                   nextLogs.push({ beforeStr: `${c.beforeSubject}(${beforeSlot})`, afterStr: `${c.afterSubject}(${afterSlot})`, status: 'success', source: c.source, pinned: !!pinnedSlot, warning: dupWarning });
 
                    validChoiceFound = true;
                    dfs(changeIndex + 1, nextSched, nextLogs, Math.max(currentMaxCost, cost), successCount + 1);
@@ -613,7 +635,7 @@ export function useElectiveChanges(
                     );
                     const nextSched = { ...currentSched, [beforeSlot]: m.subjZ, [afterSlot]: c.afterSubject, [m.zSlot]: m.subjY };
                     validChoiceFound = true;
-                    dfs(changeIndex + 1, nextSched, [...currentLogs, ...threeStepLogs(c, beforeSlot, afterSlot, m, !!pinnedSlot)], Math.max(currentMaxCost, cost), successCount + 1);
+                    dfs(changeIndex + 1, nextSched, [...currentLogs, ...threeStepLogs(c, beforeSlot, afterSlot, m, !!pinnedSlot, dupWarning)], Math.max(currentMaxCost, cost), successCount + 1);
                   }
                 }
               }
