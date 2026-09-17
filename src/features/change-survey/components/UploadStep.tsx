@@ -92,8 +92,8 @@ export function UploadStep({
                 {changeUploadNames[changeActiveGrade]?.timetable || '업로드된 파일'}
               </span>
             </div>
-            <span className="text-stone-600 text-sm">
-              {changeActiveGrade === "grade2" ? "2학년" : "3학년"} 학생 선택 데이터: {parsedSampleData[changeActiveGrade].length}명 파싱 완료
+            <span className="inline-block px-2 py-0.5 bg-emerald-500/10 text-emerald-700 text-xs font-semibold rounded border border-emerald-500/20">
+              {changeActiveGrade === "grade2" ? "2학년" : "3학년"} 학생 선택 데이터 {parsedSampleData[changeActiveGrade].length}명 파싱 완료
             </span>
           </div>
           <div className="flex gap-4">
@@ -185,7 +185,7 @@ export function UploadStep({
                     {changeUploadNames[changeActiveGrade]?.grade2Optional || '업로드된 파일'}
                   </span>
                 </div>
-                <span className="text-stone-600 text-xs">
+                <span className="inline-block px-2 py-0.5 bg-emerald-500/10 text-emerald-700 text-xs font-semibold rounded border border-emerald-500/20">
                   {Object.keys(grade2HistoryData[changeActiveGrade] || {}).length}명 파싱 완료
                 </span>
               </div>
@@ -249,7 +249,7 @@ export function UploadStep({
                     {changeUploadNames[changeActiveGrade]?.grade3Sem1 || '업로드된 파일'}
                   </span>
                 </div>
-                <span className="text-stone-600 text-xs">
+                <span className="inline-block px-2 py-0.5 bg-emerald-500/10 text-emerald-700 text-xs font-semibold rounded border border-emerald-500/20">
                   {Object.keys(grade3Sem1HistoryData[changeActiveGrade] || {}).length}명 파싱 완료
                 </span>
               </div>

@@ -94,10 +94,10 @@ export function UploadStep({
                     {uploadedFiles[activeGrade]?.name}
                   </h4>
                   <p className="text-xs text-stone-600 mt-1">
-                    {(uploadedFiles[activeGrade]!.size / 1024).toFixed(1)} KB · {processedData[activeGrade]?.length ?? 0}명 파싱 완료
+                    {(uploadedFiles[activeGrade]!.size / 1024).toFixed(1)} KB
                   </p>
                   <span className="inline-block mt-2 px-2 py-0.5 bg-emerald-500/10 text-emerald-700 text-xs font-semibold rounded border border-emerald-500/20">
-                    업로드 완료
+                    {processedData[activeGrade]?.length ?? 0}명 파싱 완료
                   </span>
                 </div>
               </div>
