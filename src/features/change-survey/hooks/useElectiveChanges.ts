@@ -29,6 +29,9 @@ export function useElectiveChanges(
   timetableData: TimetableData,
   timeSlots: GradeStringArrays,
   classCols: GradeStringArrays,
+  /** "다년도 분석"(useStep6Data)과 같은 형태의 이전 학기 이수 과목 기록 — 학번 → 과목명 배열. */
+  grade2HistoryData: Record<string, Record<string, string[]>> = {},
+  grade3Sem1HistoryData: Record<string, Record<string, string[]>> = {},
 ) {
   const [electiveChanges, setElectiveChanges] = useState<Record<string, any[]>>({ grade2: [], grade3: [] });
   const [electiveChangesArbitrary, setElectiveChangesArbitrary] = useState<Record<string, any[]>>({ grade2: [], grade3: [] });
@@ -305,9 +308,24 @@ export function useElectiveChanges(
         }
         return null;
       };
-      const dupWarningFor = (sched: Record<string, string>, subject: string, excludeSlot: string): string | undefined => {
+      // "다년도 분석"(useStep6Data)과 같은 이전 학기 이수 기록 — 신청후 과목을 예전에 이미
+      // 들었으면(2학년: 1학기 기록, 3학년: 2학년 전체 + 3학년 1학기 기록) 잡아냅니다.
+      const completedBeforeOf = (studentId: string): string[] => {
+        if (grade === "grade2") {
+          const dataMap = grade2HistoryData.grade2 || {};
+          return dataMap[String(studentId).trim()] || dataMap[studentId] || [];
+        }
+        const g2Map = grade2HistoryData.grade3 || {};
+        const g3Map = grade3Sem1HistoryData.grade3 || {};
+        const g2History = g2Map[String(studentId).trim()] || g2Map[studentId] || [];
+        const g3Sem1History = g3Map[String(studentId).trim()] || g3Map[studentId] || [];
+        return [...g2History, ...g3Sem1History];
+      };
+      const dupWarningFor = (sched: Record<string, string>, subject: string, excludeSlot: string, studentId: string): string | undefined => {
         const dupSlot = findExistingSlot(sched, subject, excludeSlot);
-        return dupSlot ? `이미 ${dupSlot}타임에 같은 과목을 수강 중입니다` : undefined;
+        if (dupSlot) return `이미 ${dupSlot}타임에 같은 과목을 수강 중입니다`;
+        if (completedBeforeOf(studentId).some(s => sameSubject(s, subject))) return "1학기에 이미 수강한 과목입니다.";
+        return undefined;
       };
 
       // 3단계 교체 — 2단계(Y타임 과목을 X타임으로)가 막혔을 때만 씁니다.
@@ -375,7 +393,7 @@ export function useElectiveChanges(
           }
 
           const pinnedSlot = c.pinnedSlot || c._targetSlot;
-          const dupWarning = dupWarningFor(currentSchedule, c.afterSubject, beforeSlot);
+          const dupWarning = dupWarningFor(currentSchedule, c.afterSubject, beforeSlot, c.studentId);
 
           if ((!pinnedSlot || pinnedSlot === beforeSlot) && subjectExistsInSlot(c.afterSubject, beforeSlot)) {
             if (!log[c.studentId]) log[c.studentId] = [];
@@ -561,7 +579,7 @@ export function useElectiveChanges(
               }
 
               const pinnedSlot = c.pinnedSlot || c._targetSlot;
-              const dupWarning = dupWarningFor(currentSched, c.afterSubject, beforeSlot);
+              const dupWarning = dupWarningFor(currentSched, c.afterSubject, beforeSlot, c.studentId);
 
               let afterSlots = findSlotsWithSubject(c.afterSubject);
               if (pinnedSlot) {
@@ -694,7 +712,7 @@ export function useElectiveChanges(
     });
 
     return { log: logByGrade, finalSchedules };
-  }, [parsedSampleData, electiveChanges, electiveChangesArbitrary, timetableData, timeSlots, classCols, enableOptimization, confirmedBaseSchedules]);
+  }, [parsedSampleData, electiveChanges, electiveChangesArbitrary, timetableData, timeSlots, classCols, enableOptimization, confirmedBaseSchedules, grade2HistoryData, grade3Sem1HistoryData]);
 
   // 확정된(얼려둔) 로그와, 지금 표에 남아있는 신청을 계산한 결과를 학년별로 합쳐서 보여준다.
   const adjustmentLogByGrade = useMemo(() => {

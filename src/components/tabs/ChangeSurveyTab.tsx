@@ -66,7 +66,7 @@ export function ChangeSurveyTab() {
     handleConfirm,
     handleUndoConfirm,
     handleClearConfirmed,
-  } =useElectiveChanges(changeActiveGrade, parsedSampleData, timetableData, timeSlots, classCols);
+  } =useElectiveChanges(changeActiveGrade, parsedSampleData, timetableData, timeSlots, classCols, grade2HistoryData, grade3Sem1HistoryData);
 
   const {
     changeParsedCurriculumList, setChangeParsedCurriculumList,
