@@ -124,7 +124,8 @@ export function useChangeUploads(changeActiveGrade: ChangeGradeKey) {
 
       for (let r = 2; r < json.length; r++) {
         const row = json[r];
-        if (!row || row.length === 0 || !row[1]) continue;
+        // 학번 칸이 "합계"인 행(있을 수도 없을 수도 있음)은 학생이 아니라 집계 행이므로 건너뜁니다.
+        if (!row || row.length === 0 || !row[1] || String(row[1]).trim() === '합계') continue;
 
         const id = String(row[1]).trim();
         const name = String(row[2] || "");
