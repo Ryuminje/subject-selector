@@ -3,7 +3,7 @@
 import React from "react";
 import { Upload, File as FileIcon, Trash2 } from "lucide-react";
 import { GradeTabs } from "./GradeTabs";
-import type { GradeKey } from "../../../types";
+import type { GradeKey, ProcessedStudent } from "../../../types";
 
 interface UploadStepProps {
   activeGrade: GradeKey;
@@ -16,6 +16,7 @@ interface UploadStepProps {
   handlePrevHistoryFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleRemovePrevHistoryFile: () => void;
   previousSubjectMap: { [key in GradeKey]: { [studentId: string]: { name: string, subjects: string[] } } };
+  processedData: { [key in GradeKey]: ProcessedStudent[] };
 }
 
 export function UploadStep({
@@ -29,6 +30,7 @@ export function UploadStep({
   handlePrevHistoryFileUpload,
   handleRemovePrevHistoryFile,
   previousSubjectMap,
+  processedData,
 }: UploadStepProps) {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -94,7 +96,7 @@ export function UploadStep({
                     {uploadedFiles[activeGrade]?.name}
                   </h4>
                   <p className="text-xs text-stone-600 mt-1">
-                    {(uploadedFiles[activeGrade]!.size / 1024).toFixed(1)} KB
+                    {(uploadedFiles[activeGrade]!.size / 1024).toFixed(1)} KB · {processedData[activeGrade]?.length ?? 0}명 파싱 완료
                   </p>
                   <span className="inline-block mt-2 px-2 py-0.5 bg-emerald-500/10 text-emerald-700 text-xs font-semibold rounded border border-emerald-500/20">
                     업로드 완료

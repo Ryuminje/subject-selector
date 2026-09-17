@@ -302,6 +302,7 @@ export function DemandSurveyTab() {
                       handlePrevHistoryFileUpload={handlePrevHistoryFileUpload}
                       handleRemovePrevHistoryFile={handleRemovePrevHistoryFile}
                       previousSubjectMap={previousSubjectMap}
+                      processedData={processedData}
                     />
                   )}
                   {activeTab === "preview" && (

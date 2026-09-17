@@ -16,6 +16,8 @@ interface UploadStepProps {
   handleDeleteExtraUpload: (key: "grade2Optional" | "grade3Sem1") => void;
   handleExtraUpload: (key: "grade2Optional" | "grade3Sem1") => (e: React.ChangeEvent<HTMLInputElement>) => void;
   setChangeActiveTab: (tab: ChangeActiveTab) => void;
+  grade2HistoryData: Record<string, Record<string, string[]>>;
+  grade3Sem1HistoryData: Record<string, Record<string, string[]>>;
 }
 
 export function UploadStep({
@@ -29,6 +31,8 @@ export function UploadStep({
   handleDeleteExtraUpload,
   handleExtraUpload,
   setChangeActiveTab,
+  grade2HistoryData,
+  grade3Sem1HistoryData,
 }: UploadStepProps) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -174,10 +178,15 @@ export function UploadStep({
               <p className="text-stone-600 text-sm text-center max-w-full px-4 mb-4">
                 &quot;리로스쿨-교육과정-수강신청-통계-엑셀저장&quot;에서 다운받은 수강신청 통계 파일을 업로드하세요.
               </p>
-              <div className="flex items-center gap-2 mb-6 text-sm">
-                <FileIcon className="w-4 h-4 text-emerald-700" />
-                <span className="text-emerald-700 font-medium">
-                  {changeUploadNames[changeActiveGrade]?.grade2Optional || '업로드된 파일'}
+              <div className="flex flex-col items-center gap-1 mb-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <FileIcon className="w-4 h-4 text-emerald-700" />
+                  <span className="text-emerald-700 font-medium">
+                    {changeUploadNames[changeActiveGrade]?.grade2Optional || '업로드된 파일'}
+                  </span>
+                </div>
+                <span className="text-stone-600 text-xs">
+                  {Object.keys(grade2HistoryData[changeActiveGrade] || {}).length}명 파싱 완료
                 </span>
               </div>
               <div className="flex gap-2">
@@ -233,10 +242,15 @@ export function UploadStep({
               <p className="text-stone-600 text-sm text-center max-w-full px-4 mb-4">
                 &quot;리로스쿨-교육과정-수강신청-통계-엑셀저장&quot;에서 다운받은 수강신청 통계 파일을 업로드하세요.
               </p>
-              <div className="flex items-center gap-2 mb-6 text-sm">
-                <FileIcon className="w-4 h-4 text-emerald-700" />
-                <span className="text-emerald-700 font-medium">
-                  {changeUploadNames[changeActiveGrade]?.grade3Sem1 || '업로드된 파일'}
+              <div className="flex flex-col items-center gap-1 mb-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <FileIcon className="w-4 h-4 text-emerald-700" />
+                  <span className="text-emerald-700 font-medium">
+                    {changeUploadNames[changeActiveGrade]?.grade3Sem1 || '업로드된 파일'}
+                  </span>
+                </div>
+                <span className="text-stone-600 text-xs">
+                  {Object.keys(grade3Sem1HistoryData[changeActiveGrade] || {}).length}명 파싱 완료
                 </span>
               </div>
               <div className="flex gap-2">
