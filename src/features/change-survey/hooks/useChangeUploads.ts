@@ -53,12 +53,15 @@ export function useChangeUploads(changeActiveGrade: ChangeGradeKey) {
       if (key === 'grade2Optional') {
         if (json.length >= 2) {
           const headers = json[1];
+          // handleChangeSampleUpload와 같은 이유(H열에 "반배정" 결과 열이 끼어드는 경우)로
+          // 같은 자동 판별을 씁니다.
+          const startCol = String(headers[7] || "").trim() === "반배정" ? 8 : 7;
           for (let i = 2; i < json.length; i++) {
             const row = json[i];
             if (!row || row.length === 0 || !row[1] || String(row[1]) === '합계') continue;
             const studentId = String(row[1]).trim();
             const subjects: string[] = [];
-            for (let c = 7; c < headers.length; c++) {
+            for (let c = startCol; c < headers.length; c++) {
               if (row[c] && headers[c]) {
                 const subj = String(headers[c]).trim();
                 if (subj) subjects.push(subj);
@@ -72,6 +75,7 @@ export function useChangeUploads(changeActiveGrade: ChangeGradeKey) {
         if (json.length >= 2) {
           const superHeaders = json[0];
           const headers = json[1];
+          const startCol = String(headers[7] || "").trim() === "반배정" ? 8 : 7;
 
           for (let i = 2; i < json.length; i++) {
             const row = json[i];
@@ -80,7 +84,7 @@ export function useChangeUploads(changeActiveGrade: ChangeGradeKey) {
             const subjects: string[] = [];
 
             let currentSuper = "";
-            for (let c = 7; c < headers.length; c++) {
+            for (let c = startCol; c < headers.length; c++) {
               const sHeader = String(superHeaders[c] || "").trim();
               if (sHeader) currentSuper = sHeader;
 
