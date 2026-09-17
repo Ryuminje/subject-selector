@@ -36,7 +36,7 @@ export function UploadStep({
       <div className="flex justify-between items-center gap-3 flex-wrap mb-2">
         <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2 break-keep">
           <Upload className="w-6 h-6 text-amber-600 shrink-0" />
-          2학기 타임별 선택과목 데이터 업로드
+          타임별 선택과목 데이터 업로드(해당학기 데이터만)
         </h2>
 
         <div className="flex bg-stone-100 p-1 rounded-xl shrink-0">
