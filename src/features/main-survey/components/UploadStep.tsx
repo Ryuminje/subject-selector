@@ -53,7 +53,16 @@ export function UploadStep({
           </h3>
 
           {!uploadedFiles[activeGrade] ? (
-            <div className="border-2 border-dashed border-stone-300 hover:border-amber-400/50 bg-stone-50 rounded-2xl p-12 text-center transition-all duration-300 group cursor-pointer relative">
+            <div
+              className="border-2 border-dashed border-stone-300 hover:border-amber-400/50 bg-stone-50 rounded-2xl p-12 text-center transition-all duration-300 group cursor-pointer relative"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (e.dataTransfer.files?.[0]) {
+                  handleFileUpload({ target: { files: e.dataTransfer.files } } as unknown as React.ChangeEvent<HTMLInputElement>);
+                }
+              }}
+            >
               <input
                 key={`curr-${activeGrade}`}
                 type="file"
@@ -65,9 +74,11 @@ export function UploadStep({
                 <Upload className="w-6 h-6 text-amber-600" />
               </div>
               <h4 className="text-md font-medium text-stone-800 mb-1">
-                리로스쿨 설문 제출내역 파일을 업로드하세요.
+                리로스쿨 수강신청 통계 파일 업로드
               </h4>
-              <p className="text-xs text-stone-600 mb-4">또는 클릭하여 컴퓨터에서 선택 (.xlsx, .xls)</p>
+              <p className="text-xs text-stone-600 mb-4 px-4 leading-relaxed">
+                &quot;리로스쿨-교육과정-수강신청-통계-엑셀저장&quot;에서 다운받은 수강신청 통계 파일을 업로드하세요.
+              </p>
               <button className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-900 text-sm font-medium rounded-lg transition-colors border border-stone-300">
                 파일 선택
               </button>
@@ -131,7 +142,7 @@ export function UploadStep({
                 수강신청 통계 파일 업로드
               </h4>
               <p className="text-xs text-stone-600 mb-4 px-4 leading-relaxed">
-                "리로스쿨-교육과정-수강신청-통계-엑셀저장"에서 다운받은 수강신청 통계 파일을 업로드하세요.
+                &quot;리로스쿨-교육과정-수강신청-통계-엑셀저장&quot;에서 다운받은 수강신청 통계 파일을 업로드하세요.
               </p>
               <button className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-900 text-sm font-medium rounded-lg transition-colors border border-stone-300">
                 파일 선택
