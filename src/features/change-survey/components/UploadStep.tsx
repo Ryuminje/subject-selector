@@ -62,7 +62,16 @@ export function UploadStep({
       </div>
 
       {parsedSampleData[changeActiveGrade] && parsedSampleData[changeActiveGrade].length > 0 ? (
-        <div className="bg-stone-100 rounded-2xl p-8 border border-emerald-500/30 flex flex-col items-center justify-center min-h-[300px] text-center">
+        <div
+          className="bg-stone-100 rounded-2xl p-8 border border-emerald-500/30 flex flex-col items-center justify-center min-h-[300px] text-center"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files?.[0]) {
+              handleChangeSampleUpload({ target: { files: e.dataTransfer.files } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            }
+          }}
+        >
           <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">
             <CheckCircle2 className="w-10 h-10 text-emerald-700" />
           </div>
@@ -109,7 +118,16 @@ export function UploadStep({
           </div>
         </div>
       ) : (
-        <div className="bg-stone-100 rounded-2xl p-6 border border-stone-300 flex flex-col items-center justify-center min-h-[300px]">
+        <div
+          className="bg-stone-100 rounded-2xl p-6 border border-stone-300 flex flex-col items-center justify-center min-h-[300px]"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files?.[0]) {
+              handleChangeSampleUpload({ target: { files: e.dataTransfer.files } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            }
+          }}
+        >
           <div className="w-20 h-20 bg-stone-100 rounded-full flex items-center justify-center mb-4">
             <FileIcon className="w-10 h-10 text-amber-600" />
           </div>
@@ -133,7 +151,16 @@ export function UploadStep({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
         {/* 2학년 수강과목 데이터 업로드(선택) */}
-        <div className="bg-stone-100 rounded-2xl p-6 border border-stone-300 flex flex-col items-center justify-center min-h-[250px]">
+        <div
+          className="bg-stone-100 rounded-2xl p-6 border border-stone-300 flex flex-col items-center justify-center min-h-[250px]"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files?.[0]) {
+              handleExtraUpload('grade2Optional')({ target: { files: e.dataTransfer.files } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            }
+          }}
+        >
           {extraUploads[changeActiveGrade]?.grade2Optional ? (
             <>
               <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">
@@ -177,7 +204,16 @@ export function UploadStep({
         </div>
 
         {/* 3학년 1학기 데이터 업로드 */}
-        <div className="bg-stone-100 rounded-2xl p-6 border border-stone-300 flex flex-col items-center justify-center min-h-[250px]">
+        <div
+          className="bg-stone-100 rounded-2xl p-6 border border-stone-300 flex flex-col items-center justify-center min-h-[250px]"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files?.[0]) {
+              handleExtraUpload('grade3Sem1')({ target: { files: e.dataTransfer.files } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            }
+          }}
+        >
           {extraUploads[changeActiveGrade]?.grade3Sem1 ? (
             <>
               <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">

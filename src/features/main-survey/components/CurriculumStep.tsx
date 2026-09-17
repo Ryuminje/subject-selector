@@ -56,7 +56,16 @@ export function CurriculumStep({
         <span className="text-base">💡</span> 올바른 엑셀 입력 예시 보기
       </button>
 
-      <div className="relative group">
+      <div
+        className="relative group"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault();
+          if (e.dataTransfer.files?.[0]) {
+            handleCurriculumUpload({ target: { files: e.dataTransfer.files } } as unknown as React.ChangeEvent<HTMLInputElement>);
+          }
+        }}
+      >
         <input
           type="file"
           accept=".xlsx, .xls"
