@@ -369,6 +369,8 @@ export function ChangeSurveyTab() {
                       handleDeleteExtraUpload={handleDeleteExtraUpload}
                       handleExtraUpload={handleExtraUpload}
                       setChangeActiveTab={setChangeActiveTab}
+                      grade2HistoryData={grade2HistoryData}
+                      grade3Sem1HistoryData={grade3Sem1HistoryData}
                     />
                   )}
 

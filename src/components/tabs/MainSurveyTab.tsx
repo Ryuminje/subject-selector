@@ -303,6 +303,7 @@ export function MainSurveyTab() {
                       handlePrevHistoryFileUpload={handlePrevHistoryFileUpload}
                       handleRemovePrevHistoryFile={handleRemovePrevHistoryFile}
                       previousSubjectMap={previousSubjectMap}
+                      processedData={processedData}
                     />
                   )}
                   {activeTab === "preview" && (
