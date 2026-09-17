@@ -122,6 +122,11 @@ export function useChangeUploads(changeActiveGrade: ChangeGradeKey) {
       const subjectHeaders = json[1];
       const students: StudentTimeData[] = [];
 
+      // H열(0-indexed 7)부터가 보통 첫 과목 열입니다(A순번~G과목수 = 7칸). 다만 학교마다
+      // H열에 "반배정" 결과 열을 하나 더 끼워 넣는 경우가 있어, 그 헤더면 과목 열이 아니라고
+      // 보고 I열(8)부터 읽습니다.
+      const startCol = String(subjectHeaders[7] || "").trim() === "반배정" ? 8 : 7;
+
       for (let r = 2; r < json.length; r++) {
         const row = json[r];
         // 학번 칸이 "합계"인 행(있을 수도 없을 수도 있음)은 학생이 아니라 집계 행이므로 건너뜁니다.
@@ -131,9 +136,7 @@ export function useChangeUploads(changeActiveGrade: ChangeGradeKey) {
         const name = String(row[2] || "");
 
         const timeSlotMap: Record<string, string> = {};
-        // H열(0-indexed 7)부터가 첫 과목 열입니다(A순번~G과목수 = 7칸) — grade2Optional/
-        // grade3Sem1 업로드(아래 handleExtraUpload)도 같은 구조라 c=7부터 읽습니다.
-        for (let c = 7; c < row.length; c++) {
+        for (let c = startCol; c < row.length; c++) {
           const timeVal = row[c];
           if (timeVal !== undefined && timeVal !== null && subjectHeaders[c]) {
             const timeKey = String(timeVal).trim();

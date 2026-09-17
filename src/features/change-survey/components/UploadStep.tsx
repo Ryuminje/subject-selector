@@ -75,9 +75,11 @@ export function UploadStep({
           <div className="w-20 h-20 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">
             <CheckCircle2 className="w-10 h-10 text-emerald-700" />
           </div>
-          <h3 className="text-xl font-medium text-stone-800 mb-2">학생 선택 데이터 파일 (sample3) 업로드</h3>
+          <h3 className="text-xl font-medium text-stone-800 mb-2">타임별 선택과목 파일 업로드</h3>
           <p className="text-stone-600 mb-4 text-center max-w-md">
-            과목명이 열 헤더로 지정되어 있고, 셀 값으로 A, B, C, D 등의 선택 그룹이 명시된 수요조사 결과 파일을 업로드해 주세요.
+            선택과목 현황이 A, B, C등 타임이 입력되어 있는 파일을 업로드 해 주세요.
+            <br />
+            &quot;리로스쿨-교육과정-이동시간표 편성-백업파일 불러오기-엑셀저장&quot;에서 다운받은 파일을 업로드 해 주세요.
           </p>
           <div className="flex flex-col items-center gap-2 mb-6">
             <div className="flex items-center gap-2">
@@ -131,9 +133,11 @@ export function UploadStep({
           <div className="w-20 h-20 bg-stone-100 rounded-full flex items-center justify-center mb-4">
             <FileIcon className="w-10 h-10 text-amber-600" />
           </div>
-          <h3 className="text-xl font-medium text-stone-800 mb-2">학생 선택 데이터 파일 (sample3) 업로드</h3>
+          <h3 className="text-xl font-medium text-stone-800 mb-2">타임별 선택과목 파일 업로드</h3>
           <p className="text-stone-600 mb-6 text-center max-w-md">
-            과목명이 열 헤더로 지정되어 있고, 셀 값으로 A, B, C, D 등의 선택 그룹이 명시된 수요조사 결과 파일을 업로드해 주세요.
+            선택과목 현황이 A, B, C등 타임이 입력되어 있는 파일을 업로드 해 주세요.
+            <br />
+            &quot;리로스쿨-교육과정-이동시간표 편성-백업파일 불러오기-엑셀저장&quot;에서 다운받은 파일을 업로드 해 주세요.
           </p>
 
           <label className="cursor-pointer flex items-center gap-2 px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-all shadow-lg shadow-amber-500/20">
