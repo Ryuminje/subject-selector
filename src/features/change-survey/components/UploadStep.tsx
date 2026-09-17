@@ -197,7 +197,10 @@ export function UploadStep({
               <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mb-4">
                 <FileIcon className="w-8 h-8 text-amber-600" />
               </div>
-              <h3 className="text-lg font-medium text-stone-800 mb-6">2학년 수강과목 데이터 업로드(선택)</h3>
+              <h3 className="text-lg font-medium text-stone-800 mb-2">2학년 수강과목 데이터 업로드(선택)</h3>
+              <p className="text-stone-600 text-sm text-center max-w-full px-4 mb-4">
+                &quot;리로스쿨-교육과정-수강신청-통계-엑셀저장&quot;에서 다운받은 수강신청 통계 파일을 업로드하세요.
+              </p>
               <label className="cursor-pointer flex items-center gap-2 px-5 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-600 border border-stone-300 font-medium rounded-xl transition-all shadow-sm">
                 <Upload className="w-4 h-4" />
                 파일 업로드
@@ -250,7 +253,10 @@ export function UploadStep({
               <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mb-4">
                 <FileIcon className="w-8 h-8 text-amber-600" />
               </div>
-              <h3 className="text-lg font-medium text-stone-800 mb-6">3학년 1학기 데이터 업로드</h3>
+              <h3 className="text-lg font-medium text-stone-800 mb-2">3학년 1학기 데이터 업로드</h3>
+              <p className="text-stone-600 text-sm text-center max-w-full px-4 mb-4">
+                &quot;리로스쿨-교육과정-수강신청-통계-엑셀저장&quot;에서 다운받은 수강신청 통계 파일을 업로드하세요.
+              </p>
               <label className="cursor-pointer flex items-center gap-2 px-5 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-600 border border-stone-300 font-medium rounded-xl transition-all shadow-sm">
                 <Upload className="w-4 h-4" />
                 파일 업로드
