@@ -130,7 +130,9 @@ export function useChangeUploads(changeActiveGrade: ChangeGradeKey) {
         const name = String(row[2] || "");
 
         const timeSlotMap: Record<string, string> = {};
-        for (let c = 8; c < row.length; c++) {
+        // H열(0-indexed 7)부터가 첫 과목 열입니다(A순번~G과목수 = 7칸) — grade2Optional/
+        // grade3Sem1 업로드(아래 handleExtraUpload)도 같은 구조라 c=7부터 읽습니다.
+        for (let c = 7; c < row.length; c++) {
           const timeVal = row[c];
           if (timeVal !== undefined && timeVal !== null && subjectHeaders[c]) {
             const timeKey = String(timeVal).trim();
