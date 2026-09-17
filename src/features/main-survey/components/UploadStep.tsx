@@ -127,7 +127,16 @@ export function UploadStep({
           </h3>
 
           {!previousHistoryFiles[activeGrade] ? (
-            <div className="border-2 border-dashed border-stone-300 hover:border-amber-500/50 bg-stone-50 rounded-2xl p-12 text-center transition-all duration-300 group cursor-pointer relative">
+            <div
+              className="border-2 border-dashed border-stone-300 hover:border-amber-500/50 bg-stone-50 rounded-2xl p-12 text-center transition-all duration-300 group cursor-pointer relative"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (e.dataTransfer.files?.[0]) {
+                  handlePrevHistoryFileUpload({ target: { files: e.dataTransfer.files } } as unknown as React.ChangeEvent<HTMLInputElement>);
+                }
+              }}
+            >
               <input
                 key={`prev-${activeGrade}`}
                 type="file"
