@@ -138,10 +138,11 @@ export default function EnvelopeLabelPrintPage() {
       }</style>
       <style>{`
         /* A5 한 장 = 210×148mm. 그 세로 둘이 297mm라 A4 세로에 정확히 들어갑니다.
-           좌우 여백은 프린터의 인쇄 불가 영역(대개 4~6mm)보다 넉넉해야 테두리가 잘리지
-           않습니다. 위아래는 두 장이 297mm에 딱 맞아 늘릴 여유가 없으므로 좁게 둡니다. */
+           여백은 프린터의 인쇄 불가 영역(대개 4~6mm)보다 넉넉해야 테두리가 잘리지 않습니다.
+           이 여백은 장 바깥이 아니라 딱지 **안쪽** 값이라, 늘려도 한 장의 높이(148.5mm)와
+           자르는 선 위치는 그대로이고 테두리만 안으로 들어옵니다. */
         .envelope-print.layout-a5 { --label-h: 148mm; --pad-y: 7mm; --pad-x: 7mm; }
-        .envelope-print.layout-a4-2up { --label-h: 148.5mm; --pad-y: 3mm; --pad-x: 8mm; }
+        .envelope-print.layout-a4-2up { --label-h: 148.5mm; --pad-y: 8mm; --pad-x: 8mm; }
 
         .envelope-print .sheet {
           width: 210mm;
