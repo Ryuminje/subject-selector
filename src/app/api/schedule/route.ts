@@ -26,12 +26,16 @@ export async function GET(request: Request) {
 
   const defaultBlockSettings: Record<string, Record<string, number[]>> = {};
   const tempBlockSettings: Record<string, Record<string, number[]>> = {};
+  // 날짜 단위 임시 차단 — 요일 단위인 위 둘과 달리 "YYYY-MM-DD"가 키입니다.
+  const dateBlockSettings: Record<string, Record<string, number[]>> = {};
   const teacherDepts: Record<string, string> = {};
   for (const t of teacherRows) {
     const fixed = JSON.parse(t.fixedBlockDays) as Record<string, number[]>;
     if (Object.keys(fixed).length > 0) defaultBlockSettings[t.name] = fixed;
     const temp = JSON.parse(t.tempBlockDays) as Record<string, number[]>;
     if (Object.keys(temp).length > 0) tempBlockSettings[t.name] = temp;
+    const dates = JSON.parse(t.dateBlocks) as Record<string, number[]>;
+    if (Object.keys(dates).length > 0) dateBlockSettings[t.name] = dates;
     if (t.department) teacherDepts[t.name] = t.department;
   }
 
@@ -42,6 +46,7 @@ export async function GET(request: Request) {
     schoolName: school.name,
     defaultBlockSettings,
     tempBlockSettings,
+    dateBlockSettings,
     globalMeetingBlocks: JSON.parse(school.globalMeetingBlocks) as Record<string, number[]>,
     blockedSubjects: JSON.parse(school.blockedSubjects) as string[],
     blockedTeachers: JSON.parse(school.blockedTeachers) as string[],

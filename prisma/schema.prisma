@@ -133,6 +133,12 @@ model Teacher {
   // 오늘 결근/출장 등 임시 설정 (기존 브라우저 localStorage 대체, 학교 전체 공유, JSON: Record<day, number[]>)
   tempBlockDays String @default("{}")
 
+  // 특정 "날짜"만 교체 불가 (JSON: Record<"YYYY-MM-DD", number[]>).
+  // tempBlockDays와 달리 요일이 아니라 달력 날짜 단위입니다 — "이 선생님은 이미 9월 25일
+  // 3교시를 다른 분과 교체했다"처럼 그 날 하루만 막고 다음 주에는 다시 후보로 떠야 하는
+  // 기록이라, 요일로 저장하면 매주 막혀 보강원이 틀어집니다.
+  dateBlocks String @default("{}")
+
   @@unique([schoolId, name])
 }
 

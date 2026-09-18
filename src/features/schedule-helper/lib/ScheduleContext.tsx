@@ -21,6 +21,8 @@ export interface ScheduleData {
   tableData: ScheduleRow[];
   defaultBlockSettings: Record<string, Record<string, number[]>>;
   tempBlockSettings: Record<string, Record<string, number[]>>;
+  /** 날짜 단위 임시 교체불가 — Record<교사명, Record<"YYYY-MM-DD", 교시[]>> */
+  dateBlockSettings: Record<string, Record<string, number[]>>;
   globalMeetingBlocks: Record<string, number[]>;
   blockedSubjects: string[];
   blockedTeachers: string[];
@@ -39,6 +41,16 @@ interface ScheduleContextType {
   isBlocked: (teacher: string, day: string, period: number) => boolean;
   isSubjectBlocked: (subject: string) => boolean;
   isTeacherBlocked: (teacher: string) => boolean;
+  /**
+   * 날짜 단위 교체불가. isBlocked(요일)와 일부러 분리했습니다 — 협의회/차단 설정 화면은
+   * 달력 날짜 개념이 없어서, isBlocked에 날짜를 끼워넣으면 그쪽까지 끌려 들어옵니다.
+   * 날짜를 아는 화면(수업 교체)만 이 함수를 추가로 봅니다.
+   */
+  dateBlocks: BlockSettings;
+  isDateBlocked: (teacher: string, date: string, period: number) => boolean;
+  addDateBlock: (teacher: string, date: string, period: number) => Promise<void>;
+  /** period를 생략하면 그 날짜 전체를 해제합니다. */
+  removeDateBlock: (teacher: string, date: string, period?: number) => Promise<void>;
   refetch: () => Promise<void>;
 }
 
@@ -58,12 +70,14 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sharedBlockSettings, setSharedBlockSettings] = useState<BlockSettings>({});
+  const [dateBlocks, setDateBlocks] = useState<BlockSettings>({});
 
   const refetch = async () => {
     try {
       const res = await loadSchedule();
       setData(res);
       setSharedBlockSettings(res.tempBlockSettings);
+      setDateBlocks(res.dateBlockSettings ?? {});
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "데이터를 가져오는데 실패했습니다.");
@@ -76,6 +90,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       .then((res) => {
         setData(res);
         setSharedBlockSettings(res.tempBlockSettings);
+        setDateBlocks(res.dateBlockSettings ?? {});
         setLoading(false);
       })
       .catch((err) => {
@@ -110,6 +125,33 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
+  // 특정 날짜만 교체불가로 기록 — "이 선생님은 이미 9월 25일 3교시를 다른 분과 교체했다".
+  // 학교 서버에 저장되어 같은 학교 선생님 모두에게 공유됩니다.
+  const addDateBlock = async (teacher: string, date: string, period: number) => {
+    const res = await fetch("/api/schedule-helper/date-blocks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teacherName: teacher, date, period }),
+    });
+    if (!res.ok) return;
+    const body = await res.json();
+    setDateBlocks((prev) => ({ ...prev, [teacher]: body.dateBlocks }));
+  };
+
+  const removeDateBlock = async (teacher: string, date: string, period?: number) => {
+    const res = await fetch("/api/schedule-helper/date-blocks", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ teacherName: teacher, date, period }),
+    });
+    if (!res.ok) return;
+    const body = await res.json();
+    setDateBlocks((prev) => ({ ...prev, [teacher]: body.dateBlocks }));
+  };
+
+  const isDateBlocked = (teacher: string, date: string, period: number) =>
+    dateBlocks[teacher]?.[date]?.includes(period) ?? false;
+
   const isBlocked = (teacher: string, day: string, period: number) => {
     if (!data) return false;
 
@@ -138,6 +180,10 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isBlocked,
         isSubjectBlocked,
         isTeacherBlocked,
+        dateBlocks,
+        isDateBlocked,
+        addDateBlock,
+        removeDateBlock,
         refetch
       }}
     >
