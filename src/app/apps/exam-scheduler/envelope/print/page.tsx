@@ -8,7 +8,7 @@ import {
   type EnvelopeLayout,
 } from "@/features/exam-scheduler/lib/io/openEnvelopeLabels";
 
-// 시험지 봉투에 붙일 딱지. 한 봉투에 한 장이라 A5 가로로 한 장씩 끊어 나갑니다.
+// 시험지 봉투 겉면에 붙일 표지. 한 봉투에 한 장이라 A5 가로로 한 장씩 끊어 나갑니다.
 // 내용은 봉투 표지 `.xls`와 같은 데이터(buildEnvelopeRows)입니다.
 
 /** 글자 폭 합계(em). 한글·한자는 한 칸, 영문·숫자·기호는 반 칸으로 봅니다. */
@@ -22,7 +22,7 @@ function emWidth(text: string): number {
  * 한 줄이 주어진 폭 안에 들어가도록 글씨 크기를 정합니다.
  *
  * 실제로 재서 맞추는 게 정확하지만 인쇄 미리보기에서는 측정 시점이 어긋나 값이 튑니다.
- * 딱지는 줄이 셋뿐이고 들어올 내용도 뻔해서(과목명·학반·타임) 폭 추정으로 충분합니다.
+ * 표지는 줄이 셋뿐이고 들어올 내용도 뻔해서(과목명·학반·타임) 폭 추정으로 충분합니다.
  * ponytail: 폭 추정 근사(굵은 글씨 여유 5%). 넘치는 경우가 보이면 그때 실측으로 바꾸세요.
  */
 function fitMm(text: string, base: number, min: number, boxMm: number): number {
@@ -31,7 +31,7 @@ function fitMm(text: string, base: number, min: number, boxMm: number): number {
   return Math.max(min, Math.min(base, (boxMm * 0.95) / width));
 }
 
-/** 딱지 안쪽 폭(mm) — A5 가로 210 − 바깥 여백 14 − 테두리 안쪽 여백 24. */
+/** 표지 안쪽 폭(mm) — A5 가로 210 − 바깥 여백 14 − 테두리 안쪽 여백 24. */
 const INNER_MM = 172;
 /** 타임/반 줄은 24mm 들여쓰므로 그만큼 좁습니다. */
 const SUB_INNER_MM = INNER_MM - 24;
@@ -112,9 +112,9 @@ export default function EnvelopeLabelPrintPage() {
   if (missing) {
     return (
       <div className="p-10 text-center text-slate-500">
-        <p className="mb-1 font-semibold">봉투 딱지 데이터가 없습니다.</p>
+        <p className="mb-1 font-semibold">시험지 봉투 표지 데이터가 없습니다.</p>
         <p className="text-sm">
-          시험 시간표 작성 도우미의 결과·출력 단계에서 &quot;봉투 딱지 인쇄 (A5)&quot;를 다시 눌러주세요.
+          시험 시간표 작성 도우미의 결과·출력 단계에서 &quot;시험지 봉투 표지 인쇄 (A5)&quot;를 다시 눌러주세요.
         </p>
       </div>
     );
@@ -122,8 +122,8 @@ export default function EnvelopeLabelPrintPage() {
 
   if (!rows) return <div className="p-10 text-center text-slate-400">불러오는 중...</div>;
 
-  // 한 장에 몇 개를 얹을지. 쪽 넘김은 딱지가 아니라 "장"에 걸어야 2장씩 배치가 어긋나지
-  // 않습니다(딱지에 nth-child로 걸면 머리말 같은 형제가 하나만 끼어도 홀짝이 밀립니다).
+  // 한 장에 몇 개를 얹을지. 쪽 넘김은 표지가 아니라 "장"에 걸어야 2장씩 배치가 어긋나지
+  // 않습니다(표지에 nth-child로 걸면 머리말 같은 형제가 하나만 끼어도 홀짝이 밀립니다).
   const perSheet = layout === "a4-2up" ? 2 : 1;
   const sheets: EnvelopeLabel[][] = [];
   for (let i = 0; i < rows.length; i += perSheet) sheets.push(rows.slice(i, i + perSheet));
@@ -184,14 +184,14 @@ export default function EnvelopeLabelPrintPage() {
             break-after: page;
           }
           .envelope-print .sheet:last-child { break-after: auto; }
-          /* 한 장 안의 딱지는 절대 갈라지면 안 됩니다. */
+          /* 한 장 안의 표지는 절대 갈라지면 안 됩니다. */
           .envelope-print .label { break-inside: avoid; }
         }
       `}</style>
 
       <div className="no-print mx-auto mb-4 flex max-w-[210mm] items-center justify-between gap-4 px-4">
         <p className="text-sm text-slate-500">
-          봉투 딱지 {rows.length}장 ·{" "}
+          시험지 봉투 표지 {rows.length}장 ·{" "}
           {layout === "a4-2up"
             ? `A4 세로 ${sheets.length}쪽 (한 쪽에 2장)`
             : `A5 가로 ${sheets.length}쪽 (한 쪽에 1장)`}
