@@ -32,6 +32,35 @@ function compareCodePoints(a: string, b: string): number {
 }
 
 /**
+ * 시험실 이름 비교. 숫자 덩어리는 숫자로 봅니다 — 글자만으로 비교하면 `1-10`이 `1-2`보다
+ * 앞에 와서 봉투 순서가 실제 교실 순서와 어긋납니다.
+ */
+function compareRoomNames(a: string, b: string): number {
+  const chunks = (value: string) => value.match(/\d+|\D+/g) ?? [];
+  const left = chunks(a);
+  const right = chunks(b);
+
+  for (let i = 0; i < Math.min(left.length, right.length); i += 1) {
+    const x = left[i];
+    const y = right[i];
+    const bothNumeric = /^\d/.test(x) && /^\d/.test(y);
+    const diff = bothNumeric ? Number(x) - Number(y) : compareCodePoints(x, y);
+    if (diff !== 0) return diff;
+  }
+  return left.length - right.length;
+}
+
+/**
+ * 정렬에 쓸 학년 숫자. 비었거나 숫자가 아니면 맨 뒤로 보냅니다
+ * (`Number("")`가 0이라 그냥 두면 빈 값이 1학년보다 앞에 섭니다).
+ */
+function gradeOrder(group: GradeGroup): number {
+  const text = String(group.gradePrefix ?? '').trim();
+  const grade = Number(text);
+  return text && Number.isFinite(grade) ? grade : Number.MAX_SAFE_INTEGER;
+}
+
+/**
  * 강의실 이름을 표지에 쓸 짧은 형태로 줄입니다.
  * 글자와 숫자가 모두 있으면 `글자 + 마지막 숫자`, 아니면 원본 그대로입니다.
  *
@@ -92,9 +121,10 @@ export function buildEnvelopeRows(
   groups: GradeGroup[],
   excludedKeysByGroup: Record<string, ReadonlySet<StudentKey>> = {},
 ): EnvelopeRow[] {
-  const collected: Array<EnvelopeRow & { groupIndex: number }> = [];
+  const collected: Array<EnvelopeRow & { groupIndex: number; grade: number }> = [];
 
   groups.forEach((group, groupIndex) => {
+    const grade = gradeOrder(group);
     const excluded = excludedKeysByGroup[group.id] ?? new Set<StudentKey>();
     const students = group.records.filter(
       (record) =>
@@ -129,7 +159,7 @@ export function buildEnvelopeRows(
           }
 
           const sortedRooms = [...byRoom.entries()].sort(([a], [b]) =>
-            compareCodePoints(a, b),
+            compareRoomNames(a, b),
           );
 
           for (const [room, roomStudents] of sortedRooms) {
@@ -142,6 +172,7 @@ export function buildEnvelopeRows(
 
             collected.push({
               groupIndex,
+              grade,
               examDate,
               period: period + 1,
               subject,
@@ -173,13 +204,17 @@ export function buildEnvelopeRows(
     return true;
   });
 
+  // 봉투를 나눠 주는 순서 그대로입니다 — 학년 → 시험시간(날짜·교시) → 시험실.
+  // 학년 숫자가 같으면(또는 둘 다 알 수 없으면) 명단을 불러온 순서를 따릅니다.
   return unique
     .map((row, index) => ({ row, index }))
     .sort(
       (a, b) =>
+        a.row.grade - b.row.grade ||
+        a.row.groupIndex - b.row.groupIndex ||
         compareCodePoints(a.row.examDate, b.row.examDate) ||
         a.row.period - b.row.period ||
-        compareCodePoints(a.row.examRoom, b.row.examRoom) ||
+        compareRoomNames(a.row.examRoom, b.row.examRoom) ||
         a.index - b.index,
     )
     .map(({ row }) => ({
