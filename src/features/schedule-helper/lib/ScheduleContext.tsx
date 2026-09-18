@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import type { ScheduleRow } from "./sheetData";
+import type { ManualChange } from "./manualChanges";
 
 interface BlockSettings {
   [teacher: string]: {
@@ -24,6 +25,8 @@ export interface ScheduleData {
   globalMeetingBlocks: Record<string, number[]>;
   blockedSubjects: string[];
   blockedTeachers: string[];
+  /** 이 도구를 거치지 않고 이미 이뤄진 교체·보강 기록 (manualChanges.ts 참고) */
+  manualChanges: ManualChange[];
   teacherDepts: Record<string, string>;
   scheduleUploadedAt: string | null;
   joinCode: string | null;
@@ -39,6 +42,13 @@ interface ScheduleContextType {
   isBlocked: (teacher: string, day: string, period: number) => boolean;
   isSubjectBlocked: (subject: string) => boolean;
   isTeacherBlocked: (teacher: string) => boolean;
+  /**
+   * 이미 이뤄진 교체·보강을 손으로 기록합니다. 저장하면 그 날짜가 속한 주의 시간표가
+   * 실제로 바뀐 것처럼 보이고, 교체 상대 검색도 그 시간표를 기준으로 돕니다.
+   */
+  manualChanges: ManualChange[];
+  addManualChange: (change: Omit<ManualChange, "id" | "createdAt">) => Promise<string | null>;
+  removeManualChange: (id: string) => Promise<void>;
   refetch: () => Promise<void>;
 }
 
@@ -58,12 +68,14 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sharedBlockSettings, setSharedBlockSettings] = useState<BlockSettings>({});
+  const [manualChanges, setManualChanges] = useState<ManualChange[]>([]);
 
   const refetch = async () => {
     try {
       const res = await loadSchedule();
       setData(res);
       setSharedBlockSettings(res.tempBlockSettings);
+      setManualChanges(res.manualChanges ?? []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "데이터를 가져오는데 실패했습니다.");
@@ -76,6 +88,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       .then((res) => {
         setData(res);
         setSharedBlockSettings(res.tempBlockSettings);
+        setManualChanges(res.manualChanges ?? []);
         setLoading(false);
       })
       .catch((err) => {
@@ -110,6 +123,30 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
+  // 이미 이뤄진 교체·보강 기록 — 학교 서버에 저장되어 같은 학교 선생님 모두에게 공유됩니다.
+  const addManualChange = async (change: Omit<ManualChange, "id" | "createdAt">) => {
+    const res = await fetch("/api/schedule-helper/manual-changes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(change),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return (body.error as string) ?? "기록에 실패했습니다.";
+    setManualChanges(body.manualChanges ?? []);
+    return null;
+  };
+
+  const removeManualChange = async (id: string) => {
+    const res = await fetch("/api/schedule-helper/manual-changes", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) return;
+    const body = await res.json();
+    setManualChanges(body.manualChanges ?? []);
+  };
+
   const isBlocked = (teacher: string, day: string, period: number) => {
     if (!data) return false;
 
@@ -138,6 +175,9 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isBlocked,
         isSubjectBlocked,
         isTeacherBlocked,
+        manualChanges,
+        addManualChange,
+        removeManualChange,
         refetch
       }}
     >

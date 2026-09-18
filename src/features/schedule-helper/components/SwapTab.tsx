@@ -10,6 +10,8 @@ import { useMakeupTray } from "@/features/schedule-helper/components/makeup/useM
 import MakeupBatchBar from "@/features/schedule-helper/components/makeup/MakeupBatchBar";
 import { useMakeupBatches, type MakeupBatch } from "@/features/schedule-helper/components/makeup/useMakeupBatches";
 import { absentDateOf, dateForWeekday, exchangeDateOf, koreanDate } from "@/features/schedule-helper/lib/makeup/buildRows";
+import ManualChangeBar from "@/features/schedule-helper/components/ManualChangeBar";
+import { applyManualChanges, cellKey } from "@/features/schedule-helper/lib/manualChanges";
 import type { ClassSlot, MakeupEntry, MakeupKind } from "@/features/schedule-helper/lib/makeup/types";
 
 interface SearchResult {
@@ -191,7 +193,7 @@ function absentSignature(entry: MakeupEntry, baseDate: string): string {
 }
 
 export default function SwapTab() {
-  const { data, isBlocked, isSubjectBlocked, isTeacherBlocked } = useSchedule();
+  const { data, isBlocked, isSubjectBlocked, isTeacherBlocked, manualChanges, addManualChange, removeManualChange } = useSchedule();
   const { data: session } = useSession();
   const [selectedCell, setSelectedCell] = useState<{ teacher: string; day: string; period: number } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -223,6 +225,12 @@ export default function SwapTab() {
   // candidateKey로 후보별 따로 두어야, 한 후보의 날짜를 고치는 게 다른 후보에 영향을 안 줍니다.
   const [pendingDates, setPendingDates] = useState<Record<string, PendingDates>>({});
 
+  // "이미 이뤄진 교체" 기록 모드 — 켜면 시간표 칸 클릭이 검색 대신 기록으로 동작합니다.
+  // recordPending은 첫 번째로 고른 칸(원래 그 수업을 맡던 쪽)입니다.
+  const [recording, setRecording] = useState(false);
+  const [recordPending, setRecordPending] = useState<{ teacher: string; day: string; period: number; subject: string } | null>(null);
+  const [recordError, setRecordError] = useState<string | null>(null);
+
   // 팝오버가 열려 있을 때 바깥을 누르면 닫습니다. 팝오버를 연 바로 그 클릭이 곧장 다시
   // 닫아버리지 않도록 리스너 등록을 한 틱 미룹니다(버블링 중인 이벤트를 피함).
   useEffect(() => {
@@ -245,11 +253,73 @@ export default function SwapTab() {
 
   if (!data) return null;
 
+  // 이 도구를 거치지 않고 이미 이뤄진 교체·보강을 시간표에 덧입힌 "그 주의 실제 시간표".
+  // 아래 검색·표시가 전부 이걸 봅니다 — 검색 알고리즘을 건드리지 않고도 현실을 반영합니다.
+  const { table: effectiveTable, touched } = applyManualChanges(data.tableData, manualChanges, tray.baseDate);
+
   const myName = session?.user?.name;
-  const myRow = myName ? data.tableData.find((r) => r.teacher === myName) : undefined;
+  const myRow = myName ? effectiveTable.find((r) => r.teacher === myName) : undefined;
+
+  /**
+   * 기록 모드에서 칸을 눌렀을 때. 두 번 눌러 한 건을 만듭니다.
+   *  1) 원래 그 수업을 맡던 선생님의 **수업 칸**
+   *  2) 맞바꾼 상대의 **수업 칸**(교체) 또는 대신 들어간 선생님의 **같은 시간 빈 칸**(보강)
+   */
+  const handleRecordClick = async (teacher: string, day: string, period: number) => {
+    setRecordError(null);
+    const classStr = effectiveTable.find((r) => r.teacher === teacher)?.[day + period];
+
+    if (!recordPending) {
+      if (!classStr) {
+        setRecordError("먼저 원래 그 수업을 맡았던 선생님의 수업 칸을 눌러 주세요.");
+        return;
+      }
+      const info = parseClassInfo(classStr);
+      setRecordPending({ teacher, day, period, subject: info?.subject ?? classStr });
+      return;
+    }
+
+    if (recordPending.teacher === teacher && recordPending.day === day && recordPending.period === period) {
+      setRecordPending(null);
+      return;
+    }
+    if (recordPending.teacher === teacher) {
+      setRecordError("같은 선생님의 다른 칸끼리는 교체가 아닙니다. 상대 선생님의 칸을 눌러 주세요.");
+      return;
+    }
+
+    const absent = {
+      date: dateForWeekday(tray.baseDate, recordPending.day),
+      day: recordPending.day,
+      period: recordPending.period,
+    };
+
+    // 빈 칸을 골랐으면 보강입니다 — 다만 대신 들어가는 건 "그 수업이 있는 바로 그 시간"이라
+    // 같은 요일·교시여야 말이 됩니다.
+    if (!classStr) {
+      if (day !== recordPending.day || period !== recordPending.period) {
+        setRecordError("보강이라면 같은 시간의 빈 칸을 눌러야 합니다. 교체라면 상대의 수업 칸을 눌러 주세요.");
+        return;
+      }
+      const err = await addManualChange({ kind: "sub", absentTeacher: recordPending.teacher, absent, partnerTeacher: teacher });
+      setRecordError(err);
+      if (!err) setRecordPending(null);
+      return;
+    }
+
+    const err = await addManualChange({
+      kind: "swap",
+      absentTeacher: recordPending.teacher,
+      absent,
+      partnerTeacher: teacher,
+      exchange: { date: dateForWeekday(tray.baseDate, day), day, period },
+    });
+    setRecordError(err);
+    if (!err) setRecordPending(null);
+  };
 
   const handleCellClick = (teacher: string, day: string, period: number) => {
-    const row = data.tableData.find((r) => r.teacher === teacher);
+    const row = effectiveTable.find((r) => r.teacher === teacher);
     const classStr = row?.[day + period];
     if (!classStr) return;
 
@@ -278,7 +348,7 @@ export default function SwapTab() {
     // 동과 대강은 시간 이동이 없으므로(사람만 바뀜) 과목 금지와 무관하게 정상 동작해야 합니다.
     const subjectBlocked = isSubjectBlocked(myInfo.subject);
 
-    data.tableData.forEach((otherRow) => {
+    effectiveTable.forEach((otherRow) => {
       if (otherRow.teacher === teacher) return;
       if (isTeacherBlocked(otherRow.teacher)) return;
 
@@ -320,7 +390,7 @@ export default function SwapTab() {
     // w와 같은 반을 가르치는 C를 찾아 B↔C를 먼저 교체하면 B가 이 시간에 비게 되어 나↔B 교체가 가능해집니다.
     const chainResults: ChainResult[] = [];
     if (swapResults.length === 0 && !subjectBlocked) {
-      outer: for (const bRow of data.tableData) {
+      outer: for (const bRow of effectiveTable) {
         if (bRow.teacher === teacher) continue;
         if (isTeacherBlocked(bRow.teacher)) continue;
         for (const dayB of data.days) {
@@ -340,7 +410,7 @@ export default function SwapTab() {
             if (!wInfo || wInfo.grade === "?" || wInfo.classNum === "?") continue;
             if (isSubjectBlocked(wInfo.subject)) continue;
 
-            for (const cRow of data.tableData) {
+            for (const cRow of effectiveTable) {
               if (cRow.teacher === teacher || cRow.teacher === bRow.teacher) continue;
               if (isTeacherBlocked(cRow.teacher)) continue;
               for (const dayC of data.days) {
@@ -377,7 +447,7 @@ export default function SwapTab() {
     setSelectedChainIdx((prev) => (prev === idx ? null : idx));
   };
 
-  const selectedClassStr = selectedCell ? data.tableData.find((r) => r.teacher === selectedCell.teacher)?.[selectedCell.day + selectedCell.period] : null;
+  const selectedClassStr = selectedCell ? effectiveTable.find((r) => r.teacher === selectedCell.teacher)?.[selectedCell.day + selectedCell.period] : null;
   const myInfo = parseClassInfo(selectedClassStr);
 
   // 지금 선택한 시간에 이미 담긴 항목 (한 시간에 한 사람만 들어갑니다)
@@ -607,7 +677,7 @@ export default function SwapTab() {
     );
   };
 
-  const renderRow = (row: typeof data.tableData[number], pinned: boolean) => (
+  const renderRow = (row: typeof effectiveTable[number], pinned: boolean) => (
     <tr
       key={row.teacher}
       className={cn("transition-colors", pinned ? "bg-amber-50 hover:bg-amber-100" : "hover:bg-emerald-50")}
@@ -653,6 +723,10 @@ export default function SwapTab() {
           // 날짜 override로 다른 주를 가리키면 겉보기엔 같은 "화7"이어도 이 칸엔 표시되지
           // 않습니다(실제로 이번 주 이 칸은 비어 있는 게 맞으므로).
           const cellDate = dateForWeekday(tray.baseDate, d);
+          // 이미 이뤄진 교체·보강 기록으로 바뀐 칸 — 수업이 빠져나갔거나(out) 들어온(in) 자리.
+          const manual = touched.get(cellKey(row.teacher, d, p));
+          const isRecordPick =
+            recordPending?.teacher === row.teacher && recordPending?.day === d && recordPending?.period === p;
           const originEntry = tray.entryFor(row.teacher, d, p);
           const exchangeEntry = originEntry
             ? undefined
@@ -682,6 +756,11 @@ export default function SwapTab() {
             <td
               key={`${d}-${p}`}
               onClick={(e) => {
+                if (recording) {
+                  e.stopPropagation();
+                  handleRecordClick(row.teacher, d, p);
+                  return;
+                }
                 if (committed && !clickableCommittedCandidate) return;
                 if (!committed && !classStr) return;
                 if (isPartner) {
@@ -702,7 +781,11 @@ export default function SwapTab() {
                 handleCellClick(row.teacher, d, p);
               }}
               title={
-                committed
+                manual
+                  ? manual.role === "in"
+                    ? `이미 이뤄진 ${manual.change.kind === "swap" ? "교체" : "보강"} 기록 — ${manual.change.absentTeacher} 선생님 대신 ${row.teacher} 선생님이 맡습니다. 막대의 목록에서 지울 수 있습니다.`
+                    : `이미 이뤄진 ${manual.change.kind === "swap" ? "교체" : "보강"} 기록 — 이 수업은 ${manual.change.partnerTeacher} 선생님이 맡아 이 시간은 비었습니다. 막대의 목록에서 지울 수 있습니다.`
+                  : committed
                   ? clickableCommittedCandidate
                     ? `${committedTooltip(committed, committedRole!, tray.baseDate)} — 지금 찾는 후보이기도 합니다. 눌러서 다른 날짜로 담을 수 있는지 확인해 보세요.`
                     : committedTooltip(committed, committedRole!, tray.baseDate)
@@ -715,6 +798,10 @@ export default function SwapTab() {
                 "h-14 border border-stone-200 p-0.5 text-center align-middle transition-colors relative overflow-hidden",
                 pi === 0 && "border-l-2 border-l-stone-400",
                 classStr && !committed && "cursor-pointer hover:bg-amber-100",
+                manual?.role === "in" && "bg-indigo-50 border-2 border-indigo-400",
+                manual?.role === "out" && "bg-indigo-50/40 border-2 border-dashed border-indigo-300",
+                recording && "cursor-pointer hover:bg-indigo-100",
+                isRecordPick && "bg-indigo-200 border-2 border-indigo-600 font-bold z-10",
                 committed && !clickableCommittedCandidate && "cursor-not-allowed bg-amber-50 border-2 border-amber-300",
                 committed && clickableCommittedCandidate && "cursor-pointer bg-amber-50 hover:bg-amber-100 border-2 border-emerald-500 font-bold z-10",
                 busyElsewhereEntry && "cursor-not-allowed bg-amber-50/60 border-2 border-amber-200",
@@ -724,6 +811,11 @@ export default function SwapTab() {
                 !committed && isChainStep2 && "bg-purple-100 border-2 border-purple-500 font-bold z-10"
               )}
             >
+              {/* 칸이 20px 남짓이라 글자 배지는 수업명을 가립니다 — 점 하나로 표시하고
+                  자세한 내용은 툴팁과 위 목록에서 보여줍니다. */}
+              {manual && (
+                <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-indigo-500 pointer-events-none" />
+              )}
               {committed ? (
                 <CommittedCell entry={committed} role={committedRole!} />
               ) : info && (
@@ -748,6 +840,21 @@ export default function SwapTab() {
   return (
     <div className="flex flex-col lg:flex-row gap-4 items-start">
     <div className="flex-1 min-w-0 bg-white rounded-[14px] border border-stone-200 overflow-hidden">
+      <ManualChangeBar
+        recording={recording}
+        onToggleRecording={() => {
+          setRecording((prev) => !prev);
+          setRecordPending(null);
+          setRecordError(null);
+          setQuickPick(null);
+        }}
+        pending={recordPending}
+        onCancelPending={() => setRecordPending(null)}
+        changes={manualChanges}
+        baseDate={tray.baseDate}
+        onRemove={removeManualChange}
+        error={recordError}
+      />
       <div className="overflow-auto max-h-[75vh] relative">
         <table className="w-full border-collapse text-sm table-fixed">
           <thead ref={theadRef} className="bg-swap text-white sticky top-0 z-20">
@@ -767,10 +874,11 @@ export default function SwapTab() {
           </thead>
           <tbody>
             {myRow && renderRow(myRow, true)}
-            {data.tableData.map((row) => {
+            {effectiveTable.map((row) => {
               if (row.teacher === myName) return null;
 
-              const isVisible = !selectedCell ||
+              // 기록 모드에서는 아무 선생님이나 골라야 하므로 후보 필터를 걷습니다.
+              const isVisible = recording || !selectedCell ||
                                 row.teacher === selectedCell.teacher ||
                                 results.swap.some(r => r.teacher === row.teacher) ||
                                 results.sub.some(r => r.teacher === row.teacher) ||
