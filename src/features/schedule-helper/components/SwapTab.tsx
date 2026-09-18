@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useSchedule } from "@/features/schedule-helper/lib/ScheduleContext";
 import { useSession } from "@/lib/auth-client";
 import { parseClassInfo, cn } from "@/features/schedule-helper/lib/utils";
-import { Search, X, Check, ArrowRightLeft, ArrowLeft, ArrowRight, Star, Pin, FilePlus2, Ban } from "lucide-react";
+import { Search, X, Check, ArrowRightLeft, ArrowLeft, ArrowRight, Star, Pin, FilePlus2 } from "lucide-react";
 import MakeupTray from "@/features/schedule-helper/components/makeup/MakeupTray";
 import { useMakeupTray } from "@/features/schedule-helper/components/makeup/useMakeupTray";
 import MakeupBatchBar from "@/features/schedule-helper/components/makeup/MakeupBatchBar";
@@ -191,7 +191,7 @@ function absentSignature(entry: MakeupEntry, baseDate: string): string {
 }
 
 export default function SwapTab() {
-  const { data, isBlocked, isSubjectBlocked, isTeacherBlocked, isDateBlocked, addDateBlock, removeDateBlock } = useSchedule();
+  const { data, isBlocked, isSubjectBlocked, isTeacherBlocked } = useSchedule();
   const { data: session } = useSession();
   const [selectedCell, setSelectedCell] = useState<{ teacher: string; day: string; period: number } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -248,16 +248,6 @@ export default function SwapTab() {
   const myName = session?.user?.name;
   const myRow = myName ? data.tableData.find((r) => r.teacher === myName) : undefined;
 
-  /**
-   * 요일 단위 차단(고정·임시)에 **날짜 단위 차단**까지 합친 판정.
-   *
-   * 시간표 칸은 요일·교시만 갖고 있으므로, 결강 주간 기준일(tray.baseDate)로 그 칸이 실제
-   * 몇 월 며칠인지 먼저 구해서 봅니다. 그래서 같은 "화3"이어도 이번 주만 막히고 다음 주에는
-   * 다시 후보로 뜹니다 — 이미 다른 분과 교체를 잡아둔 날 하루만 빼려는 것이기 때문입니다.
-   */
-  const blockedOn = (teacher: string, day: string, period: number) =>
-    isBlocked(teacher, day, period) || isDateBlocked(teacher, dateForWeekday(tray.baseDate, day), period);
-
   const handleCellClick = (teacher: string, day: string, period: number) => {
     const row = data.tableData.find((r) => r.teacher === teacher);
     const classStr = row?.[day + period];
@@ -296,10 +286,7 @@ export default function SwapTab() {
       if (!subjectBlocked) {
         data.days.forEach((dayName) => {
           data.periods.forEach((perNum) => {
-            if (blockedOn(otherRow.teacher, dayName, perNum)) return;
-            // 교체는 상대가 내 결강 시간에 대신 들어와야 성립합니다 — 그 시간이 막혀 있으면
-            // 상대 수업이 비어 있어도 후보가 될 수 없습니다(보강·연쇄 분기는 이미 봅니다).
-            if (blockedOn(otherRow.teacher, day, period)) return;
+            if (isBlocked(otherRow.teacher, dayName, perNum)) return;
             const otherStr = otherRow[dayName + perNum];
             if (otherStr) {
               const oInfo = parseClassInfo(otherStr);
@@ -321,7 +308,7 @@ export default function SwapTab() {
       // Sub Logic
       if (myInfo.isMovingClass && myDept) {
         const otherDept = data.teacherDepts[otherRow.teacher];
-        if (otherDept === myDept && !otherRow[day + period] && !blockedOn(otherRow.teacher, day, period)) {
+        if (otherDept === myDept && !otherRow[day + period] && !isBlocked(otherRow.teacher, day, period)) {
           subResults.push({ teacher: otherRow.teacher, isSub: true });
         }
       }
@@ -338,14 +325,14 @@ export default function SwapTab() {
         if (isTeacherBlocked(bRow.teacher)) continue;
         for (const dayB of data.days) {
           for (const perB of data.periods) {
-            if (blockedOn(bRow.teacher, dayB, perB)) continue;
+            if (isBlocked(bRow.teacher, dayB, perB)) continue;
             const bStr = bRow[dayB + perB];
             if (!bStr) continue;
             const bInfo = parseClassInfo(bStr);
             if (!bInfo || bInfo.grade !== myInfo.grade || bInfo.classNum !== myInfo.classNum) continue;
             if (isSubjectBlocked(bInfo.subject)) continue;
             if (row[dayB + perB]) continue; // 내가 그 시간에 비어있어야 함
-            if (blockedOn(bRow.teacher, day, period)) continue;
+            if (isBlocked(bRow.teacher, day, period)) continue;
 
             const wStr = bRow[day + period];
             if (!wStr) continue; // B가 이미 이 시간에 비어있으면 1단계로 해결됨 (여기 올 일 없음)
@@ -358,7 +345,7 @@ export default function SwapTab() {
               if (isTeacherBlocked(cRow.teacher)) continue;
               for (const dayC of data.days) {
                 for (const perC of data.periods) {
-                  if (blockedOn(cRow.teacher, dayC, perC)) continue;
+                  if (isBlocked(cRow.teacher, dayC, perC)) continue;
                   const cStr = cRow[dayC + perC];
                   if (!cStr) continue;
                   const cInfo = parseClassInfo(cStr);
@@ -366,7 +353,7 @@ export default function SwapTab() {
                   if (isSubjectBlocked(cInfo.subject)) continue;
                   if (bRow[dayC + perC]) continue; // B가 그 시간에 비어있어야 함
                   if (cRow[day + period]) continue; // C가 이 시간에 비어있어야 함
-                  if (blockedOn(cRow.teacher, day, period)) continue;
+                  if (isBlocked(cRow.teacher, day, period)) continue;
 
                   chainResults.push({
                     b: { teacher: bRow.teacher, day: dayB, period: perB, subject: bInfo.subject },
@@ -392,29 +379,6 @@ export default function SwapTab() {
 
   const selectedClassStr = selectedCell ? data.tableData.find((r) => r.teacher === selectedCell.teacher)?.[selectedCell.day + selectedCell.period] : null;
   const myInfo = parseClassInfo(selectedClassStr);
-
-  // 검색은 클릭한 순간 한 번만 돌지만 날짜 차단은 그 뒤에도 바뀝니다(후보 줄의 "이 날 불가").
-  // 그래서 저장된 결과를 그대로 쓰지 않고 그릴 때마다 걸러냅니다 — 다시 검색하지 않아도
-  // 목록과 시간표의 초록 표시가 그 자리에서 같이 사라집니다.
-  const visible = {
-    swap: results.swap.filter((r) => !blockedOn(r.teacher, r.day!, r.period!)),
-    sub: results.sub.filter((r) => !selectedCell || !blockedOn(r.teacher, selectedCell.day, selectedCell.period)),
-    chain: results.chain.filter(
-      (ch) =>
-        !selectedCell ||
-        (!blockedOn(ch.b.teacher, ch.b.day, ch.b.period) &&
-          !blockedOn(ch.b.teacher, selectedCell.day, selectedCell.period) &&
-          !blockedOn(ch.c.teacher, ch.c.day, ch.c.period) &&
-          !blockedOn(ch.c.teacher, selectedCell.day, selectedCell.period))
-    ),
-  };
-
-  /** 후보를 "이 날은 안 됨"으로 기록합니다. 연쇄 후보 선택은 번호가 밀릴 수 있어 같이 풉니다. */
-  const blockCandidate = async (teacher: string, date: string, period: number) => {
-    setSelectedChainIdx(null);
-    setQuickPick(null);
-    await addDateBlock(teacher, date, period);
-  };
 
   // 지금 선택한 시간에 이미 담긴 항목 (한 시간에 한 사람만 들어갑니다)
   const pickedForCell = selectedCell
@@ -591,10 +555,6 @@ export default function SwapTab() {
     const setPending = (patch: Partial<PendingDates>) =>
       setPendingDates((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
 
-    // "이 날 불가"로 막을 자리 — 교체면 상대 수업 칸, 보강이면 내 결강 칸(상대가 들어올 시간).
-    const blockDate = exchangeSlot ? state.exchangeDate! : state.absentDate;
-    const blockPeriod = exchangeSlot ? exchangeSlot.period : selectedCell?.period;
-
     return (
       <div className="shrink-0 flex flex-col items-end gap-1">
         {state.absentConflict && (
@@ -642,15 +602,6 @@ export default function SwapTab() {
           >
             <FilePlus2 className="w-3 h-3" /> 보강
           </button>
-          {typeof blockPeriod === "number" && (
-            <button
-              onClick={() => blockCandidate(partnerTeacher, blockDate, blockPeriod)}
-              title={`${partnerTeacher} 선생님은 ${koreanDate(blockDate)} ${blockPeriod}교시에 이미 다른 교체가 잡혀 있다고 기록합니다. 그 날 하루만 후보에서 빠지고, 시간표에서 그 칸을 다시 누르면 해제됩니다.`}
-              className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-500 transition-colors"
-            >
-              <Ban className="w-3 h-3" /> 이 날 불가
-            </button>
-          )}
         </div>
       </div>
     );
@@ -682,10 +633,10 @@ export default function SwapTab() {
           const info = parseClassInfo(classStr);
           const isSelected = selectedCell?.teacher === row.teacher && selectedCell?.day === d && selectedCell?.period === p;
           const isPartner = selectedCell && (
-            visible.swap.some(r => r.teacher === row.teacher && r.day === d && r.period === p) ||
-            visible.sub.some(r => r.teacher === row.teacher && r.day === d && r.period === p)
+            results.swap.some(r => r.teacher === row.teacher && r.day === d && r.period === p) ||
+            results.sub.some(r => r.teacher === row.teacher && r.day === d && r.period === p)
           );
-          const selectedChain = selectedChainIdx !== null ? visible.chain[selectedChainIdx] : undefined;
+          const selectedChain = selectedChainIdx !== null ? results.chain[selectedChainIdx] : undefined;
           // 1단계(B↔C 교체): B의 지금 시간(w) ↔ C의 원래 시간
           const isChainStep1 = !!selectedChain && !!selectedCell && (
             (row.teacher === selectedChain.b.teacher && d === selectedCell.day && p === selectedCell.period) ||
@@ -702,8 +653,6 @@ export default function SwapTab() {
           // 날짜 override로 다른 주를 가리키면 겉보기엔 같은 "화7"이어도 이 칸엔 표시되지
           // 않습니다(실제로 이번 주 이 칸은 비어 있는 게 맞으므로).
           const cellDate = dateForWeekday(tray.baseDate, d);
-          // 사용자가 "이 날은 안 됨"으로 직접 표시해 둔 칸. 누르면 해제됩니다.
-          const dateBlocked = isDateBlocked(row.teacher, cellDate, p);
           const originEntry = tray.entryFor(row.teacher, d, p);
           const exchangeEntry = originEntry
             ? undefined
@@ -733,11 +682,6 @@ export default function SwapTab() {
             <td
               key={`${d}-${p}`}
               onClick={(e) => {
-                if (dateBlocked) {
-                  e.stopPropagation();
-                  removeDateBlock(row.teacher, cellDate, p);
-                  return;
-                }
                 if (committed && !clickableCommittedCandidate) return;
                 if (!committed && !classStr) return;
                 if (isPartner) {
@@ -758,9 +702,7 @@ export default function SwapTab() {
                 handleCellClick(row.teacher, d, p);
               }}
               title={
-                dateBlocked
-                  ? `${row.teacher} 선생님은 ${koreanDate(cellDate)} ${p}교시 교체 불가로 표시돼 있습니다 — 눌러서 해제합니다.`
-                  : committed
+                committed
                   ? clickableCommittedCandidate
                     ? `${committedTooltip(committed, committedRole!, tray.baseDate)} — 지금 찾는 후보이기도 합니다. 눌러서 다른 날짜로 담을 수 있는지 확인해 보세요.`
                     : committedTooltip(committed, committedRole!, tray.baseDate)
@@ -773,7 +715,6 @@ export default function SwapTab() {
                 "h-14 border border-stone-200 p-0.5 text-center align-middle transition-colors relative overflow-hidden",
                 pi === 0 && "border-l-2 border-l-stone-400",
                 classStr && !committed && "cursor-pointer hover:bg-amber-100",
-                dateBlocked && "cursor-pointer bg-stone-200 border-2 border-stone-400 z-10",
                 committed && !clickableCommittedCandidate && "cursor-not-allowed bg-amber-50 border-2 border-amber-300",
                 committed && clickableCommittedCandidate && "cursor-pointer bg-amber-50 hover:bg-amber-100 border-2 border-emerald-500 font-bold z-10",
                 busyElsewhereEntry && "cursor-not-allowed bg-amber-50/60 border-2 border-amber-200",
@@ -783,11 +724,10 @@ export default function SwapTab() {
                 !committed && isChainStep2 && "bg-purple-100 border-2 border-purple-500 font-bold z-10"
               )}
             >
-              {dateBlocked && <Ban className="w-3.5 h-3.5 text-stone-500 absolute top-0.5 right-0.5 pointer-events-none" />}
-              {committed && !dateBlocked ? (
+              {committed ? (
                 <CommittedCell entry={committed} role={committedRole!} />
               ) : info && (
-                <div className={cn("flex flex-col items-center justify-center leading-tight", dateBlocked && "opacity-40")}>
+                <div className="flex flex-col items-center justify-center leading-tight">
                   <span className="text-[10px] sm:text-[11px] font-bold text-stone-700 truncate w-full block">
                     {truncateSubject(info.subject)}
                   </span>
@@ -832,9 +772,9 @@ export default function SwapTab() {
 
               const isVisible = !selectedCell ||
                                 row.teacher === selectedCell.teacher ||
-                                visible.swap.some(r => r.teacher === row.teacher) ||
-                                visible.sub.some(r => r.teacher === row.teacher) ||
-                                visible.chain.some(ch => ch.b.teacher === row.teacher || ch.c.teacher === row.teacher);
+                                results.swap.some(r => r.teacher === row.teacher) ||
+                                results.sub.some(r => r.teacher === row.teacher) ||
+                                results.chain.some(ch => ch.b.teacher === row.teacher || ch.c.teacher === row.teacher);
 
               if (!isVisible) return null;
 
@@ -874,22 +814,6 @@ export default function SwapTab() {
                     <span className="bg-stone-700 text-white px-2 py-0.5 rounded text-xs ml-1">{myInfo.blockGroup}블록</span>
                   )}
                 </div>
-                {/* 이 수업 자체를 그 날 하루만 교체 후보에서 빼둡니다 — 개인적으로 쓰다 보니
-                    이미 다른 분과 교체를 잡아둔 걸 잊는 경우를 막기 위한 메모입니다. */}
-                {selectedCell && (
-                  <button
-                    onClick={() => {
-                      const date = dateForWeekday(tray.baseDate, selectedCell.day);
-                      blockCandidate(selectedCell.teacher, date, selectedCell.period);
-                      setModalOpen(false);
-                      setSelectedCell(null);
-                    }}
-                    title={`${selectedCell.teacher} 선생님의 이 수업을 ${koreanDate(dateForWeekday(tray.baseDate, selectedCell.day))} 하루만 교체 후보에서 뺍니다. 시간표에서 그 칸을 다시 누르면 해제됩니다.`}
-                    className="mt-2 inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold rounded-lg bg-white hover:bg-stone-100 text-stone-500 border border-stone-200 transition-colors"
-                  >
-                    <Ban className="w-3 h-3" /> {koreanDate(dateForWeekday(tray.baseDate, selectedCell.day))} {selectedCell.period}교시 교체 불가로 표시
-                  </button>
-                )}
               </div>
 
               {selectedCell && isTeacherBlocked(selectedCell.teacher) ? (
@@ -907,11 +831,11 @@ export default function SwapTab() {
                       <h3 className="text-sm font-bold text-emerald-600 mb-3 flex items-center gap-2">
                         <Star className="w-4 h-4 fill-emerald-600" /> 1순위 추천: 동과 대강 ({data.teacherDepts[selectedCell!.teacher]})
                       </h3>
-                      {visible.sub.length === 0 ? (
+                      {results.sub.length === 0 ? (
                         <div className="text-sm text-rose-600 bg-rose-50 p-3 rounded-xl">해당 시간에 공강인 동과 선생님이 없습니다.</div>
                       ) : (
                         <div className="space-y-2">
-                          {visible.sub.map((res, i) => (
+                          {results.sub.map((res, i) => (
                             <div key={i} className="flex items-center gap-3 p-3 border border-emerald-100 bg-emerald-50 rounded-xl">
                               <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0">
                                 <Check className="w-4 h-4 font-bold" />
@@ -943,13 +867,13 @@ export default function SwapTab() {
                     <div className="text-center p-8 text-rose-600 font-bold bg-rose-50 rounded-xl">
                       &apos;{myInfo.subject}&apos; 과목은 교체가 금지되어 있습니다.
                     </div>
-                  ) : visible.swap.length === 0 ? (
+                  ) : results.swap.length === 0 ? (
                     <div className="text-center p-8 text-stone-400 bg-stone-50 rounded-xl">
                       교체 가능한 대상이 없습니다.
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {visible.swap.map((res, i) => (
+                      {results.swap.map((res, i) => (
                         <div key={i} className="flex items-center gap-3 p-3 border border-stone-100 rounded-xl hover:bg-stone-50 transition-colors">
                           <div className="w-8 h-8 rounded-full bg-swap text-white flex items-center justify-center shrink-0 text-xs font-bold">
                             {i + 1}
@@ -964,7 +888,7 @@ export default function SwapTab() {
                     </div>
                   )}
 
-                  {visible.swap.length === 0 && visible.chain.length > 0 && (
+                  {results.swap.length === 0 && results.chain.length > 0 && (
                     <div className="mt-2">
                       <div className="border-b border-dashed border-stone-200 mb-5"></div>
                       <h3 className="text-sm font-bold text-purple-600 mb-1 flex items-center gap-2">
@@ -974,7 +898,7 @@ export default function SwapTab() {
                         바로 교체할 상대가 없어, 두 번의 교체를 연결하면 가능한 조합을 찾았습니다. 원하는 조합을 선택하세요.
                       </p>
                       <div className="space-y-2">
-                        {visible.chain.map((ch, i) => (
+                        {results.chain.map((ch, i) => (
                           <div
                             key={i}
                             onClick={() => selectChain(i)}
@@ -1034,7 +958,7 @@ export default function SwapTab() {
           결과 목록(renderPickButtons)과 완전히 같은 getCandidateState/addToTray를 씁니다 —
           어디서 눌러도 같은 결과가 나와야 하니 로직을 두 번 만들지 않습니다. */}
       {quickPick && (() => {
-        const match = visible.swap.find(
+        const match = results.swap.find(
           (r) => r.teacher === quickPick.teacher && r.day === quickPick.day && r.period === quickPick.period
         );
         if (!match) return null;
@@ -1121,13 +1045,6 @@ export default function SwapTab() {
                     <FilePlus2 className="w-3 h-3" /> 보강
                   </button>
                 </div>
-                <button
-                  onClick={() => blockCandidate(quickPick.teacher, state.exchangeDate!, exchangeSlot.period)}
-                  title={`${quickPick.teacher} 선생님은 ${koreanDate(state.exchangeDate!)} ${exchangeSlot.period}교시에 이미 다른 교체가 잡혀 있다고 기록합니다. 그 날 하루만 후보에서 빠지고, 이 칸을 다시 누르면 해제됩니다.`}
-                  className="w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 text-[11px] font-bold rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-500 transition-colors"
-                >
-                  <Ban className="w-3 h-3" /> 이 날 불가
-                </button>
               </div>
             )}
           </div>
