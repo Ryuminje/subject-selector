@@ -193,7 +193,7 @@ function absentSignature(entry: MakeupEntry, baseDate: string): string {
 }
 
 export default function SwapTab() {
-  const { data, isBlocked, isSubjectBlocked, isTeacherBlocked, manualChanges, addManualChange, removeManualChange } = useSchedule();
+  const { data, isBlocked, isSubjectBlocked, isTeacherBlocked, manualChanges, addManualChange, removeManualChange, updateManualChange } = useSchedule();
   const { data: session } = useSession();
   const [selectedCell, setSelectedCell] = useState<{ teacher: string; day: string; period: number } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -853,6 +853,7 @@ export default function SwapTab() {
         changes={manualChanges}
         baseDate={tray.baseDate}
         onRemove={removeManualChange}
+        onUpdateDate={updateManualChange}
         error={recordError}
       />
       <div className="overflow-auto max-h-[75vh] relative">

@@ -49,6 +49,8 @@ interface ScheduleContextType {
   manualChanges: ManualChange[];
   addManualChange: (change: Omit<ManualChange, "id" | "createdAt">) => Promise<string | null>;
   removeManualChange: (id: string) => Promise<void>;
+  /** 기록의 결강일·교체일을 고칩니다. 실패하면 사용자에게 보여줄 문구를 돌려줍니다. */
+  updateManualChange: (id: string, dates: { absentDate?: string; exchangeDate?: string }) => Promise<string | null>;
   refetch: () => Promise<void>;
 }
 
@@ -147,6 +149,18 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setManualChanges(body.manualChanges ?? []);
   };
 
+  const updateManualChange = async (id: string, dates: { absentDate?: string; exchangeDate?: string }) => {
+    const res = await fetch("/api/schedule-helper/manual-changes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...dates }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return (body.error as string) ?? "날짜를 바꾸지 못했습니다.";
+    setManualChanges(body.manualChanges ?? []);
+    return null;
+  };
+
   const isBlocked = (teacher: string, day: string, period: number) => {
     if (!data) return false;
 
@@ -178,6 +192,7 @@ export const ScheduleProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         manualChanges,
         addManualChange,
         removeManualChange,
+        updateManualChange,
         refetch
       }}
     >
