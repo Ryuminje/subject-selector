@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import type { ScheduleRow } from "@/features/schedule-helper/lib/sheetData";
+import { cutoffDate, readManualChanges } from "@/features/schedule-helper/lib/manualChanges";
 
 export async function GET(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -45,6 +46,8 @@ export async function GET(request: Request) {
     globalMeetingBlocks: JSON.parse(school.globalMeetingBlocks) as Record<string, number[]>,
     blockedSubjects: JSON.parse(school.blockedSubjects) as string[],
     blockedTeachers: JSON.parse(school.blockedTeachers) as string[],
+    // 이 도구를 거치지 않고 이미 이뤄진 교체·보강 — 시간표에 덧입혀 쓰입니다.
+    manualChanges: readManualChanges(school.manualChanges, cutoffDate(60)),
     teacherDepts,
     scheduleUploadedAt: school.scheduleUploadedAt,
     // 학교 초대 코드 — 가입 시에만 한 번 보여주고 재확인할 곳이 없었어서, 관리자에게만 다시 노출합니다.

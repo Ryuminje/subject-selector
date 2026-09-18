@@ -33,6 +33,11 @@ model School {
   // 교체·대강 모두 완전히 금지된 교사명 목록 (JSON: string[])
   blockedTeachers String @default("[]")
 
+  // 이 도구를 거치지 않고 선생님들끼리 이미 해버린 교체·보강을 손으로 입력한 기록
+  // (JSON: ManualChange[] — lib/manualChanges.ts 참고). 날짜가 박혀 있어 그 날짜가 속한
+  // 주의 시간표에만 반영되고, 지난 기록은 쓰기 때 정리됩니다.
+  manualChanges String @default("[]")
+
   // 연수 이수증 수거용 Gemini API 키 — 관리자가 등록하면 같은 학교 전원이 사용 (평문 저장, joinCode와 동일한 신뢰 수준)
   geminiApiKey String?
 
