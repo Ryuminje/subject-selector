@@ -5,6 +5,7 @@ import { Printer } from "lucide-react";
 import {
   ENVELOPE_LABEL_KEY,
   type EnvelopeLabel,
+  type EnvelopeLayout,
 } from "@/features/exam-scheduler/lib/io/openEnvelopeLabels";
 
 // 시험지 봉투에 붙일 딱지. 한 봉투에 한 장이라 A5 가로로 한 장씩 끊어 나갑니다.
@@ -66,10 +67,16 @@ function Label({ row }: { row: EnvelopeLabel }) {
 
 export default function EnvelopeLabelPrintPage() {
   const [rows, setRows] = useState<EnvelopeLabel[] | null>(null);
+  const [layout, setLayout] = useState<EnvelopeLayout>("a5");
   const [missing, setMissing] = useState(false);
 
   useEffect(() => {
     Promise.resolve().then(() => {
+      // 용지 배치는 주소로 받습니다(useSearchParams는 Suspense가 필요해 과합니다).
+      if (new URLSearchParams(window.location.search).get("layout") === "a4-2up") {
+        setLayout("a4-2up");
+      }
+
       // 새 탭에는 localStorage로만 확실히 전달됩니다. 받자마자 옮겨 담아, 이 탭에서
       // 새로고침은 되면서도 브라우저에 오래 남지 않게 합니다.
       const handoff = localStorage.getItem(ENVELOPE_LABEL_KEY);
@@ -115,17 +122,35 @@ export default function EnvelopeLabelPrintPage() {
 
   if (!rows) return <div className="p-10 text-center text-slate-400">불러오는 중...</div>;
 
-  return (
-    <div className="envelope-print bg-slate-100 py-8 print:bg-white print:py-0">
-      <style>{`
-        @page { size: A5 landscape; margin: 0; }
+  // 한 장에 몇 개를 얹을지. 쪽 넘김은 딱지가 아니라 "장"에 걸어야 2장씩 배치가 어긋나지
+  // 않습니다(딱지에 nth-child로 걸면 머리말 같은 형제가 하나만 끼어도 홀짝이 밀립니다).
+  const perSheet = layout === "a4-2up" ? 2 : 1;
+  const sheets: EnvelopeLabel[][] = [];
+  for (let i = 0; i < rows.length; i += perSheet) sheets.push(rows.slice(i, i + perSheet));
 
-        .envelope-print .label {
+  return (
+    <div className={`envelope-print layout-${layout} bg-slate-100 py-8 print:bg-white print:py-0`}>
+      {/* @page는 선택자를 못 받아 배치별로 규칙 자체를 갈아 끼웁니다. */}
+      <style>{
+        layout === "a4-2up"
+          ? "@page { size: A4 portrait; margin: 0; }"
+          : "@page { size: A5 landscape; margin: 0; }"
+      }</style>
+      <style>{`
+        /* A5 한 장 = 210×148mm. 그 세로 둘이 297mm라 A4 세로에 정확히 들어갑니다. */
+        .envelope-print.layout-a5 { --label-h: 148mm; --pad: 7mm; }
+        .envelope-print.layout-a4-2up { --label-h: 148.5mm; --pad: 3mm; }
+
+        .envelope-print .sheet {
           width: 210mm;
-          height: 148mm;
           margin: 0 auto 8mm;
           background: #fff;
-          padding: 7mm;
+        }
+        .envelope-print .label {
+          width: 210mm;
+          height: var(--label-h);
+          background: #fff;
+          padding: var(--pad);
           box-sizing: border-box;
         }
         .envelope-print .label-box {
@@ -154,17 +179,22 @@ export default function EnvelopeLabelPrintPage() {
         @media print {
           html, body { background: #fff; }
           .no-print { display: none !important; }
-          .envelope-print .label {
+          .envelope-print .sheet {
             margin: 0;
             break-after: page;
           }
-          .envelope-print .label:last-child { break-after: auto; }
+          .envelope-print .sheet:last-child { break-after: auto; }
+          /* 한 장 안의 딱지는 절대 갈라지면 안 됩니다. */
+          .envelope-print .label { break-inside: avoid; }
         }
       `}</style>
 
       <div className="no-print mx-auto mb-4 flex max-w-[210mm] items-center justify-between gap-4 px-4">
         <p className="text-sm text-slate-500">
-          봉투 딱지 {rows.length}장 · A5 가로 · 한 봉투에 한 장
+          봉투 딱지 {rows.length}장 ·{" "}
+          {layout === "a4-2up"
+            ? `A4 세로 ${sheets.length}쪽 (한 쪽에 2장)`
+            : `A5 가로 ${sheets.length}쪽 (한 쪽에 1장)`}
         </p>
         <button
           onClick={() => window.print()}
@@ -174,8 +204,12 @@ export default function EnvelopeLabelPrintPage() {
         </button>
       </div>
 
-      {rows.map((row, index) => (
-        <Label key={`${row.examDate}|${row.period}|${row.subject}|${row.examRoom}|${index}`} row={row} />
+      {sheets.map((sheet, sheetIndex) => (
+        <div className="sheet" key={sheetIndex}>
+          {sheet.map((row, index) => (
+            <Label key={`${row.examDate}|${row.period}|${row.subject}|${row.examRoom}|${index}`} row={row} />
+          ))}
+        </div>
       ))}
     </div>
   );

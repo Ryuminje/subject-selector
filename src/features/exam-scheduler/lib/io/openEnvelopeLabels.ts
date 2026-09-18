@@ -19,17 +19,26 @@ export const ENVELOPE_LABEL_PATH = '/apps/exam-scheduler/envelope/print';
 export type EnvelopeLabel = EnvelopeRow;
 
 /**
+ * 용지 배치.
+ *  - `a5`: A5 가로 한 장에 딱지 하나.
+ *  - `a4-2up`: A4 세로 한 장에 딱지 둘(위·아래). A5 가로의 세로 길이가 148mm라
+ *    두 장이 297mm에 정확히 들어갑니다.
+ */
+export type EnvelopeLayout = 'a5' | 'a4-2up';
+
+/**
  * 딱지를 새 탭에서 엽니다. 만들 줄이 없으면 아무것도 하지 않고 `false`입니다.
  * 브라우저에서, 그리고 사용자의 클릭 안에서 호출하세요(팝업 차단 때문입니다).
  */
 export function openEnvelopeLabels(
   groups: GradeGroup[],
   excludedKeysByGroup: Record<string, ReadonlySet<StudentKey>> = {},
+  layout: EnvelopeLayout = 'a5',
 ): boolean {
   const rows = buildEnvelopeRows(groups, excludedKeysByGroup);
   if (rows.length === 0) return false;
 
   localStorage.setItem(ENVELOPE_LABEL_KEY, JSON.stringify(rows));
-  window.open(ENVELOPE_LABEL_PATH, '_blank', 'noopener');
+  window.open(`${ENVELOPE_LABEL_PATH}?layout=${layout}`, '_blank', 'noopener');
   return true;
 }
