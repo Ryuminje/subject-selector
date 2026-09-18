@@ -4,7 +4,35 @@ import { prisma } from "@/lib/prisma";
 import type { ScheduleRow } from "@/features/schedule-helper/lib/sheetData";
 import { cutoffDate, readManualChanges } from "@/features/schedule-helper/lib/manualChanges";
 
+/**
+ * 조회가 터졌을 때 화면에 그대로 띄울 한 줄. 그동안 이 라우트는 예외를 그냥 흘려보내
+ * 500만 나갔고, 화면에는 "데이터를 가져오는데 실패했습니다."만 떠서 원인을 알 수 없었습니다.
+ *
+ * P2022는 "DB에 그 컬럼이 없다" — 코드는 새로 올라갔는데 마이그레이션이 아직 안 돈,
+ * 배포 직후에 가장 흔한 경우라 따로 집어 안내합니다.
+ */
+function failureDetail(err: unknown): string {
+  const code = (err as { code?: string } | null)?.code;
+  if (code === "P2022" || code === "P2021") {
+    return "서버 데이터베이스가 최신 상태가 아닙니다. 배포 후 prisma migrate deploy가 끝났는지 확인해 주세요.";
+  }
+  if (code === "P1001" || code === "P1002") return "데이터베이스에 연결하지 못했습니다.";
+  return err instanceof Error ? err.message : "알 수 없는 오류";
+}
+
 export async function GET(request: Request) {
+  try {
+    return await loadSchedule(request);
+  } catch (err) {
+    console.error("[api/schedule] 시간표 조회 실패", err);
+    return NextResponse.json(
+      { error: `시간표 데이터를 읽지 못했습니다 — ${failureDetail(err)}` },
+      { status: 500 }
+    );
+  }
+}
+
+async function loadSchedule(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
   if (!session) {
     return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
