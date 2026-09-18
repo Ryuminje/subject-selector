@@ -208,7 +208,7 @@ export function ResultsStep() {
               )
             }
           >
-            봉투 딱지 인쇄 (A5)
+            시험지 봉투 표지 인쇄 (A5)
           </ExportButton>
 
           <ExportButton
@@ -222,13 +222,13 @@ export function ResultsStep() {
               )
             }
           >
-            봉투 딱지 인쇄 (A4 2장씩)
+            시험지 봉투 표지 인쇄 (A4 2장씩)
           </ExportButton>
         </div>
         <p className="mt-3 text-xs text-ink-muted">
           학년별 출력은 위 학년 탭에서 고른 학년으로 나갑니다. 봉투 표지는 한글 메일머지에
           쓰이므로 <code>.xls</code> 형식입니다. 한글 없이 바로 뽑으려면 같은 데이터를
-          A5 가로 한 장씩으로 펴 주는 <b>봉투 딱지 인쇄</b>를 쓰세요. A4 용지만 있으면
+          A5 가로 한 장씩으로 펴 주는 <b>시험지 봉투 표지 인쇄</b>를 쓰세요. A4 용지만 있으면
           <b>A4 2장씩</b>으로 뽑아 반으로 자르면 됩니다.
         </p>
       </div>
