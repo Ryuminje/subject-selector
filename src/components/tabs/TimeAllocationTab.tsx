@@ -5,13 +5,14 @@
 // 저장은 기존 탭들의 "저장/불러오기" 번들에 window.getTimeAllocBackup/loadTimeAllocBackup 로 합류.
 
 import React, { useRef } from "react";
-import { CalendarClock, FolderOpen, Save } from "lucide-react";
+import { CalendarClock, Calculator, FolderOpen, Save } from "lucide-react";
 import type { GradeKey } from "../../types";
 import { GradeTabs } from "../../features/main-survey/components/GradeTabs";
 import { useTimeAllocation } from "../../features/time-allocation/hooks/useTimeAllocation";
 import { DataInputStep } from "../../features/time-allocation/components/DataInputStep";
 import { AllocationGridStep } from "../../features/time-allocation/components/AllocationGridStep";
 import { StudentResultStep } from "../../features/time-allocation/components/StudentResultStep";
+import { TeacherPlanStep } from "../../features/time-allocation/components/TeacherPlanStep";
 import type { MainSurveySnapshot } from "../../features/time-allocation/lib/fromMainSurvey";
 
 const STEPS = [
@@ -29,7 +30,7 @@ const GRADE_FILE_LABEL: Record<GradeKey, string> = {
 
 export function TimeAllocationTab() {
   const api = useTimeAllocation();
-  const [step, setStep] = React.useState<StepKey>("input");
+  const [step, setStep] = React.useState<StepKey | "teacher">("input");
 
   // 프로젝트 JSON 저장 번들에 합류 (기존 탭들의 handleSaveBackup / handleLoadBackup 가 호출).
   React.useEffect(() => {
@@ -194,6 +195,17 @@ export function TimeAllocationTab() {
               {s.label}
             </button>
           ))}
+          <button
+            onClick={() => setStep("teacher")}
+            title="한 구획에 함께 돌릴 과목·학점과 반 수로 최소 교사 수를 계산하고 실제 배치표를 만듭니다."
+            className={`ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+              step === "teacher"
+                ? "bg-amber-500 text-white shadow"
+                : "text-stone-600 border border-stone-200 hover:bg-stone-100"
+            }`}
+          >
+            <Calculator className="w-4 h-4" /> 교사 수 계산기
+          </button>
         </div>
       </header>
 
@@ -201,6 +213,10 @@ export function TimeAllocationTab() {
         <GradeTabs activeGrade={api.activeGrade} setActiveGrade={api.setActiveGrade} />
         {step === "input" && <DataInputStep api={api} onLoadFromMain={loadFromMain} />}
         {step === "alloc" && <AllocationGridStep api={api} />}
+        {/* 계산기는 끄지 않고 숨기기만 합니다 — 단계를 옮겼다 오면 입력이 지워져 버립니다(실제로 겪음). */}
+        <div className={step === "teacher" ? "block" : "hidden"}>
+          <TeacherPlanStep />
+        </div>
         {step === "student" && (
           <StudentResultStep
             api={api}
