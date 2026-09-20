@@ -37,6 +37,13 @@ const TONES = {
     activeText: "text-assist",
     badge: "bg-assist/15 text-assist",
   },
+  pdf: {
+    button: "text-stone-500 hover:text-pdf border-stone-200",
+    icon: "bg-pdf/15 text-pdf",
+    activeRow: "bg-pdf/8",
+    activeText: "text-pdf",
+    badge: "bg-pdf/15 text-pdf",
+  },
 } as const;
 
 export type AppSwitcherTone = keyof typeof TONES;

@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Bot, CalendarClock, ClipboardCheck, FileText, GraduationCap, HeartHandshake, ScrollText, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Bot, CalendarClock, ClipboardCheck, FileCog, FileText, GraduationCap, HeartHandshake, ScrollText, type LucideIcon } from "lucide-react";
 
 export interface HubApp {
   title: string;
@@ -66,6 +66,12 @@ export const departments: HubDepartment[] = [
         description: "업무 자료를 올려두면 그 자료만 근거로 답하는 나만의 챗봇을 만듭니다.",
         href: "/apps/schedule-helper/assistant",
         icon: Bot,
+      },
+      {
+        title: "PDF 다듬이",
+        description: "PDF 합치기·나누기, 용량 줄이기, 암호 제거까지. 파일은 이 브라우저 안에서만 처리됩니다.",
+        href: "/apps/schedule-helper/pdf",
+        icon: FileCog,
       },
     ],
   },

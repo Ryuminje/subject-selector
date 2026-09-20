@@ -45,6 +45,7 @@ body {
   --color-swap: #1f5c52; /* 시간표 교체 도우미 — 깊은 소나무 */
   --color-cert: #3b4a7a; /* 연수 이수증 수거 — 남색 관인 */
   --color-assist: #5c6b4f; /* 업무 AI 파트너 — 세이지 */
+  --color-pdf: #8a3f32; /* PDF 다듬이 — 벽돌(쌤스 헬퍼 앱 4번째 강조색) */
 }
 
 /* 쌤스 헬퍼 각 layout.tsx가 Song Myung을 --font-display CSS 변수로 실어 옵니다.
