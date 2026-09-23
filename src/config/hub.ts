@@ -1,10 +1,18 @@
-import { ArrowLeftRight, Bot, CalendarClock, ClipboardCheck, FileCog, FileText, GraduationCap, HeartHandshake, ScrollText, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Bot, BookOpenCheck, CalendarClock, ClipboardCheck, FileCog, FileText, GraduationCap, HeartHandshake, ScrollText, type LucideIcon } from "lucide-react";
 
 export interface HubApp {
   title: string;
   description: string;
+  /** http로 시작하면 바깥 사이트로 보고 새 탭에서 엽니다. */
   href: string;
   icon: LucideIcon;
+  /** 남이 만든 프로그램을 링크로 걸 때 밝히는 출처·제작자. */
+  credit?: string;
+}
+
+/** 우리 앱이 아니라 바깥 사이트인지. */
+export function isExternal(href: string): boolean {
+  return href.startsWith("http://") || href.startsWith("https://");
 }
 
 export interface HubDepartment {
@@ -72,6 +80,13 @@ export const departments: HubDepartment[] = [
         description: "PDF 합치기·나누기, 용량 줄이기, 암호 제거까지. 파일은 이 브라우저 안에서만 처리됩니다.",
         href: "/apps/schedule-helper/pdf",
         icon: FileCog,
+      },
+      {
+        title: "교과서 선정 초안 작성기",
+        description: "교과서 선정 협의 자료 초안을 만들어 줍니다.",
+        href: "https://dacisosl.github.io/choice/",
+        icon: BookOpenCheck,
+        credit: "출처 · 제작: 해밀고 황대연",
       },
     ],
   },
