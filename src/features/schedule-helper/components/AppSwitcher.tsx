@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
-import { departments } from "@/config/hub";
+import { departments, isExternal } from "@/config/hub";
 
 // 같은 부서(쌤스 헬퍼)에 속한 앱들을 오가는 드롭다운.
 //
@@ -130,6 +130,8 @@ export default function AppSwitcher({ tone = "swap" }: { tone?: AppSwitcherTone 
                 <Link
                   key={app.href}
                   href={app.href}
+                  target={isExternal(app.href) ? "_blank" : undefined}
+                  rel={isExternal(app.href) ? "noopener noreferrer" : undefined}
                   role="menuitem"
                   onClick={() => setOpen(false)}
                   aria-current={isCurrent ? "page" : undefined}

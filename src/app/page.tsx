@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { schoolName, introText, departments } from "@/config/hub";
+import { ArrowRight, ExternalLink } from "lucide-react";
+import { schoolName, introText, departments, isExternal } from "@/config/hub";
 
 const palette = [
   {
@@ -126,10 +126,13 @@ export default function Home() {
                 <div className="space-y-3">
                   {activeDept.apps.map((app) => {
                     const AppIcon = app.icon;
+                    const external = isExternal(app.href);
                     return (
                       <Link
                         key={app.href}
                         href={app.href}
+                        target={external ? "_blank" : undefined}
+                        rel={external ? "noopener noreferrer" : undefined}
                         className="group flex items-center gap-4 p-4 bg-stone-50 hover:bg-white border border-stone-200 hover:border-amber-300 rounded-2xl transition-all duration-200"
                       >
                         <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl bg-amber-500/15 text-amber-600">
@@ -140,8 +143,15 @@ export default function Home() {
                             {app.title}
                           </h3>
                           <p className="mt-0.5 text-sm text-stone-600 leading-relaxed">{app.description}</p>
+                          {app.credit && (
+                            <p className="mt-1 text-xs text-stone-400">{app.credit}</p>
+                          )}
                         </div>
-                        <ArrowRight className="w-4 h-4 text-stone-300 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                        {external ? (
+                          <ExternalLink className="w-4 h-4 text-stone-300 group-hover:text-amber-600 transition-all flex-shrink-0" />
+                        ) : (
+                          <ArrowRight className="w-4 h-4 text-stone-300 group-hover:text-amber-600 group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                        )}
                       </Link>
                     );
                   })}
