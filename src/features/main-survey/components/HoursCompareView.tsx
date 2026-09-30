@@ -2,24 +2,12 @@
 
 import React, { useState } from "react";
 import * as XLSX from "xlsx-js-style";
+import { buildCompareWorkbook, COMPARE_METRICS, deltaOf, type CompareColumn } from "../lib/compareXlsx";
 import { Download, RefreshCw } from "lucide-react";
 import { avgOf, categoryNames, diffCategory, findCategory, type AvgMetric, type SimBaseline, type SimCategory, type SimPlan } from "../lib/hoursSim";
 
-const METRICS: { key: AvgMetric; label: string }[] = [
-  { key: "sem1", label: "1학기 평균시수" },
-  { key: "sem2", label: "2학기 평균시수" },
-  { key: "year", label: "1년 평균시수" },
-];
+const METRICS = COMPARE_METRICS;
 const CURRENT = "__current__";
-
-interface Column {
-  key: string;
-  name: string;
-  cats: SimCategory[];
-}
-
-const fmt = (v: number | null) => (v === null ? "–" : v.toFixed(1));
-const deltaOf = (v: number | null, b: number | null) => (v === null || b === null ? null : Math.round((v - b) * 10) / 10);
 
 function Delta({ d }: { d: number | null }) {
   if (d === null) return <span className="text-stone-400">–</span>;
@@ -62,7 +50,7 @@ export function HoursCompareView({
     );
   }
 
-  const columns: Column[] = [
+  const columns: CompareColumn[] = [
     ...plans.filter((p) => picked.has(p.id)).map((p) => ({ key: p.id, name: p.name, cats: p.cats })),
     ...(picked.has(CURRENT) && currentCats.length ? [{ key: CURRENT, name: "지금 표", cats: currentCats }] : []),
   ];
@@ -74,55 +62,7 @@ export function HoursCompareView({
     return next;
   };
 
-  const exportXlsx = () => {
-    const wb = XLSX.utils.book_new();
-    const head = { font: { bold: true }, fill: { fgColor: { rgb: "EEEEEE" } }, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
-    const center = { alignment: { horizontal: "center", vertical: "center" } };
-    for (const m of METRICS) {
-      const aoa: (string | number)[][] = [
-        ["교과", "교사 수(기준)", "기준(6단계)", ...columns.flatMap((c) => [c.name, ""])],
-        ["", "", "", ...columns.flatMap(() => ["평균", "증감"])],
-      ];
-      const deltas: (number | null)[][] = [];
-      for (const name of names) {
-        const base = findCategory(baseline.cats, name);
-        const b = avgOf(base, m.key);
-        const rowDeltas: (number | null)[] = [];
-        const row: (string | number)[] = [name, base ? base.teachers : "–", fmt(b)];
-        for (const c of columns) {
-          const v = avgOf(findCategory(c.cats, name), m.key);
-          const d = deltaOf(v, b);
-          rowDeltas.push(d);
-          row.push(fmt(v), d === null ? "–" : d > 0 ? `▲ ${d.toFixed(1)}` : d < 0 ? `▼ ${Math.abs(d).toFixed(1)}` : "0.0");
-        }
-        aoa.push(row);
-        deltas.push(rowDeltas);
-      }
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-      const range = XLSX.utils.decode_range(ws["!ref"]!);
-      for (let r = 0; r <= range.e.r; r++) {
-        for (let c = 0; c <= range.e.c; c++) {
-          const ref = XLSX.utils.encode_cell({ r, c });
-          if (!ws[ref]) ws[ref] = { t: "s", v: "" };
-          ws[ref].s = r < 2 ? head : { ...center };
-          // 증감 칸 글자색: 늘어남 빨강, 줄어듦 파랑
-          if (r >= 2 && c >= 4 && (c - 4) % 2 === 0) {
-            const d = deltas[r - 2][(c - 4) / 2];
-            if (d) ws[ref].s = { ...center, font: { bold: true, color: { rgb: d > 0 ? "DC2626" : "2563EB" } } };
-          }
-        }
-      }
-      ws["!merges"] = [
-        { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
-        { s: { r: 0, c: 1 }, e: { r: 1, c: 1 } },
-        { s: { r: 0, c: 2 }, e: { r: 1, c: 2 } },
-        ...columns.map((_, i) => ({ s: { r: 0, c: 3 + i * 2 }, e: { r: 0, c: 4 + i * 2 } })),
-      ];
-      ws["!cols"] = [{ wch: 12 }, { wch: 10 }, { wch: 12 }, ...columns.flatMap(() => [{ wch: 10 }, { wch: 10 }])];
-      XLSX.utils.book_append_sheet(wb, ws, m.label);
-    }
-    XLSX.writeFile(wb, "교과별_평균시수_안비교.xlsx");
-  };
+  const exportXlsx = () => XLSX.writeFile(buildCompareWorkbook(baseline, columns, names), "교과별_평균시수_안비교.xlsx");
 
   return (
     <div className="space-y-4">
@@ -202,12 +142,7 @@ export function HoursCompareView({
                 const colCats = columns.map((c) => findCategory(c.cats, name));
                 const teacherVaries = colCats.some((c) => c && base && c.teachers !== base.teachers);
                 const isOpen = open.has(name);
-                const cell = (v: number | null) =>
-                  v === null ? "–" : metric === "year" ? (
-                    <>
-                      {v.toFixed(1)} <span className="text-stone-400 text-xs">({(v / 2).toFixed(1)})</span>
-                    </>
-                  ) : v.toFixed(1);
+                const cell = (v: number | null) => (v === null ? "–" : v.toFixed(1));
                 return (
                   <React.Fragment key={name}>
                     <tr onClick={() => setOpen((s) => toggle(s, name))} className="border-b border-stone-300 cursor-pointer hover:bg-white/60" title="눌러서 바뀐 내용 보기">
@@ -250,7 +185,7 @@ export function HoursCompareView({
       )}
 
       <p className="text-xs text-stone-500">
-        값은 교사 1인당 평균시수입니다(교과 시수에서 수석교사 감축을 뺀 뒤 교사 수로 나눔). 1년 평균 옆 괄호는 학기당 평균. 증감은 빨강 ▲ 늘어남, 파랑 ▼ 줄어듦이고, 교사 수가 0이거나 교과가 없으면 「–」로 둡니다. 교과 줄을 누르면 기준과 무엇이 다른지 펼쳐집니다.
+        값은 교사 1인당 평균시수입니다(교과 시수에서 수석교사 감축을 뺀 뒤 교사 수로 나눔). 1년 평균시수도 학기 단위로 봅니다: (1학기 + 2학기) ÷ 교사 수 ÷ 2. 증감은 빨강 ▲ 늘어남, 파랑 ▼ 줄어듦이고, 교사 수가 0이거나 교과가 없으면 「–」로 둡니다. 교과 줄을 누르면 기준과 무엇이 다른지 펼쳐집니다.
       </p>
     </div>
   );

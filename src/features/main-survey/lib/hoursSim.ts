@@ -68,11 +68,14 @@ export type AvgMetric = "sem1" | "sem2" | "year";
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
 
-/** 교사 1인당 평균시수(감축 뺀 뒤). 교과가 없거나 교사 수가 0이면 낼 수 없어 null. 증감이 화면 숫자와 맞도록 소수 첫째 자리로 반올림합니다. */
+/**
+ * 교사 1인당 평균시수(감축 뺀 뒤). 1년 값도 학기 단위로 봅니다: (1학기 + 2학기) ÷ 교사 수 ÷ 2.
+ * 교과가 없거나 교사 수가 0이면 낼 수 없어 null. 증감이 화면 숫자와 맞도록 소수 첫째 자리로 반올림합니다.
+ */
 export function avgOf(c: SimCategory | undefined, m: AvgMetric): number | null {
   if (!c || c.teachers <= 0) return null;
   const t = totalsOf(c);
-  const hours = m === "sem1" ? t.sem1Total : m === "sem2" ? t.sem2Total : t.yearTotal;
+  const hours = m === "sem1" ? t.sem1Total : m === "sem2" ? t.sem2Total : t.yearTotal / 2;
   return round1(hours / c.teachers);
 }
 
