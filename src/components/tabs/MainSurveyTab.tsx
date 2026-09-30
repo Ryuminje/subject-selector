@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import { Upload, FileText, Settings, CheckCircle2, Save, FolderOpen, GitBranch } from "lucide-react";
+import React, { useState, useRef, useMemo } from "react";
+import { Upload, FileText, Settings, CheckCircle2, Save, FolderOpen, GitBranch, Calculator } from "lucide-react";
 import { useMainCurriculum } from "../../features/main-survey/hooks/useMainCurriculum";
 import { useMainUploads } from "../../features/main-survey/hooks/useMainUploads";
 import { useMainClassSummary } from "../../features/main-survey/hooks/useMainClassSummary";
@@ -11,6 +11,8 @@ import { UploadStep } from "../../features/main-survey/components/UploadStep";
 import { PreviewStep } from "../../features/main-survey/components/PreviewStep";
 import { ClassOpeningStep } from "../../features/main-survey/components/ClassOpeningStep";
 import { CategorySummaryStep } from "../../features/main-survey/components/CategorySummaryStep";
+import { HoursSimStep, type CurriculumCandidate } from "../../features/main-survey/components/HoursSimStep";
+import { fromSummaryRows, type SimBaseline, type SimCategory, type SimPlan } from "../../features/main-survey/lib/hoursSim";
 import type { GradeKey } from "../../types";
 
 export function MainSurveyTab() {
@@ -54,6 +56,11 @@ export function MainSurveyTab() {
   const [editingTeachers, setEditingTeachers] = useState<{ [category: string]: boolean }>({});
   const [manualStep5Classes, setManualStep5Classes] = useState<{ [key: string]: string }>({});
   const [editingStep5Classes, setEditingStep5Classes] = useState<{ [key: string]: boolean }>({});
+  // 7단계(교과별 시수 조정) — 6단계와 완전히 따로 쓰는 연습판
+  const [hoursSim, setHoursSim] = useState<SimCategory[]>([]);
+  const [hoursSimPlans, setHoursSimPlans] = useState<SimPlan[]>([]);
+  const [activeSimPlanId, setActiveSimPlanId] = useState<string | null>(null);
+  const [hoursSimBaseline, setHoursSimBaseline] = useState<SimBaseline | null>(null);
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -78,7 +85,11 @@ export function MainSurveyTab() {
     teacherCounts,
     designatedSubjects,
     selectedSubjectHours,
-    headTeacherReductions
+    headTeacherReductions,
+    hoursSim,
+    hoursSimPlans,
+    activeSimPlanId,
+    hoursSimBaseline
   });
 
   (window as any).loadMainBackup = (parsed: any) => {
@@ -101,6 +112,10 @@ export function MainSurveyTab() {
     if (parsed.headTeacherReductions) setHeadTeacherReductions(parsed.headTeacherReductions);
     if (parsed.designatedSubjects) setDesignatedSubjects({ pre1: [], ...parsed.designatedSubjects });
     if (parsed.selectedSubjectHours) setSelectedSubjectHours({ pre1: [], ...parsed.selectedSubjectHours });
+    setHoursSim(Array.isArray(parsed.hoursSim) ? parsed.hoursSim : []);
+    setHoursSimPlans(Array.isArray(parsed.hoursSimPlans) ? parsed.hoursSimPlans : []);
+    setActiveSimPlanId(typeof parsed.activeSimPlanId === "string" ? parsed.activeSimPlanId : null);
+    setHoursSimBaseline(parsed.hoursSimBaseline && Array.isArray(parsed.hoursSimBaseline.cats) ? parsed.hoursSimBaseline : null);
   };
   }
 
@@ -211,6 +226,17 @@ export function MainSurveyTab() {
     subjectMap,
   );
 
+  // 7단계 과목명 후보 — 편성표(1단계)에 있는 과목. 학년 탭마다 같은 편성표 전체를 읽으므로 이름으로 한 번씩만 둡니다.
+  const curriculumCandidates = useMemo<CurriculumCandidate[]>(() => {
+    const seen = new Map<string, CurriculumCandidate>();
+    (["pre1", "grade1", "grade2"] as GradeKey[]).forEach(g =>
+      (parsedCurriculumList[g] || []).forEach(p => {
+        if (!seen.has(p.subject)) seen.set(p.subject, { subject: p.subject, type: p.type, credits: p.credits });
+      }),
+    );
+    return [...seen.values()];
+  }, [parsedCurriculumList]);
+
 
 
   return ( <>
@@ -255,6 +281,7 @@ export function MainSurveyTab() {
                   <button onClick={() => setActiveTab('preview')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'preview' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>수강신청(본조사) 결과</span></div></button>
                   <button onClick={() => setActiveTab('classOpening')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'classOpening' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span><div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /><span>과목 개설 여부</span></div></button>
                   <button onClick={() => setActiveTab('categorySummary')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'categorySummary' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>교과(군)별 시수 정리</span></div></button>
+                  <button onClick={() => setActiveTab('hoursSim')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'hoursSim' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">7단계</span><div className="flex items-center gap-1.5"><Calculator className="w-4 h-4" /><span>교과별 시수 조정</span></div></button>
                 </div>
           </div>
         </header>
@@ -348,6 +375,21 @@ export function MainSurveyTab() {
                       manualClassCounts={manualClassCounts}
                       editingClasses={editingClasses}
                       setEditingClasses={setEditingClasses}
+                    />
+                  )}
+                  {activeTab === "hoursSim" && (
+                    <HoursSimStep
+                      cats={hoursSim}
+                      setCats={setHoursSim}
+                      canImport={categorySummaryData.length > 0}
+                      onImport={() => fromSummaryRows(categorySummaryData, teacherCounts, headTeacherReductions, manualClassCounts)}
+                      candidates={curriculumCandidates}
+                      plans={hoursSimPlans}
+                      setPlans={setHoursSimPlans}
+                      activePlanId={activeSimPlanId}
+                      setActivePlanId={setActiveSimPlanId}
+                      baseline={hoursSimBaseline}
+                      setBaseline={setHoursSimBaseline}
                     />
                   )}
                 </div>

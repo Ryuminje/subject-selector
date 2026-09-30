@@ -537,13 +537,31 @@ export function useMainClassSummary(
     return rows;
   }, [designatedSubjects, manualClassCounts, totalClasses, teacherCounts, headTeacherReductions, subjectStats, manualStep5Classes, standardClassSize, parsedCurriculumList, subjectMap]);
 
-  const handleExportCategorySummary = () => {
+  const handleExportCategorySummary = () => exportCategorySummaryXlsx(categorySummaryData, teacherCounts);
+
+  return {
+    handleExport,
+    handleExportStep5,
+    categorySummaryData,
+    handleExportCategorySummary,
+  };
+}
+
+/**
+ * 교과(군)별 시수 정리표 엑셀. 6단계와 7단계(교과별 시수 조정)가 같은 양식·색(지정 초록, 선택 보라)을 쓰도록 하나로 둡니다.
+ */
+export function exportCategorySummaryXlsx(
+  categorySummaryData: CategorySummaryRow[],
+  teacherCounts: { [category: string]: number },
+  title = "교과(군)별 시수 정리표",
+  fileName = "교과군별_시수정리표.xlsx",
+) {
     if (categorySummaryData.length === 0) return;
 
     const aoa = [];
 
     // Title row
-    aoa.push(["교과(군)별 시수 정리표"]);
+    aoa.push([title]);
     aoa.push([]);
 
     // Header rows
@@ -718,13 +736,5 @@ export function useMainClassSummary(
     ];
 
     XLSX.utils.book_append_sheet(wb, ws, "시수정리");
-    XLSX.writeFile(wb, `교과군별_시수정리표.xlsx`);
-  };
-
-  return {
-    handleExport,
-    handleExportStep5,
-    categorySummaryData,
-    handleExportCategorySummary,
-  };
+    XLSX.writeFile(wb, fileName);
 }
