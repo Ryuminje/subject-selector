@@ -387,7 +387,7 @@ function studentSection(student: ProcessedStudent, input: ConfirmationDocxInput)
     children: [
       para(input.schoolName.split("").join(" "), { align: AlignmentType.CENTER, size: 18, color: "444444", after: 40 }),
       para(`${input.schoolYear}학년도 선택과목 수강신청 확인서`, { align: AlignmentType.CENTER, bold: true, size: 36, font: "바탕", after: 40 }),
-      para(`${gradeLabel} · ${input.schoolYear}학년도 1학기~2학기 신청 선택과목 · 본조사 결과 기준`, { align: AlignmentType.CENTER, size: 17, color: "555555", after: 160 }),
+      para(`${gradeLabel} · ${input.schoolYear}학년도 1학기~2학기 신청 선택과목`, { align: AlignmentType.CENTER, size: 17, color: "555555", after: 160 }),
       infoTable,
       para(
         [
@@ -427,4 +427,55 @@ export function downloadBlob(blob: Blob, fileName: string) {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+// ── 저장 폴더 지정 ──────────────────────────────────────────────────────────
+// 웹 페이지는 "C:\\..." 같은 경로 글자를 받아 쓸 수 없고, 브라우저의 폴더 선택창
+// (File System Access API)으로 고른 폴더에만 쓸 수 있습니다. 크롬·엣지에서, 그리고 https나
+// localhost 주소에서만 켜지므로 못 쓰는 환경에서는 기존 다운로드 방식으로 되돌아갑니다.
+
+type DirectoryPicker = (options?: { mode?: "read" | "readwrite" }) => Promise<FileSystemDirectoryHandle>;
+
+export function canPickDirectory(): boolean {
+  return typeof window !== "undefined" && window.isSecureContext && "showDirectoryPicker" in window;
+}
+
+/** 폴더 선택창을 엽니다. 사용자가 그냥 닫으면 null입니다. */
+export async function pickDirectory(): Promise<FileSystemDirectoryHandle | null> {
+  const picker = (window as unknown as { showDirectoryPicker: DirectoryPicker }).showDirectoryPicker;
+  try {
+    return await picker.call(window, { mode: "readwrite" });
+  } catch (e) {
+    if ((e as DOMException).name === "AbortError") return null;
+    throw e;
+  }
+}
+
+async function fileExists(dir: FileSystemDirectoryHandle, name: string): Promise<boolean> {
+  try {
+    await dir.getFileHandle(name);
+    return true;
+  } catch (e) {
+    if ((e as DOMException).name === "NotFoundError") return false;
+    throw e;
+  }
+}
+
+/** 폴더에 저장합니다. 같은 이름이 있으면 덮어쓰지 않고 "이름 (2).docx"로 저장하고, 실제 이름을 돌려줍니다. */
+export async function saveBlobToDirectory(
+  dir: FileSystemDirectoryHandle,
+  blob: Blob,
+  fileName: string,
+): Promise<string> {
+  const dot = fileName.lastIndexOf(".");
+  const stem = dot > 0 ? fileName.slice(0, dot) : fileName;
+  const ext = dot > 0 ? fileName.slice(dot) : "";
+  let name = fileName;
+  for (let n = 2; await fileExists(dir, name); n += 1) name = `${stem} (${n})${ext}`;
+
+  const handle = await dir.getFileHandle(name, { create: true });
+  const writable = await handle.createWritable();
+  await writable.write(blob);
+  await writable.close();
+  return name;
 }
