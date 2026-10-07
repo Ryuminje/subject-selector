@@ -4,6 +4,16 @@
 
 ---
 
+### 2026-10-07
+
+**Dockerfile 정정 (Node 22, prisma 파일을 yarn install 앞에서 복사):**
+- NAS 도커 빌드가 두 군데서 실패해서 고쳤습니다. ① `kysely@0.29.6`이 Node 22 이상을 요구하는데 이미지가 `node:20-slim`이라 `yarn install`이 멈춤 → `node:22-slim`. ② `package.json`의 `postinstall`(`prisma generate && node scripts/copy-pdfjs.mjs`)이 `yarn install` 때 돌지만 그 시점엔 `package*.json`만 복사돼 있어 `schema.prisma`를 못 찾음 → `yarn install` 앞에 `COPY prisma ./prisma`, `COPY prisma.config.ts ./`, `COPY scripts ./scripts` 추가.
+
+**배포 구조 정리 (학교 컴퓨터 지침이 틀렸던 부분):**
+- 운영 앱은 Vercel(`subject-selector.vercel.app`)이고 main에 push하면 자동 배포됩니다. NAS 도커 앱은 쓰지 않으며 현재 멈춰 둔 상태입니다(`docker compose stop`). 이유: NAS `.env.production`의 `DATABASE_URL`이 옛 SQLite 주소(`file:`)라 PostgreSQL 스키마와 맞지 않아 `prisma migrate deploy`(P1013)에서 죽고 재시작을 반복했습니다. `deploy.sh`는 `rsync`를 쓰는데 개발 PC에는 rsync가 없습니다.
+- DB는 NAS의 PostgreSQL(`192.168.0.21:55432`) 하나를 Vercel과 로컬이 같이 씁니다. 마이그레이션이 든 변경을 push하면 배포 후 개발 PC에서 `npx prisma migrate status`로 pending·failed를 확인한 뒤 `npx prisma migrate deploy`를 직접 실행해야 합니다. 안 하면 Vercel의 `/api/schedule`이 500을 내서 수업교체 도우미가 "데이터를 가져오는데 실패했습니다"로 안 열립니다(이번에 `20261007120000_add_school_teacher_renames`가 그랬고, 직접 적용해 해결).
+- NAS 앱을 다시 쓰려면: `.env.production`의 `DATABASE_URL`을 PostgreSQL 주소로 고치고, NAS `prisma/migrations`에 남은 옛 폴더 `20260720145503_init`, `20260720150739_add_auth_tables`(SQLite 시절, 저장소엔 없음)를 먼저 지워야 합니다. 안 지우면 시작 때 `migrate deploy`가 SQLite 문법 SQL을 PostgreSQL에 적용하려다 실패해 DB에 failed 기록이 남습니다.
+
 ### 2026-09-30 (2)
 
 **7단계 안 비교: 엑셀 증감 표시 강화, 1년 평균시수를 학기당으로:**
