@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useSchedule } from "@/features/schedule-helper/lib/ScheduleContext";
 import { useSession } from "@/lib/auth-client";
 import { parseClassInfo, cn } from "@/features/schedule-helper/lib/utils";
-import { Search, X, Check, ArrowRightLeft, ArrowLeft, ArrowRight, Star, Pin, FilePlus2 } from "lucide-react";
+import { Search, X, Check, ArrowRightLeft, ArrowLeft, ArrowRight, Star, Pin, FilePlus2, Pencil } from "lucide-react";
+import RenameTeacherModal from "@/features/schedule-helper/components/RenameTeacherModal";
+import { renameInEntryObjects } from "@/features/schedule-helper/lib/renameTeacher";
 import MakeupTray from "@/features/schedule-helper/components/makeup/MakeupTray";
 import { useMakeupTray } from "@/features/schedule-helper/components/makeup/useMakeupTray";
 import MakeupBatchBar from "@/features/schedule-helper/components/makeup/MakeupBatchBar";
@@ -193,8 +195,10 @@ function absentSignature(entry: MakeupEntry, baseDate: string): string {
 }
 
 export default function SwapTab() {
-  const { data, isBlocked, isSubjectBlocked, isTeacherBlocked, manualChanges, addManualChange, removeManualChange, updateManualChange } = useSchedule();
+  const { data, isBlocked, isSubjectBlocked, isTeacherBlocked, manualChanges, addManualChange, removeManualChange, updateManualChange, refetch } = useSchedule();
   const { data: session } = useSession();
+  // 교사 이름 바꾸기 창 — 관리자만 교사명 칸의 연필로 엽니다. 값은 바꿀 교사 이름.
+  const [renameTarget, setRenameTarget] = useState<string | null>(null);
   const [selectedCell, setSelectedCell] = useState<{ teacher: string; day: string; period: number } | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [results, setResults] = useState<{ swap: SearchResult[]; sub: SearchResult[]; chain: ChainResult[] }>({ swap: [], sub: [], chain: [] });
@@ -259,6 +263,20 @@ export default function SwapTab() {
 
   const myName = session?.user?.name;
   const myRow = myName ? effectiveTable.find((r) => r.teacher === myName) : undefined;
+  const isAdmin = session?.user?.role === "ADMIN";
+
+  // 이름이 바뀐 뒤 화면 쪽 상태를 새 이름에 맞춥니다. 서버에 저장된 것(시간표·교체 기록·보강 세트)은
+  // 다시 불러오고, 서버에 없는 메모리 상태(보강원 트레이)는 이름만 바꿔 담긴 걸 지키며,
+  // 옛 이름을 가리키는 선택·검색 결과는 비웁니다.
+  const handleRenamed = async (from: string, to: string) => {
+    tray.loadEntries(renameInEntryObjects(tray.entries, from, to), tray.baseDate);
+    setSelectedCell(null);
+    setSelectedChainIdx(null);
+    setResults({ swap: [], sub: [], chain: [] });
+    setRecordPending(null);
+    setQuickPick(null);
+    await Promise.all([refetch(), makeupBatches.refresh()]);
+  };
 
   /**
    * 기록 모드에서 칸을 눌렀을 때. 두 번 눌러 한 건을 만듭니다.
@@ -689,13 +707,26 @@ export default function SwapTab() {
           pinned ? "bg-amber-100 border-stone-200" : "bg-stone-50 border-stone-200"
         )}
       >
-        {pinned ? (
-          <span className="inline-flex items-center gap-0.5 text-amber-800">
-            <Pin className="w-3 h-3 shrink-0" /> {row.teacher}
-          </span>
-        ) : (
-          row.teacher
-        )}
+        <span className="group inline-flex items-center justify-center gap-0.5 max-w-full">
+          {pinned ? (
+            <span className="inline-flex items-center gap-0.5 text-amber-800">
+              <Pin className="w-3 h-3 shrink-0" /> {row.teacher}
+            </span>
+          ) : (
+            row.teacher
+          )}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setRenameTarget(row.teacher)}
+              title="교사 이름 바꾸기"
+              aria-label={`${row.teacher} 선생님 이름 바꾸기`}
+              className="shrink-0 p-0.5 rounded text-stone-300 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-swap hover:bg-white transition-opacity"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+          )}
+        </span>
       </td>
       {data.days.map((d) =>
         data.periods.map((p, pi) => {
@@ -1159,6 +1190,15 @@ export default function SwapTab() {
           </div>
         );
       })()}
+
+      {isAdmin && renameTarget && (
+        <RenameTeacherModal
+          teacher={renameTarget}
+          existingNames={data.teachers}
+          onClose={() => setRenameTarget(null)}
+          onRenamed={handleRenamed}
+        />
+      )}
     </div>
   );
 }

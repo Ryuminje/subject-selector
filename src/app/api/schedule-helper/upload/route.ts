@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseScheduleWorkbook } from "@/features/schedule-helper/lib/sheetData";
+import { applyRenameMap } from "@/features/schedule-helper/lib/renameTeacher";
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -29,22 +30,27 @@ export async function POST(request: Request) {
 
   const schoolId = session.user.schoolId;
 
+  // 화면에서 바꿔 둔 교사 이름(휴직 대체 등)을 새 파일에도 적용합니다. 안 그러면 시간표를 다시
+  // 올릴 때마다 휴직자 이름으로 되돌아와, 그때마다 이름을 다시 바꿔야 합니다.
+  const school = await prisma.school.findUnique({ where: { id: schoolId }, select: { teacherRenames: true } });
+  const renamed = applyRenameMap(parsed, school?.teacherRenames ?? "{}");
+
   await prisma.$transaction(
     [
       prisma.school.update({
         where: { id: schoolId },
         data: {
           scheduleData: JSON.stringify({
-            teachers: parsed.teachers,
+            teachers: renamed.teachers,
             days: parsed.days,
             periods: parsed.periods,
-            tableData: parsed.tableData,
+            tableData: renamed.tableData,
           }),
           scheduleUploadedAt: new Date(),
         },
       }),
       prisma.teacher.createMany({
-        data: parsed.teachers.map((name) => ({ schoolId, name })),
+        data: renamed.teachers.map((name) => ({ schoolId, name })),
         skipDuplicates: true,
       }),
     ],
@@ -54,7 +60,10 @@ export async function POST(request: Request) {
   );
 
   return NextResponse.json({
-    teacherCount: parsed.teachers.length,
+    teacherCount: renamed.teachers.length,
     uploadedAt: new Date().toISOString(),
+    // 이름을 자동으로 바꿔 올린 교사 수 / 새 파일에 이미 그 이름이 있어 건너뛴 원래 이름들
+    renamedCount: renamed.applied,
+    renameSkipped: renamed.skipped,
   });
 }

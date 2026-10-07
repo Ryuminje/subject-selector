@@ -95,5 +95,5 @@ export function useMakeupBatches() {
     [refresh],
   );
 
-  return { batches, loading, error, create, update, remove };
+  return { batches, loading, error, refresh, create, update, remove };
 }
