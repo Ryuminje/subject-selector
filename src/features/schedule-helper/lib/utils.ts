@@ -22,7 +22,10 @@ export function parseClassInfo(str: string | undefined | null) {
 
   let isMovingClass = false;
   let blockGroup = '';
-  const blockMatch = str.match(/([A-Z])\(/);
+  // 이동수업은 과목명 끝에 대문자 **한 글자**가 붙고 바로 괄호가 오는 형태입니다(통합과학A(1-7)).
+  // 앞에 또 대문자가 있으면(물리학II(3-2), 화학II(3-4)의 로마숫자 II) 이동수업이 아니므로,
+  // 대문자 앞은 대문자가 아닌 글자(또는 문자열 시작)여야 합니다.
+  const blockMatch = str.match(/(?:^|[^A-Z])([A-Z])\(/);
   if (blockMatch) {
     isMovingClass = true;
     blockGroup = blockMatch[1];
