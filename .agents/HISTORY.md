@@ -4,6 +4,15 @@
 
 ---
 
+### 2026-10-09 (3)
+
+**`npm audit` 정리: 30건 → 14건 (치명 1 → 0, 운영 포함 22 → 9):**
+- **적용:** ① `npm audit fix`(같은 계열 안의 안전한 패치 버전 상승, 10개 부품: `@xmldom/xmldom`·`brace-expansion`·`fast-uri`·`nanoid`·`source-map-js`·`hono`·`baseline-browser-mapping`, 개발용 `browserslist`·`js-yaml`·`@tailwindcss/postcss`) ② `next`·`eslint-config-next` 16.2.9 → **16.4.0**(고정 버전 유지, 치명 1건과 연쇄로 `postcss`·`sharp` 해결) ③ `prisma`·`@prisma/client`·`@prisma/adapter-pg`를 모두 **7.10.0**으로 정렬(`audit fix`가 CLI만 7.10.0으로 올려 client 7.8.0과 어긋나서 맞춤 — 원래도 adapter-pg만 7.9.0이었음).
+- **`next`의 치명 결함이 이 프로젝트에 해당하는지:** 서버 액션 미사용(`"use server"` 0건)·Vercel(커스텀 서버 아님)·i18n 없음이라 실제 악용 가능성은 낮았지만, 쌤스 헬퍼의 로그인 차단을 `proxy.ts`가 맡고 있어 닫아 둠. 로그인 없이 `/apps/schedule-helper` 접근 시 `307 → /apps/schedule-helper/login?next=…`로 이동하는 것을 새 버전에서 확인.
+- **일부러 두는 14건과 이유:** `prisma` 계열 7건(`prisma`·`@prisma/config`·`deepmerge-ts`·`mysql2`·`@hono/node-server`·`@prisma/dev`·`valibot` — Prisma 개발 도구 안쪽 부품, `mysql2`는 우리가 PostgreSQL이라 미사용, 수정판 없음), `exceljs`/`uuid`, `mammoth`/`argparse`/`sprintf-js`, 개발용 `eslint-config-next` 계열 5건. **점검 도구가 권하는 해결책은 전부 "구버전으로 내리기"(prisma 6, exceljs 3.4, mammoth 0.3, eslint-config-next 14)라 코드가 깨짐 — `npm audit fix --force`는 절대 쓰지 말 것.** 엑셀을 읽는 `xlsx`(SheetJS)는 CDN 설치라 audit 대상이 아님.
+- **같이 한 것:** Next 16.4가 `next dev`를 켤 때마다 저장소 루트에 `AGENTS.md`를 자동 생성해서 `next.config.ts`에 `agentRules: false`로 끔(이 프로젝트의 지침은 `.agents/AGENTS.md`).
+- **검증:** 임시 복사본에서 먼저 단계별 건수를 시험 → 실제 적용 후 `tsc` 통과, `npm run lint` 기존 그대로 162 errors/1745 warnings(새 오류 없음 — 문서에 적힌 162개와 일치), `npm run build` 성공(Proxy 등록 확인), 개발 서버(Next 16.4.0 Turbopack)에서 공개 화면 5개 200, 로그인 차단 307, 아이디 로그인 → `/api/schedule`(DB 조회, prisma 7.10 + better-auth) 정상, 로그인 후 보호 화면 4개 200, 연수 API 정상, `public/pdfjs`·`public/qpdf` 생성 확인. **운영(Vercel) 배포 결과는 푸시 후 확인 필요.**
+
 ### 2026-10-09 (2)
 
 **`물리학II` 같은 로마숫자 과목이 이동수업으로 잘못 인식되던 버그 수정 (`parseClassInfo`, `lib/utils.ts`):**
