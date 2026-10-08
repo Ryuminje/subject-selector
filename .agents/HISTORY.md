@@ -9,8 +9,13 @@
 **실제 학생 정보가 든 `samples/*.xlsx` 삭제 (공개 저장소 개인정보 대응 1단계):**
 - 저장소는 공개이고 비공개 전환은 어렵다는 사용자 판단. `samples/sample.xlsx`~`sample7.xlsx` 7개를 `git rm`으로 삭제하고, 삭제 전에 저장소 밖 `C:\dev\private-samples\`로 복사해 SHA-256 해시가 원본과 모두 일치하는 것을 확인(개발 중 손으로 올려 볼 때 계속 쓸 수 있음).
 - `.gitignore`에 `/samples/*.xlsx`·`*.xls`·`*.csv`·`/sample*.xlsx` 추가, `samples/README.md`·루트 README 설명을 정정, 선택과목 변경 탭의 안내문 "(sample3)"에서 파일 이름 언급을 뺌(동작 무관, 문구만).
-- **이력에는 그대로 남아 있음** — 이 파일들은 루트의 `sample*.xlsx`와 `samples/` 두 위치로 232개 커밋 이력에 있고, 이번엔 이력을 다시 쓰지 않음. 2단계(`git filter-repo` + 강제 푸시)는 되돌릴 수 없고 다른 컴퓨터 복사본을 다시 받아야 해서 사용자 결정 대기. 포크 0·별 0으로 확인(2026-10-08). 이력에서 지워도 이미 받아 간 복사본, GitHub의 옛 커밋 캐시(해시를 알면 한동안 접근), Vercel 배포 소스 스냅샷은 남을 수 있음 — 필요하면 GitHub 지원에 캐시 삭제 요청.
-- 이력 정리 대상은 위 7개 파일뿐(`public/sample-roster-*.xlsx`, `sample-time-allocation.tsv`, 프로토타입 `sample.tsv`는 문서상 가상 데이터라 제외 — 내용은 직접 열어 확인하지 않음).
+- 이력 정리 대상은 위 7개 파일뿐(`public/sample-roster-*.xlsx`, `sample-time-allocation.tsv`, 프로토타입 `sample.tsv`는 문서상 가상 데이터라 제외 — 내용은 직접 열어 확인하지 않음). 포크 0·별 0으로 확인(2026-10-08).
+
+**이력에서도 제거 (사용자 승인 후 `git filter-repo` + 강제 푸시):**
+- **절차:** ① GitHub 전체를 미러 백업(`C:\dev\backups\subject-selector-mirror-20261009.git`, main `2a4312e`·브랜치 `a536f36`·커밋 233개) ② 백업의 별도 복사본(`...-cleaned.git`)에서만 `python -m git_filter_repo --invert-paths`로 루트와 `samples/`의 `sample*.xlsx` 14개 경로 제거(`pip install git-filter-repo` 2.47.0, 이 노트북) ③ 검증 후 `--force-with-lease`(기대값 지정)로 `main`·`feature/meeting-presets`만 푸시 ④ 작업 저장소를 `fetch` + `reset --hard origin/main`으로 맞추고 reflog 만료 + `gc --prune=now`로 로컬의 옛 객체 제거.
+- **검증:** 커밋 233개 유지(메시지·날짜·작성자 그대로), 삭제 대상 7개 파일이 모든 커밋에서 제거되고 과거에 있던 서로 다른 파일 버전 7개의 blob이 정리본에 0개 남음, 최신 `main`의 트리 해시가 푸시 전과 동일(`c97effc…`, 파일 내용 변화 없음), 낡은 브랜치의 차이는 그 7개 파일뿐. 푸시 후 `main`=`f93bc6f`, `feature/meeting-presets`=`4c09236`. 열린 PR 없음. 운영 사이트 200.
+- **GitHub에 남은 것(확인함):** 푸시 후에도 옛 커밋 해시로는 GitHub가 여전히 응답함(`commits/2a4312e` 조회됨, `contents/samples/sample3.xlsx?ref=ccb28ee`가 파일 크기를 돌려줌). 새 `main`에서는 404. GitHub 지원에 사용자가 직접 삭제를 요청해야 함.
+- **주의:** 모든 커밋 해시가 바뀜. 다른 컴퓨터 복사본은 지우고 새로 clone할 것. 이 노트북의 `C:\dev\backups\`에는 옛 이력(실제 학생 정보 포함)이 그대로 있으니 필요가 끝나면 삭제하고 어디에도 올리지 말 것.
 
 ### 2026-10-08 (2)
 
