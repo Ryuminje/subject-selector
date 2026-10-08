@@ -8,6 +8,7 @@
 // semesterKey 로 표시해 두고 그 학기의 bandTimes 로만 조회합니다.
 
 import type { Assignment, RosterStudent, RosterSubject, SemesterBandInfo } from "../types";
+import { semesterKeyOf } from "../types";
 import { bandList, classKey } from "./bands";
 import { countAt } from "./assign";
 
@@ -66,13 +67,27 @@ export interface PerTimeRow {
   sections: number; // 그 타임의 분반 수(선택 + 공통, 구획 단위)
 }
 
+/**
+ * 지금 배정 대상인 학기 키 — 선택된 과목이 하나라도 있는 학기. 선택된 과목이 전혀 없으면
+ * 모든 학기를 대상으로 봅니다(아무것도 안 골랐을 때 반 고정 공통과목 현황은 그대로 보이게).
+ * 선택하지 않은 학기의 반 고정 공통과목이 "인원(반)"에 섞여 들어오는 걸 막는 데 씁니다.
+ */
+export function activeSemesterKeys(ctx: Pick<GridContext, "subjects" | "selected" | "bySemester">): Set<string> {
+  const keys = new Set<string>();
+  ctx.subjects.forEach((s) => {
+    if (ctx.selected[s.idx]) keys.add(semesterKeyOf(s));
+  });
+  return keys.size ? keys : new Set(Object.keys(ctx.bySemester));
+}
+
 /** 타임별 인원·분반 수. 공통과목은 구획 첫 과목에서만 집계(shared 건너뜀). */
 export function perTimeRows(
   ctx: GridContext,
   assign: Assignment | null,
   placement: number[][],
 ): PerTimeRow[] {
-  const com = commonCells(ctx.bySemester);
+  const active = activeSemesterKeys(ctx);
+  const com = commonCells(ctx.bySemester).filter((c) => active.has(c.semesterKey));
   const rows: PerTimeRow[] = [];
   for (let t = 0; t < ctx.numTimes; t++) {
     let stu = 0;
@@ -108,11 +123,13 @@ export function invariantCheck(
   assign: Assignment,
   placement: number[][],
 ): { left: number; right: number; ok: boolean } {
+  const active = activeSemesterKeys(ctx);
   const left = perTimeRows(ctx, assign, placement).reduce((a, r) => a + r.students, 0);
   const right = ctx.students.reduce((acc, st, i) => {
     const k = classKey(st.id);
     let bandsForClass = 0;
-    Object.values(ctx.bySemester).forEach((info) => {
+    Object.entries(ctx.bySemester).forEach(([key, info]) => {
+      if (!active.has(key)) return;
       const bandCount = info.common.on ? bandList(info.common).length : 0;
       const occ = info.bandTimes.filter((m) => m[k] !== undefined).length;
       bandsForClass += Math.min(occ, bandCount);

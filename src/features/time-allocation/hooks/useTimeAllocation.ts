@@ -16,6 +16,7 @@ import {
   ALL_GRADE_KEYS,
   defaultSemesterSettings,
   emptyGradeState,
+  NO_SEMESTER_KEY,
   semesterKeyOf,
   type Assignment,
   type CommonSubject,
@@ -32,6 +33,7 @@ import {
   mergeAssignments,
   optimize,
   runAssign,
+  runAssignBalanced,
   type AllocContext,
   type SemesterAllocInfo,
 } from "../lib/assign";
@@ -64,17 +66,29 @@ function stateForRoster(
 ): TimeAllocGradeState {
   const anyPick = roster.groups.some((g) => g.pick > 0);
   const lastGroup = roster.groups.length - 1;
-  const selected = roster.subjects.map((s) => (anyPick ? s.group === lastGroup : true));
-
   const keys = [...new Set(roster.subjects.map(semesterKeyOf))];
+  // 학기가 여럿이면(본조사 연동) 마지막 학기(예: 2학기)만 기본 선택합니다. 학기 구분 없는
+  // 연간 과목은 학기가 아니므로 그대로 선택. 나머지 학기는 "배정 대상 학기"에서 직접 켭니다.
+  const realKeys = keys.filter((k) => k !== NO_SEMESTER_KEY).sort();
+  const defaultKey = realKeys.length > 1 ? realKeys[realKeys.length - 1] : null;
+  const selected = roster.subjects.map((s) => {
+    if (anyPick) return s.group === lastGroup;
+    if (!defaultKey) return true;
+    const k = semesterKeyOf(s);
+    return k === defaultKey || k === NO_SEMESTER_KEY;
+  });
+
   const settingsBySemester: Record<string, SemesterSettings> = {};
   keys.forEach((key) => {
     if (prev.settingsBySemester[key]) {
       settingsBySemester[key] = prev.settingsBySemester[key];
       return;
     }
+    // 선택 여부와 무관하게 센다(기본 선택에서 빠진 학기도 타임 수 기본값은 자기 과목 기준).
     const maxChoices = roster.students.reduce((m, st) => {
-      const n = st.choices.filter((c) => selected[c] && semesterKeyOf(roster.subjects[c]) === key).length;
+      const n = st.choices.filter(
+        (c) => (anyPick ? selected[c] : true) && semesterKeyOf(roster.subjects[c]) === key,
+      ).length;
       return Math.max(m, n);
     }, 0);
     settingsBySemester[key] = { ...defaultSemesterSettings(), numElectiveTimes: Math.max(1, maxChoices || 8) };
@@ -134,6 +148,8 @@ export interface TimeAllocationApi {
   setNumElectiveTimes: (key: string, n: number) => void;
   toggleSelected: (idx: number) => void;
   toggleGroup: (groupIdx: number, on: boolean) => void;
+  /** 한 학기의 모든 과목을 배정 대상으로 켜거나 끕니다(배정 최적화 범위 선택용). */
+  toggleSemester: (key: string, on: boolean) => void;
   setSection: (idx: number, n: number) => void;
   toggleFixedCap: (idx: number) => void;
   setFixedCap: (idx: number, n: number) => void;
@@ -228,7 +244,7 @@ export function useTimeAllocation(): TimeAllocationApi {
 
   const assign: Assignment | null = useMemo(() => {
     if (!ctx || !state.placement.some((p) => p.length)) return null;
-    return runAssign(ctx, state.placement);
+    return runAssignBalanced(ctx, state.placement);
   }, [ctx, state.placement]);
 
   // 학생별 결과(③단계)용 — 체크 해제해서 매칭 대상에서 빠졌지만 배치가 남아 있는 과목(예:
@@ -238,7 +254,7 @@ export function useTimeAllocation(): TimeAllocationApi {
     if (!ctx || !assign) return assign;
     const frozenSelected = ctx.selected.map((sel, i) => !sel && (state.placement[i]?.length ?? 0) > 0);
     if (!frozenSelected.some(Boolean)) return assign;
-    const frozen = runAssign({ ...ctx, selected: frozenSelected }, state.placement);
+    const frozen = runAssignBalanced({ ...ctx, selected: frozenSelected }, state.placement);
     return mergeAssignments(assign, frozen);
   }, [ctx, assign, state.placement]);
 
@@ -402,6 +418,23 @@ export function useTimeAllocation(): TimeAllocationApi {
     [patch],
   );
 
+  const toggleSemester = useCallback(
+    (key: string, on: boolean) =>
+      patch((g) => {
+        if (g.confirmed || !g.roster) return g;
+        const roster = g.roster;
+        const selected = g.selected.slice();
+        const sections = g.sections.slice();
+        roster.subjects.forEach((s, i) => {
+          if (semesterKeyOf(s) !== key) return;
+          selected[i] = on;
+          if (on && !sections[i]) sections[i] = defaultSections(s.count, capForSubjectIdx(g, i));
+        });
+        return { ...g, selected, sections };
+      }),
+    [patch],
+  );
+
   const setSection = useCallback(
     (idx: number, n: number) =>
       patch((g) => {
@@ -488,6 +521,16 @@ export function useTimeAllocation(): TimeAllocationApi {
       return;
     }
     const roster = state.roster;
+    // 배정 대상 = 체크된 과목이 하나라도 있는 학기. 체크 안 한 학기는 설정·구획·배치를 건드리지 않는다.
+    const targetKeys = semesterKeys.filter((key) =>
+      roster.subjects.some((s, i) => ctx.selected[i] && semesterKeyOf(s) === key),
+    );
+    if (!targetKeys.length) {
+      err("배정할 과목이 선택되어 있지 않습니다. '배정 대상 학기' 또는 '배정과목 선택'에서 고르세요.");
+      return;
+    }
+    const selectedCount = ctx.selected.filter(Boolean).length;
+    const scope = `${targetKeys.map((k) => (k === NO_SEMESTER_KEY ? "전체" : k)).join("·")} ${selectedCount}과목`;
     const res = optimize(ctx, state.sections, 2000, Math.random, state.placement);
     const un = res.assign.unassigned.reduce((a, u) => a + u.length, 0);
 
@@ -495,12 +538,17 @@ export function useTimeAllocation(): TimeAllocationApi {
     // — 모든 타임이 조금씩 막혀 선택과목 배정이 빡빡해지는 게 원인 — "교사 수까지 꽉
     // 채워 뭉치기"(pack)로 자동 재시도합니다. 사용자 요청: 최대한 펼치되, 미배정이 없는
     // 선에서만 펼치고 안 되면 반을 뭉쳐도 됨.
-    const spreadKeys = semesterKeys.filter((key) => (settingsOf(state, key).bandMode ?? "spread") === "spread");
+    // 재시도도 배정 대상 학기에만 적용합니다(선택하지 않은 학기의 구획 타임이 바뀌면 이미 끝낸 결과가 흔들림).
+    const spreadKeys = targetKeys.filter((key) => (settingsOf(state, key).bandMode ?? "spread") === "spread");
     if (un > 0 && spreadKeys.length) {
       const packBySemester: Record<string, SemesterAllocInfo> = {};
       semesterKeys.forEach((key) => {
+        if (!spreadKeys.includes(key)) {
+          packBySemester[key] = ctx.bySemester[key];
+          return;
+        }
         const s = settingsOf(state, key);
-        const mode = spreadKeys.includes(key) ? "pack" : (s.bandMode ?? "spread");
+        const mode = "pack";
         packBySemester[key] = {
           cap: s.cap,
           allowOver: s.allowOver,
@@ -521,13 +569,13 @@ export function useTimeAllocation(): TimeAllocationApi {
             ...Object.fromEntries(spreadKeys.map((key) => [key, { ...settingsOf(g, key), bandMode: "pack" as const }])),
           },
         }));
-        info(`최적화 완료 (${packRes.iter}회 탐색, 미배정 ${packUn}명 — 반 고정 공통과목을 조금 더 뭉쳐 배치했습니다)`);
+        info(`최적화 완료 [${scope}] (${packRes.iter}회 탐색, 미배정 ${packUn}명 — 반 고정 공통과목을 조금 더 뭉쳐 배치했습니다)`);
         return;
       }
     }
 
     patch((g) => ({ ...g, placement: res.placement }));
-    info(`최적화 완료 (${res.iter}회 탐색, 미배정 ${un}명)`);
+    info(`최적화 완료 [${scope}] (${res.iter}회 탐색, 미배정 ${un}명)`);
   }, [ctx, state, numTimes, semesterKeys, patch, info, err]);
 
   const resetPlacement = useCallback(() => {
@@ -664,6 +712,7 @@ export function useTimeAllocation(): TimeAllocationApi {
     setNumElectiveTimes,
     toggleSelected,
     toggleGroup,
+    toggleSemester,
     setSection,
     toggleFixedCap,
     setFixedCap,

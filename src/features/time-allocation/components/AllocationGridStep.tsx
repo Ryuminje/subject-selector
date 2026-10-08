@@ -181,6 +181,32 @@ export function AllocationGridStep({ api }: Props) {
         >
           <Sparkles className="w-4 h-4" /> ① 배정 최적화
         </button>
+        {semesterKeys.length > 1 && (
+          <div className="inline-flex items-center gap-3 px-3 py-2 bg-orange-50 border border-orange-200 rounded-xl text-sm">
+            <span className="font-medium text-stone-700">배정 대상 학기</span>
+            {semesterKeys.map((key) => {
+              const idxs = subs.map((s, i) => (semesterKeyOf(s) === key ? i : -1)).filter((i) => i >= 0);
+              const n = idxs.filter((i) => state.selected[i]).length;
+              return (
+                <label key={key} className="inline-flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={n > 0 && n === idxs.length}
+                    ref={(el) => {
+                      if (el) el.indeterminate = n > 0 && n < idxs.length;
+                    }}
+                    disabled={dis}
+                    onChange={(e) => api.toggleSemester(key, e.target.checked)}
+                  />
+                  {key === NO_SEMESTER_KEY ? "연간" : key}
+                  <span className="text-xs text-stone-400">
+                    ({n}/{idxs.length})
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        )}
         {!state.confirmed ? (
           <button
             onClick={() => api.setConfirmed(true)}

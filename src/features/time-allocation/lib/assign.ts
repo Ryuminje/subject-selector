@@ -132,6 +132,104 @@ export function runAssign(ctx: AllocContext, placement: number[][]): Assignment 
   return { byStudent, unassigned, load };
 }
 
+/**
+ * 이분 매칭이 끝난 배정을 "분반 하나당 인원"이 고르게 되도록 다듬습니다.
+ *
+ * runAssign 은 학생을 한 명씩 그 순간 가장 한산한 타임에 넣는 그리디라, 뒤에 처리되는 학생은
+ * 남은 자리에 끼워 맞춰져 타임 간 인원이 쏠립니다(예: 2분반 과목이 25/29). 여기서는 이미
+ * 배정된 학생을 (1) 같은 학기의 다른 과목과 시간이 겹치지 않는 선에서 한산한 타임으로
+ * 옮기거나, (2) 한산한 타임에 있던 자기 다른 과목과 시간을 맞바꿔서(스왑) 쏠림을 줄입니다.
+ * 목표 함수는 과목마다 Σ(타임 인원² ÷ 분반 수) — 총원이 같을 때 분반당 인원이 같아질수록
+ * 최소가 됩니다. 정원·반 고정 공통과목으로 막힌 시간·학기 구분은 runAssign 과 똑같이 지키고,
+ * 미배정 인원은 건드리지 않습니다(배정된 학생을 옮기기만 함).
+ */
+export function balanceAssignment(ctx: AllocContext, placement: number[][], a: Assignment): Assignment {
+  const S = ctx.subjects.length;
+  const load = a.load.map((row) => row.slice());
+  const byStudent = a.byStudent.map((m) => new Map(m));
+  const EPS = 1e-9;
+
+  const blockedCache = new Map<string, number[]>();
+  const blockedOf = (i: number, key: string): number[] => {
+    const ck = `${i}|${key}`;
+    let b = blockedCache.get(ck);
+    if (!b) {
+      const info = ctx.bySemester[key];
+      b = info ? blockedBands(ctx.students[i].id, info.common, info.bandTimes) : [];
+      blockedCache.set(ck, b);
+    }
+    return b;
+  };
+
+  // 정원을 넘기지 않고 t 에 한 명 더 받을 수 있는가(인원초과 허용 학기는 항상 가능).
+  const canTake = (s: number, t: number): boolean => {
+    const info = infoFor(ctx, s);
+    return !!info?.allowOver || load[s][t] + 1 <= capOf(ctx, s) * countAt(placement[s], t);
+  };
+  // 한 명이 from → to 로 옮겨갈 때 Σ(인원²÷분반 수)의 변화량.
+  const delta = (s: number, from: number, to: number): number =>
+    (1 - 2 * load[s][from]) / countAt(placement[s], from) + (2 * load[s][to] + 1) / countAt(placement[s], to);
+
+  const targets: number[] = [];
+  for (let s = 0; s < S; s++) {
+    if (ctx.selected[s] && new Set(placement[s]).size >= 2) targets.push(s);
+  }
+
+  for (let pass = 0; pass < 100; pass++) {
+    let moved = false;
+    for (const s of targets) {
+      const key = semesterKeyOf(ctx.subjects[s]);
+      const times = [...new Set(placement[s])];
+      for (const hi of times) {
+        for (const lo of times) {
+          if (hi === lo) continue;
+          for (let i = 0; i < byStudent.length; i++) {
+            const m = byStudent[i];
+            if (m.get(s) !== hi) continue;
+            if (blockedOf(i, key).includes(lo) || !canTake(s, lo)) continue;
+            const dS = delta(s, hi, lo);
+            // 학생이 같은 학기에서 lo 타임에 이미 듣는 다른 과목
+            let other = -1;
+            for (const [s2, t2] of m) {
+              if (s2 !== s && t2 === lo && semesterKeyOf(ctx.subjects[s2]) === key) {
+                other = s2;
+                break;
+              }
+            }
+            if (other < 0) {
+              if (dS < -EPS) {
+                m.set(s, lo);
+                load[s][hi]--;
+                load[s][lo]++;
+                moved = true;
+              }
+              continue;
+            }
+            // 맞바꾸기: other 는 hi 로 가야 하므로 그 과목이 hi 에 분반이 있고 정원이 남아야 함
+            if (countAt(placement[other], hi) === 0 || !canTake(other, hi)) continue;
+            if (dS + delta(other, lo, hi) < -EPS) {
+              m.set(s, lo);
+              m.set(other, hi);
+              load[s][hi]--;
+              load[s][lo]++;
+              load[other][lo]--;
+              load[other][hi]++;
+              moved = true;
+            }
+          }
+        }
+      }
+    }
+    if (!moved) break;
+  }
+  return { byStudent, unassigned: a.unassigned, load };
+}
+
+/** runAssign + 분반당 인원 균형 맞추기. 화면·결과·내보내기에 쓰는 최종 배정은 이걸 씁니다. */
+export function runAssignBalanced(ctx: AllocContext, placement: number[][]): Assignment {
+  return balanceAssignment(ctx, placement, runAssign(ctx, placement));
+}
+
 /** 비용 = 미배정×1000 + 정원초과×20 + 분반 불균형×0.05. */
 export function cost(ctx: AllocContext, placement: number[][]): { value: number; assign: Assignment } {
   const a = runAssign(ctx, placement);
@@ -334,9 +432,19 @@ export function splitSectionStudents(
   assign.byStudent.forEach((m, i) => {
     if (m.get(subjIdx) === t) studentIdxs.push(i);
   });
-  const cap = capOf(ctx, subjIdx);
+  // 같은 타임에 겹친 분반은 같은 시간이라 어느 쪽에 넣어도 다른 곳에 영향이 없습니다 — 정원 순서대로
+  // 앞 분반부터 채우면 (23, 19)처럼 쏠리므로, 인원을 최대한 고르게(차이 1명 이내) 나눕니다.
+  // n ≤ 정원×분반 수이면 어느 분반도 ceil(n/count) ≤ 정원이라 정원을 넘지 않습니다.
+  const n = studentIdxs.length;
   const groups: number[][] = Array.from({ length: count }, () => []);
-  studentIdxs.forEach((i, order) => groups[Math.min(count - 1, Math.floor(order / cap))].push(i));
+  const base = Math.floor(n / count);
+  const extra = n % count;
+  let at = 0;
+  for (let g = 0; g < count; g++) {
+    const size = base + (g < extra ? 1 : 0);
+    groups[g] = studentIdxs.slice(at, at + size);
+    at += size;
+  }
   return groups;
 }
 
