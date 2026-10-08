@@ -1,21 +1,37 @@
 // 로컬 개발용 표본 데이터 심기. **운영에서는 동작하지 않습니다**(아래 NODE_ENV 가드).
 //
 //   POST http://localhost:3000/api/dev-seed
-//   → 가상의 학교·교사·시간표를 만들고, 로그인 계정 test / test1234 를 만들어 줍니다.
+//   → 가상의 학교·교사 14명·시간표·계정 4개·연수/이수증/서명·협의회 프리셋·보강원 세트를 만듭니다.
 //
 // 쌤스 헬퍼는 로그인+DB가 있어야 화면을 볼 수 있는데, 새 컴퓨터에는 데이터가 없어서
 // 아무것도 확인할 수 없습니다. 그때 이 라우트로 한 번에 만들어 쓰라고 저장소에 넣어 뒀습니다.
 // 로컬 DB를 띄우는 방법은 AGENTS.md의 "다른 컴퓨터에서 이어받기" 항목을 보세요.
 //
-// 시간표는 두 기능을 다 확인할 수 있게 일부러 맞춰 짰습니다 —
-//  · 교체 후보 : 상대가 **나와 같은 학반**을 다른 시간에 가르쳐야 잡힙니다.
-//  · 동과 대강 : 그 수업이 **이동수업**(`통합과학A(1-7)`처럼 대문자+괄호)이어야 뜹니다.
+// 시간표·막힘 설정·계정 목록은 `devSeedData.ts`에 있고, 화면에서 무엇이 나와야 하는지는 그
+// 파일의 `EXPECTATIONS`에 적어 두었습니다(이 라우트도 응답에 그 내용을 같이 돌려줍니다).
 // 여러 번 실행해도 안전합니다(있으면 지우고 다시 만듭니다).
 
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { hashPassword } from "better-auth/crypto";
 import { prisma } from "@/lib/prisma";
+import { dateForWeekday } from "@/features/schedule-helper/lib/makeup/buildRows";
+import {
+  EXPECTATIONS,
+  SEED_ACCOUNTS,
+  SEED_BLOCKED_SUBJECTS,
+  SEED_BLOCKED_TEACHERS,
+  SEED_DAYS,
+  SEED_DEPARTMENT_GROUPS,
+  SEED_DEPTS,
+  SEED_FIXED_BLOCKS,
+  SEED_GLOBAL_MEETING_BLOCKS,
+  SEED_PERIODS,
+  SEED_ROSTER_EXTRAS,
+  SEED_TEACHERS,
+  SEED_TEMP_BLOCKS,
+  seedTableData,
+} from "@/features/schedule-helper/lib/devSeedData";
 
 // ⚠️ 학교 이름을 일부러 진짜 운영 학교와 똑같이 "명신고등학교"로 씁니다(예전엔 구분되게
 // "명신고등학교(로컬테스트)"였습니다). 실제 화면·인쇄물이 어떻게 보이는지 확인하려는
@@ -24,67 +40,18 @@ import { prisma } from "@/lib/prisma";
 // 헷갈리지 마세요. 옛 이름으로 만들어졌던 학교가 있으면 아래서 같이 정리합니다.
 const SCHOOL = "명신고등학교";
 const OLD_SCHOOL_NAMES = ["명신고등학교(로컬테스트)"];
-const DAYS = ["월", "화", "수", "목", "금"];
-const PERIODS = [1, 2, 3, 4, 5, 6, 7];
+const PASSWORD = "test1234";
 
-type Row = { teacher: string } & Record<string, string>;
+// 1×1 투명 PNG — 이수증 첨부·서명 이미지 자리에 들어가는 아주 작은 표본 파일.
+const TINY_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+  "base64",
+);
 
-const row = (teacher: string, lessons: Record<string, string>): Row => {
-  const r: Row = { teacher };
-  for (const day of DAYS) for (const p of PERIODS) r[`${day}${p}`] = "";
-  return Object.assign(r, lessons);
-};
-
-// 이 시간표는 두 가지 후보가 모두 나오도록 일부러 맞춰 짠 것입니다.
-//
-//  · 일반 수업 교체 : 상대 교사가 **나와 같은 학반**을 다른 시간에 가르치고, 서로 그 시간에
-//    비어 있어야 후보가 됩니다. (SwapTab의 `oInfo.grade === myInfo.grade && oInfo.classNum === ...`)
-//  · 동과 대강     : 그 수업이 **이동수업**이어야 합니다. `A(2-3)`처럼 대문자+괄호가 있어야
-//    `parseClassInfo`가 isMovingClass로 인식하고, 동시에 "N학년"도 있어야 학반이 잡힙니다.
-//    그래서 "1학년 통합과학A(1-7)" 같은 형태로 씁니다.
-const tableData: Row[] = [
-  // 결강할 선생님(=로그인 계정). 화요일 2·5교시, 목요일 1교시에 수업이 있습니다.
-  row("김결강", {
-    화2: "2학년 물리학(2-3)", // 일반 수업 → 교체 후보가 잡힘
-    화5: "1학년 통합과학A(1-7)", // 이동수업 → 동과 대강 후보가 잡힘
-    수3: "2학년 물리학(2-5)",
-    목1: "3학년 물리학II(3-2)", // 다른 날 → 보강원이 2장으로 갈리는지 확인용
-    금4: "1학년 통합과학A(1-7)",
-  }),
-  // 교체 상대(과학). 2-3반과 3-2반을 가르쳐서 김결강과 맞바꿀 거리가 있고,
-  // 화2·화5·목1에는 비어 있어 그 시간에 들어갈 수 있습니다.
-  row("박교체", {
-    월2: "2학년 지구과학(2-1)",
-    수4: "2학년 지구과학(2-3)", // ← 화2(2-3)와 맞바꿀 수 있는 수업
-    목3: "1학년 통합과학A(1-3)",
-    금6: "3학년 지구과학(3-2)", // ← 목1(3-2)와 맞바꿀 수 있는 수업
-  }),
-  // 대강 상대(과학). 화5에 비어 있어 동과 대강 후보가 됩니다.
-  // 목2(3-2)는 "슬롯 선점" 검증용 — 김결강↔한수학(목1↔화7, 둘 다 3-2)을 먼저 담아
-  // 한수학의 화7을 채운 뒤, 이보강(목2, 같은 3-2)을 검색하면 한수학의 화7이 "나(이보강)와는
-  // 무관하게 이미 다른 분(김결강)에게 가 있는" 겹침으로 잡히는지 확인할 수 있습니다.
-  row("이보강", {
-    월1: "1학년 통합과학A(1-2)",
-    화3: "2학년 화학(2-4)",
-    수2: "2학년 화학(2-6)",
-    목2: "3학년 물리학II(3-2)",
-    목5: "3학년 화학II(3-4)",
-  }),
-  // 다른 교과 — 동과 대강 후보에서 걸러지는지 확인용(과학이 아니라 안 뜹니다).
-  // 화7(2-5)은 트레이 충돌 검증용 — 수3(2-5)과 교체하면 김결강이 화7에 가 있게 됩니다.
-  row("정국어", { 화3: "2학년 국어(2-7)", 수1: "1학년 국어(1-1)", 목4: "3학년 화법과작문(3-5)", 화7: "2학년 국어(2-5)" }),
-  // 2-3반 수학 담당 — 화2 교체 후보가 한 명 더 나오도록.
-  // 화7(3-2)도 트레이 충돌 검증용 — 정국어와 교체해 김결강이 화7에 가 있는 상태에서
-  // 목1(3-2)을 다시 검색하면, 이 후보(같은 화7)가 "교체 불가"로 막히는지 확인할 수 있습니다.
-  row("한수학", { 월3: "1학년 수학(1-4)", 화4: "2학년 수학(2-2)", 목6: "2학년 수학(2-3)", 화7: "3학년 수학(3-2)" }),
-];
-
-const DEPTS: Record<string, string> = {
-  김결강: "과학",
-  박교체: "과학",
-  이보강: "과학",
-  정국어: "국어",
-  한수학: "수학",
+const today = () => {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
 export async function POST() {
@@ -93,8 +60,6 @@ export async function POST() {
   if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-
-  const teachers = tableData.map((r) => r.teacher);
 
   // 여러 번 돌려도 안전하도록, 있으면 지우고 다시 만듭니다.
   // 학교 이름을 "명신고등학교(로컬테스트)" → "명신고등학교"로 바꾼 적이 있어(2026-08-31),
@@ -111,45 +76,218 @@ export async function POST() {
     await prisma.school.delete({ where: { id: s.id } });
   }
 
+  // 이번 주 화요일 — "이미 이뤄진 교체·보강" 기록은 날짜가 박혀 있어 그 주 시간표에만 반영됩니다.
+  const baseDate = today();
+  const manualChanges = [
+    {
+      id: randomUUID(),
+      kind: "sub",
+      absentTeacher: "정국어",
+      absent: { date: dateForWeekday(baseDate, "화"), day: "화", period: 3 }, // 정국어 화3(2학년 국어 2-7)
+      partnerTeacher: "박교체", // 박교체는 화3이 비어 있어 들어갈 수 있음 → 이번 주엔 박교체 화3이 수업 중으로 보임
+      createdAt: new Date().toISOString(),
+    },
+  ];
+
   const school = await prisma.school.create({
     data: {
       name: SCHOOL,
       joinCode: "LOCALTST",
-      scheduleData: JSON.stringify({ teachers, days: DAYS, periods: PERIODS, tableData }),
+      scheduleData: JSON.stringify({
+        teachers: SEED_TEACHERS,
+        days: SEED_DAYS,
+        periods: SEED_PERIODS,
+        tableData: seedTableData,
+      }),
       scheduleUploadedAt: new Date(),
-      departmentGroups: JSON.stringify(["국어", "영어", "수학", "사회", "과학"]),
+      departmentGroups: JSON.stringify(SEED_DEPARTMENT_GROUPS),
+      globalMeetingBlocks: JSON.stringify(SEED_GLOBAL_MEETING_BLOCKS),
+      blockedSubjects: JSON.stringify(SEED_BLOCKED_SUBJECTS),
+      blockedTeachers: JSON.stringify(SEED_BLOCKED_TEACHERS),
+      manualChanges: JSON.stringify(manualChanges),
     },
   });
 
-  for (const name of teachers) {
-    await prisma.teacher.create({
-      data: { schoolId: school.id, name, department: DEPTS[name] ?? null },
+  await prisma.teacher.createMany({
+    data: SEED_TEACHERS.map((name) => ({
+      schoolId: school.id,
+      name,
+      department: SEED_DEPTS[name] ?? null,
+      fixedBlockDays: JSON.stringify(SEED_FIXED_BLOCKS[name] ?? {}),
+      tempBlockDays: JSON.stringify(SEED_TEMP_BLOCKS[name] ?? {}),
+    })),
+  });
+  const teacherRows = await prisma.teacher.findMany({ where: { schoolId: school.id } });
+  const teacherIdOf = new Map(teacherRows.map((t) => [t.name, t.id]));
+
+  // ── 계정 ──
+  const hashed = await hashPassword(PASSWORD);
+  const userIdOf = new Map<string, string>();
+  for (const acc of SEED_ACCOUNTS) {
+    const userId = randomUUID();
+    userIdOf.set(acc.name, userId);
+    await prisma.user.create({
+      data: {
+        id: userId,
+        name: acc.name,
+        email: acc.email ?? `${userId}@login.internal`,
+        emailVerified: false,
+        role: acc.role,
+        schoolId: school.id,
+        loginId: acc.loginId ?? null,
+        teacherId: teacherIdOf.get(acc.teacher),
+      },
+    });
+    await prisma.account.create({
+      data: { id: randomUUID(), accountId: userId, providerId: "credential", userId, password: hashed },
     });
   }
+  const adminId = userIdOf.get("김결강")!;
 
-  const me = await prisma.teacher.findFirst({ where: { schoolId: school.id, name: "김결강" } });
-  const userId = randomUUID();
-  await prisma.user.create({
+  // ── 협의회 시간 찾기 프리셋(계정별) ──
+  await prisma.meetingPreset.createMany({
+    data: [
+      { userId: adminId, schoolId: school.id, name: "과학과", teachers: JSON.stringify(["김결강", "박교체", "이보강"]) },
+      {
+        userId: adminId,
+        schoolId: school.id,
+        name: "2학년 교체 상대",
+        teachers: JSON.stringify(["김결강", "한수학", "박교체", "최영어"]),
+      },
+      {
+        userId: userIdOf.get("박교체")!,
+        schoolId: school.id,
+        name: "영어과",
+        teachers: JSON.stringify(["최영어", "강영어", "윤영어", "오영어"]),
+      },
+    ],
+  });
+
+  // ── 보강원 작업 세트(김결강 개인) ──
+  await prisma.makeupBatch.create({
     data: {
-      id: userId,
-      name: "김결강",
-      email: `${userId}@login.internal`,
-      emailVerified: false,
-      role: "ADMIN",
+      userId: adminId,
       schoolId: school.id,
-      loginId: "test",
-      teacherId: me?.id,
-    },
-  });
-  await prisma.account.create({
-    data: {
-      id: randomUUID(),
-      accountId: userId,
-      providerId: "credential",
-      userId,
-      password: await hashPassword("test1234"),
+      name: "출장 보강 세트(예시)",
+      baseDate,
+      entries: JSON.stringify([
+        {
+          id: randomUUID(),
+          kind: "swap",
+          absentTeacher: "김결강",
+          absent: { day: "화", period: 2, grade: "2", classNum: "3", subject: "물리학" },
+          partnerTeacher: "박교체",
+          exchange: { day: "수", period: 4, grade: "2", classNum: "3", subject: "지구과학" },
+        },
+        {
+          id: randomUUID(),
+          kind: "sub",
+          absentTeacher: "김결강",
+          absent: { day: "화", period: 5, grade: "1", classNum: "7", subject: "통합과학A" },
+          partnerTeacher: "이보강",
+        },
+      ]),
     },
   });
 
-  return NextResponse.json({ ok: true, school: school.name, loginId: "test", password: "test1234" });
+  // ── 연수 이수증 수거 ──
+  await prisma.certificateRosterExtra.createMany({
+    data: SEED_ROSTER_EXTRAS.map((name) => ({ schoolId: school.id, name, addedBy: "김결강" })),
+  });
+  const everyone = [...SEED_TEACHERS, ...SEED_ROSTER_EXTRAS];
+
+  await prisma.certificateRosterPreset.createMany({
+    data: [
+      // 관리자가 만든 것 → 학교 전체에 공통으로 보임
+      { schoolId: school.id, name: "전체 교직원", names: JSON.stringify(everyone), createdBy: "김결강" },
+      { schoolId: school.id, name: "과학과", names: JSON.stringify(["김결강", "박교체", "이보강"]), createdBy: "김결강" },
+      // 일반 교사가 만든 것 → 만든 본인에게만 보임
+      { schoolId: school.id, name: "박교체의 연수 명단", names: JSON.stringify(["박교체", "이보강", "한수학"]), createdBy: "박교체" },
+    ],
+  });
+
+  const titles = [
+    // 이수증 수거: 기본 명단(전체) / 연수 전용 명단
+    { title: "2026 학교폭력 예방 연수", registeredByName: "김결강", category: "certificate", roster: null as string[] | null },
+    {
+      title: "교원 인권 보호 연수",
+      registeredByName: "박교체",
+      category: "certificate",
+      roster: ["김결강", "박교체", "이보강", "한수학", "정국어"],
+    },
+    // 서명 연수
+    { title: "교직원 정보보안 서명 연수", registeredByName: "김결강", category: "sign", roster: null },
+    {
+      title: "안전 교육 서명 연수",
+      registeredByName: "박교체",
+      category: "sign",
+      roster: ["김결강", "박교체", "이보강", "김행정"],
+    },
+  ];
+  await prisma.trainingTitle.createMany({
+    data: titles.map((t) => ({
+      schoolId: school.id,
+      title: t.title,
+      registeredByName: t.registeredByName,
+      category: t.category,
+      rosterSnapshot: t.roster ? JSON.stringify(t.roster) : null,
+    })),
+  });
+
+  // 제출 내역 — 일부만 제출해서 "일괄확인"에 제출/미제출이 섞여 보이게 합니다.
+  const submissions: Array<[string, string, string]> = [
+    ["박교체", "2026 학교폭력 예방 연수", "KR-2026-0001"],
+    ["이보강", "2026 학교폭력 예방 연수", "KR-2026-0002"],
+    ["한수학", "2026 학교폭력 예방 연수", "KR-2026-0003"],
+    ["최영어", "2026 학교폭력 예방 연수", "KR-2026-0004"],
+    ["김결강", "교원 인권 보호 연수", "KR-2026-0101"],
+    ["박교체", "교원 인권 보호 연수", "KR-2026-0102"],
+  ];
+  await prisma.trainingCertificate.createMany({
+    data: submissions.map(([teacherName, trainingTitle, number]) => ({
+      schoolId: school.id,
+      teacherName,
+      trainingTitle,
+      number,
+      institution: "가상교원연수원",
+      certDate: "2026-09-15",
+      fileName: `${teacherName}_${number}.png`,
+      mimeType: "image/png",
+      fileBytes: TINY_PNG,
+    })),
+  });
+
+  // QR 서명 세션 — 일부만 서명한 상태
+  const signTitle = "교직원 정보보안 서명 연수";
+  const session = await prisma.signSession.create({
+    data: {
+      schoolId: school.id,
+      trainingTitles: JSON.stringify([signTitle]),
+      rosterSnapshot: JSON.stringify(everyone),
+      titleRosters: JSON.stringify({ [signTitle]: everyone }),
+      createdByUserId: adminId,
+    },
+  });
+  await prisma.signSessionSignature.createMany({
+    data: ["김결강", "박교체", "이보강", "정국어", "김행정"].map((teacherName) => ({
+      sessionId: session.id,
+      teacherName,
+      signaturePng: TINY_PNG,
+    })),
+  });
+
+  return NextResponse.json({
+    ok: true,
+    school: school.name,
+    password: PASSWORD,
+    accounts: SEED_ACCOUNTS.map((a) => ({
+      name: a.name,
+      role: a.role,
+      loginId: a.loginId ?? null,
+      email: a.email ?? null,
+    })),
+    teachers: SEED_TEACHERS.length,
+    signSessionId: session.id,
+    expectations: EXPECTATIONS,
+  });
 }
