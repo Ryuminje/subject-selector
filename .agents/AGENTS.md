@@ -1,15 +1,17 @@
 # AI 에이전트 작업 히스토리 및 규칙 (AGENTS.md)
 
-> ## 🚧 지금 진행 중인 일 (2026-09-10 갱신)
+> ## 🚧 지금 진행 중인 일 (2026-10-08 갱신)
 >
-> **타임(구획) 배정 프로토타입이 `prototypes/time-allocation/`에 들어와 있습니다 (브랜치
-> `feature/time-allocation-prototype`).** 아직 `src/`에 연결되지 않은 독립 실행 파일이며,
-> 이식하려면 그 폴더의 `README.md`를 먼저 읽으세요 — 알고리즘·이미 잡은 버그·이식 계획이
-> 전부 거기 정리돼 있습니다. 아래 "🧭 타임(구획) 배정" 섹션도 참고.
+> **타임(구획) 배정은 이미 `src/`에 이식돼 있습니다.** 2026-09-11에 `enrollment-helper`의
+> 네 번째 탭(`src/components/tabs/TimeAllocationTab.tsx`, 기능 코드는
+> `src/features/time-allocation/`)으로 편입됐고, 9/13 리로스쿨 엑셀 내보내기, 9/20 구획
+> 교사 수 계산·배치 화면까지 들어갔습니다. 결과는 DB가 아니라 탭 헤더의 JSON
+> 불러오기/저장하기로 보관합니다(`prisma/schema.prisma`에 관련 모델 없음). 원본 프로토타입
+> `prototypes/time-allocation/`은 참고용으로 남아 있으며 빌드에 포함되지 않습니다.
+> 알고리즘·잡은 버그는 그 폴더의 `README.md`, 날짜별 경위는 `HISTORY.md`를 보세요.
+> (예전에 쓰던 브랜치 `feature/time-allocation-prototype`은 원격에 없습니다.)
 >
 > **아직 답을 못 받은 것 (사용자에게 확인 필요, 그대로 남아 있음):**
-> - 타임 배정을 `enrollment-helper`의 네 번째 탭으로 넣을지, 별도 앱으로 만들지
-> - 타임 배정 결과를 DB에 저장할지 (저장하면 `prisma/schema.prisma` 변경 필요)
 > - 타임 배정 화면의 "인원설정 고정" 체크박스가 원래 학교 도구에서 뜻하던 의미가 맞는지
 >   (지금은 "최적화 시 그 과목의 분반 타임을 유지"로 해석해 구현)
 > - 보강원 서식(`makeup/print`)의 칸 비율이 실제 종이와 맞는지
@@ -238,7 +240,9 @@
 
 ## 🧭 타임(구획) 배정 프로토타입 참고 메모 — 2026-09-10 추가
 
-`prototypes/time-allocation/` — **아직 `src/`에 연결되지 않은 독립 프로토타입입니다.** 빌드에
+`prototypes/time-allocation/` — **원본 독립 프로토타입입니다. 실제 기능은 2026-09-11에
+`src/features/time-allocation/`로 이식돼 `enrollment-helper`의 네 번째 탭이 되었습니다**
+(아래 내용은 이식 전 기준 설명이라 일부는 낡았습니다). 이 폴더는 빌드에
 포함되지 않고 어떤 코드도 이 폴더를 import하지 않습니다. 의존성 없는 순수 HTML/CSS/JS라
 `node prototypes/time-allocation/server.js`로 바로 띄워 볼 수 있습니다(포트 3000).
 
