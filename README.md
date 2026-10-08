@@ -53,7 +53,7 @@ src/
   features/<이름>/         # 앱별 내부 구현 (컴포넌트·훅·라이브러리)
   lib/                    # 인증·DB 등 공용 인프라
 prisma/schema.prisma      # DB 스키마 (PostgreSQL)
-samples/                  # 개발 중 손으로 올려보는 테스트용 엑셀
+samples/                  # (비어 있음) 실제 학생 정보가 든 엑셀은 커밋 금지 — samples/README.md 참고
 ```
 
 ## 더 읽을 것

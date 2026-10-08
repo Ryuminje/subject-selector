@@ -31,7 +31,7 @@ export function RiroschoolStep({
             최종 선택과목 데이터 엑셀 다운로드
           </h3>
           <p className="text-stone-600 text-sm md:text-base leading-relaxed">
-            2단계에서 업로드했던 원본 엑셀 파일(sample3)의 형태와 서식을 그대로 유지한 채,<br />
+            2단계에서 업로드했던 원본 엑셀 파일의 형태와 서식을 그대로 유지한 채,<br />
             학생들의 변경 신청 결과에 맞춰 선택과목 알파벳 마킹(A, B, C, D)만 정확히 최신화하여 다운로드합니다.
           </p>
 

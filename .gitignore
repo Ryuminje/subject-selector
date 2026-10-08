@@ -29,3 +29,10 @@ graphify-out/
 # pdf.js 워커·글꼴 (scripts/copy-pdfjs.mjs 가 설치 때 만든 복사본)
 public/pdfjs/
 public/qpdf/
+
+# 실제 학생 정보가 든 테스트용 엑셀 — 이 저장소는 공개라 절대 커밋하지 않습니다.
+# 개발 중 올려볼 파일은 저장소 밖(예: C:\dev\private-samples)에 두세요.
+/samples/*.xlsx
+/samples/*.xls
+/samples/*.csv
+/sample*.xlsx
