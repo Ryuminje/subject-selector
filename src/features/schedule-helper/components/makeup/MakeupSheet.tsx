@@ -29,11 +29,23 @@ const COLUMNS = [
 /** 서식은 표가 3줄로 인쇄돼 있습니다. 건수가 적어도 빈 줄을 남겨 같은 모양을 유지합니다. */
 const MIN_ROWS = 3;
 
+/**
+ * 3줄을 넘으면 줄을 늘려 쓰고, **다음 장으로 넘기지 않습니다**(학교 결재 관행, 사용자 확인 2026-10-09).
+ * A4(위아래 여백 18mm 제외 261mm)에 줄 높이 3.2rem으로 실측해 보니 8줄까지 한 장에 들어가고 9줄부터
+ * 넘칩니다. 9줄 이상이면 8줄 분량(8 × 3.2rem)의 높이를 줄 수로 나눠 한 장에 맞춥니다.
+ */
+const ROW_REM = 3.2;
+const MAX_ROWS_AT_FULL_HEIGHT = 8;
+
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 export default function MakeupSheet({ doc, sheet }: { doc: MakeupDoc; sheet: MakeupSheetData }) {
   const date = parseDate(sheet.date);
   const blanks = Math.max(0, MIN_ROWS - sheet.rows.length);
+  const rowHeight = `${(sheet.rows.length > MAX_ROWS_AT_FULL_HEIGHT
+    ? (MAX_ROWS_AT_FULL_HEIGHT * ROW_REM) / sheet.rows.length
+    : ROW_REM
+  ).toFixed(3)}rem`;
 
   return (
     // 화면에서도 인쇄와 같은 폭으로 보이도록 좌우 22mm(본문 166mm)를 맞춥니다.
@@ -100,11 +112,11 @@ export default function MakeupSheet({ doc, sheet }: { doc: MakeupDoc; sheet: Mak
         </thead>
         <tbody>
           {sheet.rows.map((row, i) => (
-            <Row key={`${row.period}-${row.partnerTeacher}-${i}`} row={row} />
+            <Row key={`${row.period}-${row.partnerTeacher}-${i}`} row={row} height={rowHeight} />
           ))}
           {/* 서식의 3줄 모양을 지키기 위한 빈 줄 */}
           {Array.from({ length: blanks }, (_, i) => (
-            <Row key={`blank-${i}`} />
+            <Row key={`blank-${i}`} height={rowHeight} />
           ))}
         </tbody>
       </table>
@@ -141,13 +153,14 @@ export default function MakeupSheet({ doc, sheet }: { doc: MakeupDoc; sheet: Mak
 }
 
 /** 표의 한 줄. `row`가 없으면 서식 모양을 채우는 빈 줄입니다. */
-function Row({ row }: { row?: MakeupRow }) {
-  const cell = "border border-black text-center h-[3.2rem] px-1";
+function Row({ row, height }: { row?: MakeupRow; height: string }) {
+  const cell = "border border-black text-center px-1";
+  const style = { height };
   if (!row) {
     return (
       <tr>
         {COLUMNS.map((col) => (
-          <td key={col.label} className={cell} />
+          <td key={col.label} className={cell} style={style} />
         ))}
       </tr>
     );
@@ -157,11 +170,11 @@ function Row({ row }: { row?: MakeupRow }) {
 
   return (
     <tr>
-      <td className={cell}>{row.subject}</td>
-      <td className={cell}>{row.className}</td>
-      <td className={cell}>{row.period}</td>
+      <td className={cell} style={style}>{row.subject}</td>
+      <td className={cell} style={style}>{row.className}</td>
+      <td className={cell} style={style}>{row.period}</td>
       {/* "수업 교체의 경우만 기재" — 보강은 두 칸을 비웁니다. */}
-      <td className={`${cell} leading-snug whitespace-nowrap`}>
+      <td className={`${cell} leading-snug whitespace-nowrap`} style={style}>
         {exchangeDate && (
           <>
             ( {exchangeDate.getMonth() + 1} )월( {exchangeDate.getDate()} )일
@@ -169,8 +182,8 @@ function Row({ row }: { row?: MakeupRow }) {
           </>
         )}
       </td>
-      <td className={cell}>{row.exchangeSubject ?? ""}</td>
-      <td className={cell}>
+      <td className={cell} style={style}>{row.exchangeSubject ?? ""}</td>
+      <td className={cell} style={style}>
         <span className="font-semibold">{row.partnerTeacher}</span>
         <span className="ml-3">(인)</span>
       </td>
