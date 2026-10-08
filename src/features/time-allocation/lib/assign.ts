@@ -43,6 +43,15 @@ export function capOf(ctx: AllocContext, subjIdx: number): number {
   return infoFor(ctx, subjIdx)?.cap ?? DEFAULT_CAP;
 }
 
+/**
+ * "인원설정 고정"이 켜진 과목인가. 이 과목은 그 학기에 "인원초과 허용"이 켜져 있어도 정원을
+ * 절대 넘길 수 없습니다(사용자 확인 2026-10-09: 고정 = "그 이상의 정원은 안 된다").
+ */
+export function isCapFixed(ctx: AllocContext, subjIdx: number): boolean {
+  const v = ctx.fixedCap[subjIdx];
+  return typeof v === "number" && v > 0;
+}
+
 /** 분반 수 기본값 = ceil(신청 인원 / 정원). */
 export function defaultSections(count: number, cap: number): number {
   return Math.max(1, Math.ceil(count / Math.max(1, cap)));
@@ -75,8 +84,11 @@ export function runAssign(ctx: AllocContext, placement: number[][]): Assignment 
       // 분반 하나를 꽉 채우기 전까지는 "덜 찼다"고 오해해 2번째 분반이 계속 비게 됩니다.
       const avgLoad = (t: number) => load[s][t] / countAt(placement[s], t);
       return [...new Set(placement[s])] // 매칭은 시간 단위 — 겹친 분반이라도 같은 t를 두 번 볼 필요 없음
+        // 정원 검사는 useCap 이거나(인원초과 허용 전 단계), 정원이 고정된 과목이면 언제나 합니다.
         .filter(
-          (t) => !blocked.includes(t) && (!useCap || load[s][t] < capOf(ctx, s) * countAt(placement[s], t)),
+          (t) =>
+            !blocked.includes(t) &&
+            ((!useCap && !isCapFixed(ctx, s)) || load[s][t] < capOf(ctx, s) * countAt(placement[s], t)),
         )
         .sort((a, b) => avgLoad(a) - avgLoad(b));
     });
@@ -164,7 +176,8 @@ export function balanceAssignment(ctx: AllocContext, placement: number[][], a: A
   // 정원을 넘기지 않고 t 에 한 명 더 받을 수 있는가(인원초과 허용 학기는 항상 가능).
   const canTake = (s: number, t: number): boolean => {
     const info = infoFor(ctx, s);
-    return !!info?.allowOver || load[s][t] + 1 <= capOf(ctx, s) * countAt(placement[s], t);
+    // 정원이 고정된 과목은 인원초과 허용이어도 정원을 넘길 수 없습니다.
+    return (!!info?.allowOver && !isCapFixed(ctx, s)) || load[s][t] + 1 <= capOf(ctx, s) * countAt(placement[s], t);
   };
   // 한 명이 from → to 로 옮겨갈 때 Σ(인원²÷분반 수)의 변화량.
   const delta = (s: number, from: number, to: number): number =>

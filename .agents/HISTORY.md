@@ -4,6 +4,15 @@
 
 ---
 
+### 2026-10-09 (4)
+
+**"인원설정 고정" 뜻 확정 + 초과 허용에서도 정원을 지키도록 수정:**
+- 사용자가 학교 도구 기준으로 확인: 인원설정 고정 = **그 과목의 정원을 강제(그 이상은 안 됨)**. 이미 구현된 방향이 맞았음(타임 고정 해석은 폐기).
+- **발견한 결함:** 학기 설정의 "인원초과 허용"이 켜지면 `runAssign`이 정원 검사를 통째로 건너뛰어(`match(…, useCap=false)`), 정원 5명으로 고정한 과목에 10명이 들어갔음(가상 시험으로 재현). `balanceAssignment`의 `canTake`도 같은 구멍이 있었음.
+- **수정(`lib/assign.ts`):** `isCapFixed()` 추가 — 고정 과목은 `useCap`과 무관하게 항상 정원 검사, `canTake`도 고정 과목은 초과 불가. 넘치는 인원은 미배정으로 남음. 화면 안내문을 "체크 시 정원 강제(초과 허용이어도 불가)"로 바꿈. 고정하지 않은 과목의 초과 허용 동작은 그대로.
+- **검증:** (초과 허용 OFF/ON × 고정 유무) 시험에서 ON+고정 → 과목0=5명(미배정 5), 고정 없음은 10명 그대로. 기존 균형·불변식 검증, 학기 분리·반복 배정 검증 회귀 없음. `tsc`·`eslint` 통과.
+- 문서: AGENTS.md 상단의 낡은 설명("분반 타임 유지로 해석")과 프로토타입 README를 확정 내용으로 정정.
+
 ### 2026-10-09 (3)
 
 **`npm audit` 정리: 30건 → 14건 (치명 1 → 0, 운영 포함 22 → 9):**
@@ -25,7 +34,7 @@
 **실제 학생 정보가 든 `samples/*.xlsx` 삭제 (공개 저장소 개인정보 대응 1단계):**
 - 저장소는 공개이고 비공개 전환은 어렵다는 사용자 판단. `samples/sample.xlsx`~`sample7.xlsx` 7개를 `git rm`으로 삭제하고, 삭제 전에 저장소 밖 `C:\dev\private-samples\`로 복사해 SHA-256 해시가 원본과 모두 일치하는 것을 확인(개발 중 손으로 올려 볼 때 계속 쓸 수 있음).
 - `.gitignore`에 `/samples/*.xlsx`·`*.xls`·`*.csv`·`/sample*.xlsx` 추가, `samples/README.md`·루트 README 설명을 정정, 선택과목 변경 탭의 안내문 "(sample3)"에서 파일 이름 언급을 뺌(동작 무관, 문구만).
-- 이력 정리 대상은 위 7개 파일뿐(`public/sample-roster-*.xlsx`, `sample-time-allocation.tsv`, 프로토타입 `sample.tsv`는 문서상 가상 데이터라 제외 — 내용은 직접 열어 확인하지 않음). 포크 0·별 0으로 확인(2026-10-08).
+- 이력 정리 대상은 위 7개 파일뿐(`public/sample-roster-*.xlsx`, `sample-time-allocation.tsv`, 프로토타입 `sample.tsv`는 문서상 가상 데이터라 제외). 포크 0·별 0으로 확인(2026-10-08). **제외한 4개는 2026-10-09에 값을 출력하지 않는 집계로 확인함:** 학생 이름 칸이 전부 가짜 형식(`학생001` 등 — roster-1 78칸/80행, roster-2 54칸/56행, tsv 두 개 193칸/195행)이고, 그 외 한글 2~4자 칸은 장소명(`영어실`×5, `운동장`×36)과 머리글 정도(서로 다른 값 6개)라 실제 이름 규모(수십~수백 개의 서로 다른 값)가 아님. tsv의 5자리 숫자 192개는 문서대로 생성한 가짜 학번(학생 192명). 다만 한 번씩만 나온 짧은 한글 값 5개씩(머리글로 추정)은 값을 직접 보지는 않음.
 
 **이력에서도 제거 (사용자 승인 후 `git filter-repo` + 강제 푸시):**
 - **절차:** ① GitHub 전체를 미러 백업(`C:\dev\backups\subject-selector-mirror-20261009.git`, main `2a4312e`·브랜치 `a536f36`·커밋 233개) ② 백업의 별도 복사본(`...-cleaned.git`)에서만 `python -m git_filter_repo --invert-paths`로 루트와 `samples/`의 `sample*.xlsx` 14개 경로 제거(`pip install git-filter-repo` 2.47.0, 이 노트북) ③ 검증 후 `--force-with-lease`(기대값 지정)로 `main`·`feature/meeting-presets`만 푸시 ④ 작업 저장소를 `fetch` + `reset --hard origin/main`으로 맞추고 reflog 만료 + `gc --prune=now`로 로컬의 옛 객체 제거.

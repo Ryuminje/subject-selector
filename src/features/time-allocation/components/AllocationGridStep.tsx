@@ -364,7 +364,7 @@ export function AllocationGridStep({ api }: Props) {
             <tr>
               <td className="sticky left-0 bg-white border border-stone-200 px-2 py-1">
                 인원설정 고정
-                <span className="block text-[10px] text-stone-400">체크 시 정원 강제</span>
+                <span className="block text-[10px] text-stone-400">체크 시 정원 강제(초과 허용이어도 불가)</span>
               </td>
               <td className="border border-stone-200" />
               {orderedColumns.map((col) => {
