@@ -238,9 +238,123 @@ export function balanceAssignment(ctx: AllocContext, placement: number[][], a: A
   return { byStudent, unassigned: a.unassigned, load };
 }
 
-/** runAssign + 분반당 인원 균형 맞추기. 화면·결과·내보내기에 쓰는 최종 배정은 이걸 씁니다. */
+/** rematchAssignment 가 한 학생·한 학기에서 다룰 수 있는 최대 타임 수(비트마스크 DP 라 2^N 으로 커집니다). */
+const MAX_REMATCH_TIMES = 12;
+
+/**
+ * 학생 한 명씩 "그 학생의 과목들을 시간에 짝짓기"를 **통째로 최적으로 다시** 합니다.
+ *
+ * balanceAssignment 는 한 명을 한 칸 옮기거나 두 과목을 맞바꾸는 것만 시도해서, 여러 과목이 한꺼번에
+ * 자리를 바꿔야 풀리는 쏠림(과목 셋이 돌려 앉기 등)은 못 풉니다. 여기서는 그 학생이 들을 과목들을
+ * 서로 다른 타임에 놓는 모든 경우 중 목표 함수가 가장 낮은 것을 DP 로 골라 다시 앉힙니다. 목표는
+ * balanceAssignment 와 같은 Σ(타임 인원² ÷ 분반 수)이고, 학생을 뺐다가 다시 넣는 한계 비용
+ * (2×인원+1)÷분반 수의 합을 최소화하면 그 학생에 대한 최적입니다. 더 나아지는 학생이 없을 때까지 반복합니다.
+ *
+ * 정원·반 고정 공통과목으로 막힌 시간·학기 구분은 runAssign 과 같게 지키고, 배정된 학생만 옮기므로
+ * 미배정 인원은 바뀌지 않습니다. 실제 자료(학생 190명)로 쏠림이 큰 경우(군을 함께 선택, 택8)에서
+ * 분반당 인원 최대 차이를 줄였고, 쏠림이 없는 경우는 결과가 같습니다(2026-10-09 실측).
+ */
+export function rematchAssignment(ctx: AllocContext, placement: number[][], a: Assignment): Assignment {
+  const load = a.load.map((row) => row.slice());
+  const byStudent = a.byStudent.map((m) => new Map(m));
+  const EPS = 1e-9;
+  const INF = 1e18;
+
+  const blockedCache = new Map<string, number[]>();
+  const blockedOf = (i: number, key: string): number[] => {
+    const ck = `${i}|${key}`;
+    let b = blockedCache.get(ck);
+    if (!b) {
+      const info = ctx.bySemester[key];
+      b = info ? blockedBands(ctx.students[i].id, info.common, info.bandTimes) : [];
+      blockedCache.set(ck, b);
+    }
+    return b;
+  };
+  // 그 학생을 뺀 상태에서 (s, t)에 한 명을 더 받을 수 있는가 — 인원초과 허용이어도 정원 고정 과목은 불가.
+  const canTake = (s: number, t: number): boolean => {
+    const info = infoFor(ctx, s);
+    return (!!info?.allowOver && !isCapFixed(ctx, s)) || load[s][t] + 1 <= capOf(ctx, s) * countAt(placement[s], t);
+  };
+  const marginal = (s: number, t: number): number => (2 * load[s][t] + 1) / countAt(placement[s], t);
+
+  for (let pass = 0; pass < 40; pass++) {
+    let moved = false;
+    for (let i = 0; i < byStudent.length; i++) {
+      const m = byStudent[i];
+      const keys = new Set<string>();
+      for (const s of m.keys()) keys.add(semesterKeyOf(ctx.subjects[s]));
+      for (const key of keys) {
+        const subs = [...m.keys()].filter((s) => semesterKeyOf(ctx.subjects[s]) === key);
+        if (subs.length < 2) continue;
+
+        for (const s of subs) load[s][m.get(s)!]--; // 이 학생을 잠시 뺀다
+        const restore = () => {
+          for (const s of subs) load[s][m.get(s)!]++;
+        };
+        const blocked = blockedOf(i, key);
+        const opts = subs.map((s) =>
+          [...new Set(placement[s])].filter((t) => !blocked.includes(t) && canTake(s, t)),
+        );
+        const times = [...new Set(opts.flat())].sort((x, y) => x - y);
+        if (times.length > MAX_REMATCH_TIMES) {
+          restore();
+          continue;
+        }
+        const bit = new Map(times.map((t, k) => [t, k]));
+        const size = 1 << times.length;
+        // dp[k][mask] = 앞 k개 과목을 mask 에 해당하는 타임들에 서로 겹치지 않게 놓았을 때의 최소 비용
+        const dp: number[][] = Array.from({ length: subs.length + 1 }, () => new Array<number>(size).fill(INF));
+        const from: Array<Array<[number, number] | null>> = Array.from({ length: subs.length + 1 }, () =>
+          new Array<[number, number] | null>(size).fill(null),
+        );
+        dp[0][0] = 0;
+        for (let k = 0; k < subs.length; k++) {
+          for (let mask = 0; mask < size; mask++) {
+            if (dp[k][mask] >= INF) continue;
+            for (const t of opts[k]) {
+              const b = 1 << bit.get(t)!;
+              if (mask & b) continue;
+              const v = dp[k][mask] + marginal(subs[k], t);
+              if (v < dp[k + 1][mask | b]) {
+                dp[k + 1][mask | b] = v;
+                from[k + 1][mask | b] = [mask, t];
+              }
+            }
+          }
+        }
+        let best = INF;
+        let bestMask = -1;
+        for (let mask = 0; mask < size; mask++) {
+          if (dp[subs.length][mask] < best) {
+            best = dp[subs.length][mask];
+            bestMask = mask;
+          }
+        }
+        const curCost = subs.reduce((x, s) => x + marginal(s, m.get(s)!), 0);
+        if (bestMask >= 0 && best < curCost - EPS) {
+          let mask = bestMask;
+          for (let k = subs.length; k >= 1; k--) {
+            const [prev, t] = from[k][mask]!;
+            m.set(subs[k - 1], t);
+            mask = prev;
+          }
+          moved = true;
+        }
+        restore();
+      }
+    }
+    if (!moved) break;
+  }
+  return { byStudent, unassigned: a.unassigned, load };
+}
+
+/**
+ * runAssign + 분반당 인원 균형 맞추기(한 칸 옮기기·맞바꾸기 → 학생별 통째로 다시 짝짓기).
+ * 화면·결과·내보내기에 쓰는 최종 배정은 이걸 씁니다.
+ */
 export function runAssignBalanced(ctx: AllocContext, placement: number[][]): Assignment {
-  return balanceAssignment(ctx, placement, runAssign(ctx, placement));
+  return rematchAssignment(ctx, placement, balanceAssignment(ctx, placement, runAssign(ctx, placement)));
 }
 
 /** 비용 = 미배정×1000 + 정원초과×20 + 분반 불균형×0.05. */
