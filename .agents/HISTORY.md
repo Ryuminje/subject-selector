@@ -4,6 +4,13 @@
 
 ---
 
+### 2026-10-09 (6)
+
+**린트 점검 대상에서 우리 코드가 아닌 폴더 제외 (`eslint.config.mjs`) — 오류 162 → 146, 경고 1745 → 11:**
+- **분석:** 린트 오류 162개·경고 1745개 중 `public/pdfjs/`(설치 때 `scripts/copy-pdfjs.mjs`가 `node_modules`에서 복사하는 pdf.js 압축 코드, gitignore 대상)가 오류 10·경고 1733, `prototypes/`(src에 이식하기 전 독립 프로토타입, 빌드에 안 들어감)가 오류 6·경고 1이었음. 우리 코드(`src/`)는 오류 146·경고 11뿐. 린트는 빌드·배포를 막지 않음(162개 상태로 배포 성공).
+- **수정:** 점검 대상에서 `public/pdfjs/**`, `public/qpdf/**`, `prototypes/**` 제외. 점검 파일 305개(src 300개)는 그대로이고 라이브러리·프로토타입만 빠짐을 확인. 코드는 한 줄도 안 바꿈. `tsc` 영향 없음.
+- **남은 `src/` 오류 146개의 정체(손대지 않음):** `no-explicit-any` 120(타입을 `any`로 적은 것, 동작 무관·안전망 구멍), `prefer-const` 14(자동 수정 가능, `npx eslint --fix`), `react-hooks/immutability` 6(세 탭 화면이 렌더 중에 `window.getXxxBackup` 같은 저장/불러오기 함수를 전역에 등록 — 잘 동작하나 React 최신 규칙은 effect 사용을 권함, 고치면 저장/불러오기 연결을 건드려 위험), `set-state-in-effect` 4(`TeacherPlanStep.tsx:46`은 입력 중 빈칸이 되돌려지지 않게 한 의도된 패턴), `no-unescaped-entities` 2(`AnalysisStep.tsx` 글자 `'`). 경고 11은 안 쓰는 변수와 `<img>` 2개. **앞으로 새 코드는 `npm run lint` 결과가 이 숫자(146/11) 이상으로 늘지 않는지 보면 됨.** `any` 120개와 React 규칙 10개는 얻는 게 적고 동작이 바뀔 위험이 있어 일부러 미룸.
+
 ### 2026-10-09 (5)
 
 **보강원: 학교 확인 마무리 + 3줄 초과 시에도 한 장 유지:**
