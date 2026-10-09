@@ -357,7 +357,15 @@ export function runAssignBalanced(ctx: AllocContext, placement: number[][]): Ass
   return rematchAssignment(ctx, placement, balanceAssignment(ctx, placement, runAssign(ctx, placement)));
 }
 
-/** 비용 = 미배정×1000 + 정원초과×20 + 분반 불균형×0.05. */
+/**
+ * 분반 불균형(기댓값과의 편차 제곱합)이 비용에서 차지하는 가중치. 예전에는 0.05였는데, 실제 자료(학생
+ * 190명)로 비교하니 **타임 맞교환 이동(SWAP_MOVE_RATE)과 함께 1로 올릴 때** 미배정과 인원 쏠림이 함께
+ * 줄었습니다(2026-10-09 실측, HISTORY 참고). 이동 방식을 그대로 두고 가중치만 올리면 오히려 나빠지니
+ * 둘을 따로 바꾸지 마세요.
+ */
+const IMBALANCE_WEIGHT = 1;
+
+/** 비용 = 미배정×1000 + 정원초과×20 + 분반 불균형×IMBALANCE_WEIGHT. */
 export function cost(ctx: AllocContext, placement: number[][]): { value: number; assign: Assignment } {
   const a = runAssign(ctx, placement);
   let un = 0;
@@ -379,7 +387,7 @@ export function cost(ctx: AllocContext, placement: number[][]): { value: number;
       imb += (l - expected) * (l - expected);
     }
   });
-  return { value: un * 1000 + over * 20 + imb * 0.05, assign: a };
+  return { value: un * 1000 + over * 20 + imb * IMBALANCE_WEIGHT, assign: a };
 }
 
 /** 과목 간 동시 선택 빈도 행렬. */
@@ -473,6 +481,9 @@ export function initialPlacement(
   return placement;
 }
 
+/** optimize 가 한 번 이동할 때 "두 과목의 타임 맞바꾸기"를 고를 확률(나머지는 빈 타임으로 옮기기). */
+const SWAP_MOVE_RATE = 0.4;
+
 export interface OptimizeResult {
   placement: number[][];
   best: number;
@@ -489,6 +500,12 @@ export interface OptimizeResult {
  * 써서 탐색 횟수가 희석되고, ② cost()가 전체 과목을 합쳐 계산해 반복마다 더 느려집니다 —
  * 그 결과 다른 학기를 추가로 선택하기만 해도 이 학기의 배정 품질(그래서 실제 배정 결과)이
  * 흔들리는 문제가 있었습니다.
+ *
+ * 이동 방식은 두 가지를 섞습니다 — ① 한 과목의 분반 위치를 빈 타임으로 옮기기, ② 두 과목이 서로의
+ * 타임을 **맞바꾸기**(SWAP_MOVE_RATE 비율). ①만으로는 모든 타임이 이미 차 있을 때 한 곳을 옮기면 다른
+ * 곳이 막혀 막다른 곳에 갇혔는데, ②가 한 번에 두 곳을 옮겨 거기서 빠져나옵니다. 실제 자료로 같은
+ * 계산 시간에서 비교하니 정원을 빠듯하게 고정한 학기의 미배정이 8.8→2.0명(D+E 함께), 24.4→13.3명
+ * (2학기)으로 줄었습니다.
  */
 export function optimize(
   ctx: AllocContext,
@@ -515,18 +532,42 @@ export function optimize(
     const t0 = now();
     while (movable.length && now() - t0 < budgetMs) {
       iter++;
-      const s = movable[Math.floor(rand() * movable.length)];
-      const set = new Set(placement[s]);
-      const t1 = placement[s][Math.floor(rand() * placement[s].length)];
-      const free = [...Array(ownTimes).keys()].filter((t) => !set.has(t));
-      if (!free.length) continue;
-      const t2 = free[Math.floor(rand() * free.length)];
-      placement[s] = placement[s].map((t) => (t === t1 ? t2 : t));
+      let undo: () => void;
+      if (movable.length > 1 && rand() < SWAP_MOVE_RATE) {
+        // 맞바꾸기: s 의 타임 ts 와 u 의 타임 tu 를 서로 교환(각자 이미 그 타임에 있으면 불가)
+        const s = movable[Math.floor(rand() * movable.length)];
+        const u = movable[Math.floor(rand() * movable.length)];
+        if (s === u) continue;
+        const ts = placement[s][Math.floor(rand() * placement[s].length)];
+        const tu = placement[u][Math.floor(rand() * placement[u].length)];
+        if (ts === tu || placement[s].includes(tu) || placement[u].includes(ts)) continue;
+        const prevS = placement[s];
+        const prevU = placement[u];
+        placement[s] = prevS.map((t) => (t === ts ? tu : t));
+        placement[u] = prevU.map((t) => (t === tu ? ts : t));
+        undo = () => {
+          placement[s] = prevS;
+          placement[u] = prevU;
+        };
+      } else {
+        // 옮기기: s 의 타임 t1 을 비어 있는 t2 로
+        const s = movable[Math.floor(rand() * movable.length)];
+        const set = new Set(placement[s]);
+        const t1 = placement[s][Math.floor(rand() * placement[s].length)];
+        const free = [...Array(ownTimes).keys()].filter((t) => !set.has(t));
+        if (!free.length) continue;
+        const t2 = free[Math.floor(rand() * free.length)];
+        const prevS = placement[s];
+        placement[s] = prevS.map((t) => (t === t1 ? t2 : t));
+        undo = () => {
+          placement[s] = prevS;
+        };
+      }
       const c = cost(semCtx, placement).value;
       if (c <= best) {
         best = c;
       } else {
-        placement[s] = placement[s].map((t) => (t === t2 ? t1 : t));
+        undo();
       }
     }
   }
