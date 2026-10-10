@@ -870,7 +870,7 @@ export default function SwapTab() {
 
   return (
     <div className="flex flex-col lg:flex-row gap-4 items-start">
-    <div className="flex-1 min-w-0 bg-white rounded-[14px] border border-stone-200 overflow-hidden">
+    <div className="w-full lg:w-auto flex-1 min-w-0 bg-white rounded-[14px] border border-stone-200 overflow-hidden">
       <ManualChangeBar
         recording={recording}
         onToggleRecording={() => {
@@ -888,7 +888,14 @@ export default function SwapTab() {
         error={recordError}
       />
       <div className="overflow-auto max-h-[75vh] relative">
-        <table className="w-full border-collapse text-sm table-fixed">
+        {/* lg 미만(휴대폰·작은 태블릿)에서는 교시 칸 하나를 48px 이상으로 고정해 가로로 스크롤합니다.
+            table-fixed + w-full 이면 35칸이 화면 폭을 나눠 가져 칸이 7px 남짓이 되어 글자가 세로로
+            쪼개집니다. 교사명 칸(85px)은 왼쪽에 붙어 있어 스크롤해도 누구 줄인지 보입니다.
+            lg 이상은 기존처럼 한 화면에 맞춥니다(min-w-0). */}
+        <table
+          className="w-full min-w-[var(--swap-min-width)] lg:min-w-0 border-collapse text-sm table-fixed"
+          style={{ "--swap-min-width": `${85 + data.days.length * data.periods.length * 48}px` } as React.CSSProperties}
+        >
           <thead ref={theadRef} className="bg-swap text-white sticky top-0 z-20">
             <tr>
               <th rowSpan={2} className="p-2 border-r border-white/20 sticky left-0 z-30 bg-swap w-[85px] whitespace-nowrap overflow-hidden text-ellipsis text-xs sm:text-sm">교사명</th>

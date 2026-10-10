@@ -21,7 +21,7 @@ export function PdfToolsApp() {
 
   return (
     <main className="max-w-[1920px] mx-auto px-2 md:px-6 py-6 w-full">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
         <div className="flex items-center gap-2">
           <Link
             href="/"
