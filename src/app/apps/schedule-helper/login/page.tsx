@@ -3,14 +3,13 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Noto_Sans_KR, Song_Myung } from "next/font/google";
+import { Song_Myung } from "next/font/google";
 import { LogIn, ArrowLeft, ShieldCheck, KeyRound, School, ChevronDown } from "lucide-react";
 import { signIn } from "@/lib/auth-client";
 
 // 이 라우트는 전용 layout.tsx가 없어서(가입 화면과 함께 최상위 RootLayout의 Geist를
 // 그대로 물려받고 있었습니다), 다른 쌤스 헬퍼 화면과 폰트가 어긋나 있었습니다.
 // 2026-08-30 디자인 개편으로 나머지 화면과 같은 조합을 여기서 직접 불러옵니다.
-const notoSansKR = Noto_Sans_KR({ subsets: ["latin"], weight: ["400", "500", "700"] });
 const songMyung = Song_Myung({ weight: "400", variable: "--font-display" });
 
 type Mode = "email" | "id";
@@ -110,7 +109,7 @@ function LoginForm() {
 
   return (
     <div
-      className={`${notoSansKR.className} ${songMyung.variable} min-h-screen bg-[#F1EEE6] text-[#221F1A] flex items-center justify-center px-4`}
+      className={`font-sans ${songMyung.variable} min-h-screen bg-[#F1EEE6] text-[#221F1A] flex items-center justify-center px-4`}
     >
       <div className="w-full max-w-sm">
         <Link href="/" className="inline-flex items-center gap-1.5 mb-6 text-sm text-swap hover:opacity-80 font-medium">

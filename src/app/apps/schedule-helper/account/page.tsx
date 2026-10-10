@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Noto_Sans_KR, Song_Myung } from "next/font/google";
+import { Song_Myung } from "next/font/google";
 import { ArrowLeft, KeyRound } from "lucide-react";
 import { changePassword } from "@/lib/auth-client";
 
 // login/page.tsx와 같은 이유로 여기도 전용 layout.tsx가 없어 폰트를 직접 불러옵니다.
 // 세 앱(교체 도우미/이수증 수거/AI 파트너) 전부에서 링크로 들어오는 공용 화면이라
 // 특정 앱 색이 아니라 로그인·가입 화면과 같은 swap 톤을 기본값으로 씁니다.
-const notoSansKR = Noto_Sans_KR({ subsets: ["latin"], weight: ["400", "500", "700"] });
 const songMyung = Song_Myung({ weight: "400", variable: "--font-display" });
 
 export default function AccountPage() {
@@ -45,7 +44,7 @@ export default function AccountPage() {
 
   return (
     <div
-      className={`${notoSansKR.className} ${songMyung.variable} min-h-screen bg-[#F1EEE6] text-[#221F1A] flex items-center justify-center px-4`}
+      className={`font-sans ${songMyung.variable} min-h-screen bg-[#F1EEE6] text-[#221F1A] flex items-center justify-center px-4`}
     >
       <div className="w-full max-w-sm">
         <Link href="/" className="inline-flex items-center gap-1.5 mb-6 text-sm text-swap hover:opacity-80 font-medium">

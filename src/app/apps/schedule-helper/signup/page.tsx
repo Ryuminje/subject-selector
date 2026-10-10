@@ -3,11 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Noto_Sans_KR, Song_Myung } from "next/font/google";
+import { Song_Myung } from "next/font/google";
 import { School, KeyRound, ArrowLeft, Copy, Check } from "lucide-react";
 
 // login/page.tsx와 같은 이유로 여기도 전용 layout.tsx가 없어 폰트를 직접 불러옵니다.
-const notoSansKR = Noto_Sans_KR({ subsets: ["latin"], weight: ["400", "500", "700"] });
 const songMyung = Song_Myung({ weight: "400", variable: "--font-display" });
 
 type Mode = "create" | "join";
@@ -68,7 +67,7 @@ export default function SignupPage() {
   if (created) {
     return (
       <div
-        className={`${notoSansKR.className} ${songMyung.variable} min-h-screen bg-[#F1EEE6] text-[#221F1A] flex items-center justify-center px-4`}
+        className={`font-sans ${songMyung.variable} min-h-screen bg-[#F1EEE6] text-[#221F1A] flex items-center justify-center px-4`}
       >
         <div className="w-full max-w-sm">
           <div className="bg-white rounded-[14px] border border-[#E2DCCC] p-8 text-center">
@@ -105,7 +104,7 @@ export default function SignupPage() {
 
   return (
     <div
-      className={`${notoSansKR.className} ${songMyung.variable} min-h-screen bg-[#F1EEE6] text-[#221F1A] flex items-center justify-center px-4`}
+      className={`font-sans ${songMyung.variable} min-h-screen bg-[#F1EEE6] text-[#221F1A] flex items-center justify-center px-4`}
     >
       <div className="w-full max-w-sm">
         <Link href="/" className="inline-flex items-center gap-1.5 mb-6 text-sm text-swap hover:opacity-80 font-medium">

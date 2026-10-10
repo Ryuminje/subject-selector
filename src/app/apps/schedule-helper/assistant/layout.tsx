@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { Noto_Sans_KR, Song_Myung } from "next/font/google";
+import { Song_Myung } from "next/font/google";
 
-const notoSansKR = Noto_Sans_KR({ subsets: ["latin"], weight: ["400", "500", "700"] });
 const songMyung = Song_Myung({ weight: "400", variable: "--font-display" });
 
 export const metadata: Metadata = {
@@ -14,7 +13,7 @@ export const metadata: Metadata = {
 // 전형적인 "AI가 만든 대시보드" 장식이라 걷어냈습니다.
 export default function AssistantLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className={`${notoSansKR.className} ${songMyung.variable} bg-[#F1EEE6] text-[#221F1A] min-h-screen`}>
+    <div className={`font-sans ${songMyung.variable} bg-[#F1EEE6] text-[#221F1A] min-h-screen`}>
       {children}
     </div>
   );

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import { Noto_Sans_KR, Song_Myung } from "next/font/google";
+import { Song_Myung } from "next/font/google";
 
-const notoSansKR = Noto_Sans_KR({ subsets: ["latin"], weight: ["400", "500", "700"] });
 const songMyung = Song_Myung({ weight: "400", variable: "--font-display" });
 
 export const metadata: Metadata = {
@@ -16,7 +15,7 @@ export default function CertificatesLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className={`${notoSansKR.className} ${songMyung.variable} bg-[#F1EEE6] text-[#221F1A] min-h-screen`}>
+    <div className={`font-sans ${songMyung.variable} bg-[#F1EEE6] text-[#221F1A] min-h-screen`}>
       {children}
     </div>
   );

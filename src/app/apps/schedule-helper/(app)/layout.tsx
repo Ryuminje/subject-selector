@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { Noto_Sans_KR, Song_Myung } from "next/font/google";
+import { Song_Myung } from "next/font/google";
 import { ScheduleProvider } from "@/features/schedule-helper/lib/ScheduleContext";
 
-const notoSansKR = Noto_Sans_KR({ subsets: ["latin"], weight: ["400", "500", "700"] });
 // 큰 제목 전용 세리프 — globals.css의 .font-display가 이 변수를 읽습니다.
 const songMyung = Song_Myung({ weight: "400", variable: "--font-display" });
 
@@ -18,7 +17,7 @@ export default function ScheduleHelperLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className={`${notoSansKR.className} ${songMyung.variable} bg-[#F1EEE6] text-[#221F1A] min-h-screen`}>
+    <div className={`font-sans ${songMyung.variable} bg-[#F1EEE6] text-[#221F1A] min-h-screen`}>
       <ScheduleProvider>{children}</ScheduleProvider>
     </div>
   );
