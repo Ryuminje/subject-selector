@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ExternalLink } from "lucide-react";
 import { schoolName, introText, departments, isExternal } from "@/config/hub";
+import { GuideBanner } from "@/features/guide/components/GuideBanner";
+import { GuideLink } from "@/features/guide/components/GuideLink";
 
 const palette = [
   {
@@ -74,7 +76,12 @@ export default function Home() {
         <header className="mb-10 text-center">
           <h1 className="text-3xl sm:text-4xl font-bold text-stone-900 tracking-tight">{schoolName}</h1>
           <p className="mt-3 text-stone-600">{introText}</p>
+          <div className="mt-4 flex justify-center">
+            <GuideLink label="사용 설명서" />
+          </div>
         </header>
+
+        <GuideBanner />
 
         <div className="grid grid-cols-1 md:grid-cols-[320px_1fr] gap-6 items-start">
           {/* Left: department pill list */}

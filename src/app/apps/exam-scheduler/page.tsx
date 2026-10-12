@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { ArrowLeft, GraduationCap, Save, Upload } from 'lucide-react';
+import { GuideLink } from '@/features/guide/components/GuideLink';
 import {
   ResultsStep,
   RoomsStep,
@@ -74,14 +75,18 @@ export default function ExamSchedulerPage() {
   return (
     <div className="flex min-h-screen w-full flex-col">
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line bg-surface px-6 py-4">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-100 bg-white/80 px-3 py-1.5 text-sm font-medium text-emerald-700 shadow-sm transition-colors hover:bg-white"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-emerald-100 bg-white/80 px-3 py-1.5 text-sm font-medium text-emerald-700 shadow-sm transition-colors hover:bg-white"
           >
             <ArrowLeft className="size-4" aria-hidden />
             허브로 돌아가기
           </Link>
+          <GuideLink
+            slug="exam"
+            className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl border border-line bg-white/80 px-3 py-1.5 text-sm font-medium text-ink-muted shadow-sm transition-colors hover:bg-white"
+          />
           <span className="flex size-9 items-center justify-center rounded-lg bg-brand text-white">
             <GraduationCap className="size-5" aria-hidden />
           </span>

@@ -6,6 +6,7 @@ import { useSession, signOut } from "@/lib/auth-client";
 import { ArrowLeft, KeyRound, Loader2, LogOut } from "lucide-react";
 import AppSwitcher from "@/features/schedule-helper/components/AppSwitcher";
 import AssistantApp from "@/features/schedule-helper/components/assistant/AssistantApp";
+import { GuideLink } from "@/features/guide/components/GuideLink";
 
 export default function AssistantPage() {
   const router = useRouter();
@@ -39,6 +40,7 @@ export default function AssistantPage() {
           <AppSwitcher tone="assist" />
         </div>
         <div className="flex items-center gap-2">
+          <GuideLink slug="assistant" />
           <Link
             href="/apps/schedule-helper/account"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-stone-500 hover:text-assist text-sm font-medium rounded-[10px] border border-stone-200 shadow-sm transition-colors"

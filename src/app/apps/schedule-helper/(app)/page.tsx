@@ -11,6 +11,7 @@ import SwapTab from "@/features/schedule-helper/components/SwapTab";
 import MeetingTab from "@/features/schedule-helper/components/MeetingTab";
 import BlockTab from "@/features/schedule-helper/components/BlockTab";
 import UploadPanel from "@/features/schedule-helper/components/UploadPanel";
+import { GuideLink } from "@/features/guide/components/GuideLink";
 
 export default function ScheduleHelperPage() {
   const router = useRouter();
@@ -68,6 +69,7 @@ export default function ScheduleHelperPage() {
           <AppSwitcher tone="swap" />
         </div>
         <div className="flex items-center gap-2">
+          <GuideLink slug="swap" />
           <Link
             href="/apps/schedule-helper/account"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-stone-500 hover:text-swap text-sm font-medium rounded-[10px] border border-stone-200 transition-colors"

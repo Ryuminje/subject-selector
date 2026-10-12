@@ -6,6 +6,7 @@ import { useSession, signOut } from "@/lib/auth-client";
 import { ArrowLeft, LogOut, Loader2, KeyRound, UserPlus } from "lucide-react";
 import AppSwitcher from "@/features/schedule-helper/components/AppSwitcher";
 import CertificatesTabs from "@/features/schedule-helper/components/certificates/CertificatesTabs";
+import { GuideLink } from "@/features/guide/components/GuideLink";
 
 export default function CertificatesPage() {
   const router = useRouter();
@@ -41,6 +42,7 @@ export default function CertificatesPage() {
           <AppSwitcher tone="cert" />
         </div>
         <div className="flex items-center gap-2">
+          <GuideLink slug="certificates" />
           <Link
             href="/apps/schedule-helper/account"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-stone-500 hover:text-cert text-sm font-medium rounded-[10px] border border-stone-200 transition-colors"

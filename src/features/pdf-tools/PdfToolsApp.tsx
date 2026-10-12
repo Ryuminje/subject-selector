@@ -10,6 +10,7 @@ import { ArrowLeft, KeyRound, LogOut, ShieldCheck } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
 import AppSwitcher from "@/features/schedule-helper/components/AppSwitcher";
 import { Workbench } from "./components/Workbench";
+import { GuideLink } from "@/features/guide/components/GuideLink";
 
 export function PdfToolsApp() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export function PdfToolsApp() {
           <AppSwitcher tone="pdf" />
         </div>
         <div className="flex items-center gap-2">
+          <GuideLink slug="pdf" />
           <Link
             href="/apps/schedule-helper/account"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/80 hover:bg-white text-stone-500 hover:text-pdf text-sm font-medium rounded-[10px] border border-stone-200 transition-colors"

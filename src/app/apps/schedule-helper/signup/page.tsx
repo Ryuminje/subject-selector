@@ -224,6 +224,11 @@ export default function SignupPage() {
               로그인
             </Link>
           </p>
+          <p className="text-sm text-[#8B8577] mt-2 text-center">
+            <Link href="/guide/start" className="text-swap font-semibold hover:underline">
+              처음이세요? 사용법 보기
+            </Link>
+          </p>
         </div>
       </div>
     </div>
