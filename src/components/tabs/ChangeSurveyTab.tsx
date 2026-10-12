@@ -17,6 +17,7 @@ import { RosterAfterStep } from "../../features/change-survey/components/RosterA
 import { AnalysisStep } from "../../features/change-survey/components/AnalysisStep";
 import { RiroschoolStep } from "../../features/change-survey/components/RiroschoolStep";
 import { subjectOptionsOf } from "../../features/change-survey/lib/subjectMatch";
+import { GuideLink } from "@/features/guide/components/GuideLink";
 
 export function ChangeSurveyTab() {
   const [changeActiveTab, setChangeActiveTab] = useState<"basic" | "upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis" | "riroschool">("basic");
@@ -299,7 +300,7 @@ export function ChangeSurveyTab() {
               명신고등학교 선택과목 변경 시스템
             </h1>
             
-            <div className="flex gap-2 shrink-0">
+            <div className="flex flex-wrap gap-2 min-w-0 sm:shrink-0">
               <input
                 type="file"
                 accept=".json"
@@ -307,6 +308,7 @@ export function ChangeSurveyTab() {
                 ref={fileInputRef}
                 onChange={handleLoadBackup}
               />
+              <GuideLink slug="enrollment" className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-stone-50 text-stone-700 text-sm font-medium rounded-xl transition-all border border-stone-300 shadow-sm whitespace-nowrap" />
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-medium rounded-xl transition-all border border-stone-300 shadow-sm"

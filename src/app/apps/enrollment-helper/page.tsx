@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import Link from "next/link";
-import { Settings, FileText, GitBranch, CalendarClock, BookOpen } from "lucide-react";
+import { Settings, FileText, GitBranch, CalendarClock } from "lucide-react";
 import { DemandSurveyTab } from "@/components/tabs/DemandSurveyTab";
 import { ChangeSurveyTab } from "@/components/tabs/ChangeSurveyTab";
 import { MainSurveyTab } from "@/components/tabs/MainSurveyTab";
@@ -96,17 +96,6 @@ export default function EnrollmentHelperPage() {
               <div className="absolute left-0 w-1 h-8 bg-amber-500 rounded-r-full shadow-[0_0_10px_rgba(217,119,6,0.4)]" />
             )}
           </button>
-          <Link
-            href="/guide/enrollment"
-            className="relative flex items-center px-4 h-[60px] transition-all duration-300 group overflow-hidden bg-white/95 backdrop-blur-xl border-y border-r border-stone-200 rounded-r-2xl shadow-[4px_0_15px_rgba(0,0,0,0.08)] w-16 hover:w-64 hover:bg-stone-50"
-          >
-            <div className="w-8 h-8 flex flex-shrink-0 justify-center items-center rounded-xl text-stone-500 group-hover:text-amber-700 transition-colors duration-300">
-              <BookOpen className="w-5 h-5" />
-            </div>
-            <span className="ml-4 font-medium whitespace-nowrap text-stone-600 opacity-0 group-hover:opacity-100 transition-all duration-300">
-              사용 설명서
-            </span>
-          </Link>
         </nav>
       </aside>
 

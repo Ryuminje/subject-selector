@@ -14,6 +14,7 @@ import { CategorySummaryStep } from "../../features/main-survey/components/Categ
 import { HoursSimStep, type CurriculumCandidate } from "../../features/main-survey/components/HoursSimStep";
 import { fromSummaryRows, type SimBaseline, type SimCategory, type SimPlan } from "../../features/main-survey/lib/hoursSim";
 import type { GradeKey } from "../../types";
+import { GuideLink } from "@/features/guide/components/GuideLink";
 
 export function MainSurveyTab() {
   const [activeTab, setActiveTab] = useState("curriculum");
@@ -248,7 +249,7 @@ export function MainSurveyTab() {
               명신고등학교 수강신청(본조사) 데이터 정리
             </h1>
             
-            <div className="flex gap-2 shrink-0">
+            <div className="flex flex-wrap gap-2 min-w-0 sm:shrink-0">
               <input
                 type="file"
                 accept=".json"
@@ -256,6 +257,7 @@ export function MainSurveyTab() {
                 ref={fileInputRef}
                 onChange={handleLoadBackup}
               />
+              <GuideLink slug="enrollment" className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-stone-50 text-stone-700 text-sm font-medium rounded-xl transition-all border border-stone-300 shadow-sm whitespace-nowrap" />
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-medium rounded-xl transition-all border border-stone-300 shadow-sm"

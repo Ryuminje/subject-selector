@@ -14,6 +14,7 @@ import { AllocationGridStep } from "../../features/time-allocation/components/Al
 import { StudentResultStep } from "../../features/time-allocation/components/StudentResultStep";
 import { TeacherPlanStep } from "../../features/time-allocation/components/TeacherPlanStep";
 import type { MainSurveySnapshot } from "../../features/time-allocation/lib/fromMainSurvey";
+import { GuideLink } from "@/features/guide/components/GuideLink";
 
 const STEPS = [
   { key: "input", label: "① 데이터 입력" },
@@ -159,7 +160,7 @@ export function TimeAllocationTab() {
             <CalendarClock className="w-6 h-6 text-amber-600 shrink-0" />
             선택과목 타임(구획) 배정
           </h1>
-          <div className="flex gap-2 shrink-0">
+          <div className="flex flex-wrap gap-2 min-w-0 sm:shrink-0">
             <input
               type="file"
               accept=".json"
@@ -167,6 +168,7 @@ export function TimeAllocationTab() {
               ref={fileInputRef}
               onChange={handleLoadBackup}
             />
+            <GuideLink slug="enrollment" className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-stone-50 text-stone-700 text-sm font-medium rounded-xl transition-all border border-stone-300 shadow-sm whitespace-nowrap" />
             <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-medium rounded-xl transition-all border border-stone-300 shadow-sm"
