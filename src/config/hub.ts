@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Bot, BookOpenCheck, CalendarClock, ClipboardCheck, FileCog, FileText, GraduationCap, HeartHandshake, ScrollText, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Bot, BookOpenCheck, CalendarClock, ClipboardCheck, FileCog, FileText, GraduationCap, HeartHandshake, LineChart, ScrollText, Users, type LucideIcon } from "lucide-react";
 
 export interface HubApp {
   title: string;
@@ -49,6 +49,19 @@ export const departments: HubDepartment[] = [
         description: "명단 · 시간표를 바탕으로 시험실 배정, 분반, 결과표를 한 번에 만듭니다.",
         href: "/apps/exam-scheduler",
         icon: CalendarClock,
+      },
+    ],
+  },
+  {
+    name: "학년부 (담임용)",
+    description: "담임 선생님의 학생 상담·지도 업무 프로그램",
+    icon: Users,
+    apps: [
+      {
+        title: "내신-모의고사 성적 분석기",
+        description: "내신·모의고사 성적표 PDF를 올리면 학생별 분석, 수시·정시 성향, 상담 메모를 한 화면에서 봅니다. 파일은 이 브라우저 안에서만 처리됩니다.",
+        href: "/apps/score-analyzer",
+        icon: LineChart,
       },
     ],
   },

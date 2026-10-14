@@ -4,6 +4,16 @@
 
 ---
 
+### 2026-10-14
+
+**내신-모의고사 성적 분석기(`/apps/score-analyzer`) 허브 등록 — 학년부(담임용) 부서 신설, `feature/score-analyzer` → `main`:**
+- **구성:** 코드는 `src/features/score-analyzer/`(lib: `parseReport`·`parseKiceReport`·`neis`·`naesin`·`integrated`·`analyze`·`saveFile`, components: `ScoreAnalyzerApp`·`NaesinView`·`IntegratedView`·`ClassOverview`·`GradeChangeChart`·`NotesPanel`·`Charts`), 라우트는 `src/app/apps/score-analyzer/page.tsx`. 허브 `hub.ts`에 "학년부 (담임용)"을 교육평가부 다음에 추가, `guide.ts`에 `score` 항목.
+- **원칙(사용자 요구):** 학생 개인정보라 **서버·DB 전송/저장 없음.** PDF는 브라우저 안(pdf.js)에서만 읽고 로그인 불필요(`/apps/score-analyzer`는 `proxy.ts` matcher 밖). 저장은 자동 저장 없이 **"저장하기/불러오기" 파일(.json)** 뿐이며 선택 비밀번호는 WebCrypto(PBKDF2+AES-GCM). 위치·이름은 `showSaveFilePicker`(미지원 브라우저는 다운로드 폴더). 파일에 이름·성적이 들어가므로 저장소에 올리지 말 것.
+- **세 탭(내신·모의고사·통합)** 이 학생 선택(`번호|이름`)과 상담 메모(학생별)를 `ScoreAnalyzerApp`에서 함께 들고 있다.
+- **파서 검증은 실제 학교 PDF(저장소 밖 `D:\3학년 모의고사 성적\`)로 했고** 저장소에는 실제 파일·이름을 넣지 않았다. 아직 못 한 것: 실제 PDF를 브라우저 화면으로 올려 보기, 인쇄 미리보기, KICE 제2외국어/한문 영역, 9월 평가원 양식 실물 확인, 5등급제 환산·중학교 모드·상담 우선순위·학급 일괄 처리.
+
+---
+
 ### 2026-10-12
 
 **사용 설명서(`/guide`) 신설 — 요약본 + 앱별 상세, `feature/user-guide` 브랜치:**
