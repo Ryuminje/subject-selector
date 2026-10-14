@@ -8,6 +8,8 @@ import { NaesinView } from "./NaesinView";
 import { IntegratedView } from "./IntegratedView";
 import { GuideLink } from "@/features/guide/components/GuideLink";
 import { NotesPanel } from "./NotesPanel";
+import { AdmissionView } from "./AdmissionView";
+import { EMPTY_ADMISSION, packAdmission, unpackAdmission, type AdmissionState } from "../lib/admission";
 import { decodeSave, encodeSave, isEncrypted, personKey, type Note, type Notes } from "../lib/saveFile";
 import type { NeisStudent } from "../lib/neis";
 import { readReportPdf } from "../lib/readPdf";
@@ -44,7 +46,9 @@ const fmt = (n: number | null, d = 2) => (n == null ? "—" : n.toFixed(d).repla
 const byExam = (a: Report, b: Report) => a.year - b.year || a.month - b.month;
 
 export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Report[] }) {
-  const [tab, setTab] = useState<"naesin" | "mock" | "integrated">("naesin");
+  const [tab, setTab] = useState<"naesin" | "mock" | "integrated" | "admission">("naesin");
+  // 입결 자료(대학어디가). 줄인 형태로 저장 파일에 함께 담깁니다.
+  const [admission, setAdmission] = useState<AdmissionState>(EMPTY_ADMISSION);
   // 내신 자료는 내신 탭과 수시·정시 통합 탭이 함께 쓰므로 여기서 들고 있습니다.
   const [naesin, setNaesin] = useState<{ students: NeisStudent[]; fileName: string }>({ students: [], fileName: "" });
   const [reports, setReports] = useState<Report[]>(initialReports);
@@ -146,7 +150,7 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
       "",
     );
     if (pw === null) return;
-    const blob = await encodeSave({ reports, naesin, files, notes }, pw);
+    const blob = await encodeSave({ reports, naesin, files, notes, admission: packAdmission(admission) }, pw);
     if (handle) {
       const w = await handle.createWritable();
       await w.write(blob);
@@ -176,8 +180,14 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
       setNaesin(d.naesin);
       setFiles(d.files);
       setNotes(d.notes);
+      const adm = unpackAdmission(d.admission);
+      setAdmission(adm);
       setSelected("");
-      setSaveMsg(`불러왔습니다. (모의고사 ${d.reports.length}건 · 내신 ${d.naesin.students.length}명)`);
+      setSaveMsg(
+        `불러왔습니다. (모의고사 ${d.reports.length}건 · 내신 ${d.naesin.students.length}명` +
+          (adm.susi.length + adm.jeongsi.length ? ` · 입결 ${(adm.susi.length + adm.jeongsi.length).toLocaleString()}행` : "") +
+          ")",
+      );
     } catch (e) {
       setSaveMsg(e instanceof Error ? e.message : "파일을 읽지 못했습니다.");
     } finally {
@@ -233,6 +243,7 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
                 ["naesin", "내신 분석"],
                 ["mock", "모의고사"],
                 ["integrated", "수시·정시 통합"],
+                ["admission", "입결 자료"],
               ] as const
             ).map(([k, label]) => (
               <button
@@ -250,13 +261,15 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
               ? "모의고사 성적통지표 PDF를 올리면 분석 자료가 만들어집니다"
               : tab === "naesin"
                 ? "교과학습발달상황 PDF를 올리면 내신 분석 자료가 만들어집니다"
-                : "내신과 모의고사를 함께 올리면 수시·정시 성향을 비교해 줍니다"}
+                : tab === "admission"
+                  ? "대학어디가 입결 엑셀을 올리면 줄여서 저장 파일에 함께 담습니다"
+                  : "내신과 모의고사를 함께 올리면 수시·정시 성향을 비교해 줍니다"}
           </span>
           <div className="ml-auto flex gap-2 flex-wrap items-center">
             {saveMsg && <span className="text-xs text-stone-600" role="status">{saveMsg}</span>}
             <button
               onClick={() => void saveToFile()}
-              disabled={!reports.length && !naesin.students.length}
+              disabled={!reports.length && !naesin.students.length && !admission.susi.length && !admission.jeongsi.length}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-white rounded-xl border border-stone-300 hover:bg-stone-50 disabled:opacity-40"
             >
               <Save className="w-4 h-4" /> 저장하기
@@ -308,6 +321,16 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
       {tab === "integrated" && (
         <IntegratedView naesin={naesin.students} reports={reports} opts={opts} goTo={setTab} notes={notes} onNote={setNote} selected={selected} onSelect={setSelected} />
       )}
+      <div className={tab === "admission" ? "" : "hidden"}>
+        <AdmissionView
+          admission={admission}
+          onChange={setAdmission}
+          naesin={naesin.students}
+          reports={reports}
+          selected={selected}
+          onSelect={setSelected}
+        />
+      </div>
       <div className={`max-w-[1400px] mx-auto px-4 py-3 grid gap-3 lg:grid-cols-[320px_1fr] items-start ${tab === "mock" ? "" : "hidden"}`}>
         {/* 왼쪽: 올리기·설정 */}
         <aside className="print:hidden grid gap-3 sm:grid-cols-2 lg:grid-cols-1 items-start">

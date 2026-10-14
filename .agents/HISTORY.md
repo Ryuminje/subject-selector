@@ -10,6 +10,7 @@
 - **구성:** 코드는 `src/features/score-analyzer/`(lib: `parseReport`·`parseKiceReport`·`neis`·`naesin`·`integrated`·`analyze`·`saveFile`, components: `ScoreAnalyzerApp`·`NaesinView`·`IntegratedView`·`ClassOverview`·`GradeChangeChart`·`NotesPanel`·`Charts`), 라우트는 `src/app/apps/score-analyzer/page.tsx`. 허브 `hub.ts`에 "학년부 (담임용)"을 교육평가부 다음에 추가, `guide.ts`에 `score` 항목.
 - **원칙(사용자 요구):** 학생 개인정보라 **서버·DB 전송/저장 없음.** PDF는 브라우저 안(pdf.js)에서만 읽고 로그인 불필요(`/apps/score-analyzer`는 `proxy.ts` matcher 밖). 저장은 자동 저장 없이 **"저장하기/불러오기" 파일(.json)** 뿐이며 선택 비밀번호는 WebCrypto(PBKDF2+AES-GCM). 위치·이름은 `showSaveFilePicker`(미지원 브라우저는 다운로드 폴더). 파일에 이름·성적이 들어가므로 저장소에 올리지 말 것.
 - **세 탭(내신·모의고사·통합)** 이 학생 선택(`번호|이름`)과 상담 메모(학생별)를 `ScoreAnalyzerApp`에서 함께 들고 있다.
+- **입결 자료 탭(같은 날 추가):** 선생님이 대학어디가 수시·정시 입결 엑셀(`대학자료` 시트, 약 17MB+8.5MB)을 올리면 브라우저에서 필요한 27개 열만 남겨 줄여(`lib/admission.ts`) 저장 파일에 함께 담는다(저장 파일 `v2`: JSON→gzip→선택 암호화→base64, 줄인 JSON 9.4MB→약 1.6MB, `v1` 파일도 읽힘). `lib/compare.ts`가 학생 내신 평균등급(수시)·국수탐 백분위 평균(정시)을 최신 연도 50%·70% 컷과 비교해 안정·적정·소신·상향을 낸다(소신 범위 0.5등급·5점은 상담용 가정). **알려진 한계:** 대학별 반영 교과·학년·환산식은 반영하지 못함(선택한 조합 평균 하나로 비교). 자료 출처는 목포제일여고 김현석 선생님 개인 작업물이라 **저장소에 자료를 넣지 않는다**(사용자가 직접 올리는 방식). 어디가·진학사 공개 API는 확인되지 않았다.
 - **파서 검증은 실제 학교 PDF(저장소 밖 `D:\3학년 모의고사 성적\`)로 했고** 저장소에는 실제 파일·이름을 넣지 않았다. 아직 못 한 것: 실제 PDF를 브라우저 화면으로 올려 보기, 인쇄 미리보기, KICE 제2외국어/한문 영역, 9월 평가원 양식 실물 확인, 5등급제 환산·중학교 모드·상담 우선순위·학급 일괄 처리.
 
 ---
