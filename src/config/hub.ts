@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Bot, BookOpenCheck, CalendarClock, ClipboardCheck, FileCog, FileText, GraduationCap, HeartHandshake, LineChart, ScrollText, Users, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, Bot, BookOpenCheck, CalendarClock, ClipboardCheck, FileCog, FileText, GraduationCap, HeartHandshake, LineChart, MessagesSquare, ScrollText, Users, type LucideIcon } from "lucide-react";
 
 export interface HubApp {
   title: string;
@@ -62,6 +62,13 @@ export const departments: HubDepartment[] = [
         description: "내신·모의고사 성적표 PDF를 올리면 학생별 분석, 수시·정시 성향, 상담 메모를 한 화면에서 봅니다. 파일은 이 브라우저 안에서만 처리됩니다.",
         href: "/apps/score-analyzer",
         icon: LineChart,
+      },
+      {
+        title: "면접지도 준비기",
+        description: "학생 면접 지도를 준비하는 데 쓰는 바깥 사이트입니다. 누르면 새 탭에서 열립니다.",
+        href: "https://lab.esquire0.workers.dev/",
+        icon: MessagesSquare,
+        credit: "출처: @hirameki",
       },
     ],
   },
