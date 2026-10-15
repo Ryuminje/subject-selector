@@ -10,6 +10,7 @@ import { GuideLink } from "@/features/guide/components/GuideLink";
 import { NotesPanel } from "./NotesPanel";
 import { AdmissionView } from "./AdmissionView";
 import { EMPTY_ADMISSION, packAdmission, unpackAdmission, type AdmissionState } from "../lib/admission";
+import type { Guideline } from "../lib/guideline";
 import { decodeSave, encodeSave, isEncrypted, personKey, type Note, type Notes } from "../lib/saveFile";
 import type { NeisStudent } from "../lib/neis";
 import { readReportPdf } from "../lib/readPdf";
@@ -49,6 +50,8 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
   const [tab, setTab] = useState<"naesin" | "mock" | "integrated" | "admission">("naesin");
   // 입결 자료(대학어디가). 줄인 형태로 저장 파일에 함께 담깁니다.
   const [admission, setAdmission] = useState<AdmissionState>(EMPTY_ADMISSION);
+  // 모집요강 정리 JSON(대학별 반영 규칙). 저장 파일에 함께 담깁니다.
+  const [guidelines, setGuidelines] = useState<Guideline[]>([]);
   // 내신 자료는 내신 탭과 수시·정시 통합 탭이 함께 쓰므로 여기서 들고 있습니다.
   const [naesin, setNaesin] = useState<{ students: NeisStudent[]; fileName: string }>({ students: [], fileName: "" });
   const [reports, setReports] = useState<Report[]>(initialReports);
@@ -150,7 +153,10 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
       "",
     );
     if (pw === null) return;
-    const blob = await encodeSave({ reports, naesin, files, notes, admission: packAdmission(admission) }, pw);
+    const blob = await encodeSave(
+      { reports, naesin, files, notes, admission: packAdmission(admission), guidelines: guidelines.length ? guidelines : undefined },
+      pw,
+    );
     if (handle) {
       const w = await handle.createWritable();
       await w.write(blob);
@@ -182,10 +188,12 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
       setNotes(d.notes);
       const adm = unpackAdmission(d.admission);
       setAdmission(adm);
+      setGuidelines(d.guidelines ?? []);
       setSelected("");
       setSaveMsg(
         `불러왔습니다. (모의고사 ${d.reports.length}건 · 내신 ${d.naesin.students.length}명` +
           (adm.susi.length + adm.jeongsi.length ? ` · 입결 ${(adm.susi.length + adm.jeongsi.length).toLocaleString()}행` : "") +
+          (d.guidelines?.length ? ` · 모집요강 ${d.guidelines.length}건` : "") +
           ")",
       );
     } catch (e) {
@@ -269,7 +277,9 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
             {saveMsg && <span className="text-xs text-stone-600" role="status">{saveMsg}</span>}
             <button
               onClick={() => void saveToFile()}
-              disabled={!reports.length && !naesin.students.length && !admission.susi.length && !admission.jeongsi.length}
+              disabled={
+                !reports.length && !naesin.students.length && !admission.susi.length && !admission.jeongsi.length && !guidelines.length
+              }
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-white rounded-xl border border-stone-300 hover:bg-stone-50 disabled:opacity-40"
             >
               <Save className="w-4 h-4" /> 저장하기
@@ -329,6 +339,8 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
           reports={reports}
           selected={selected}
           onSelect={setSelected}
+          guidelines={guidelines}
+          onGuidelines={setGuidelines}
         />
       </div>
       <div className={`max-w-[1400px] mx-auto px-4 py-3 grid gap-3 lg:grid-cols-[320px_1fr] items-start ${tab === "mock" ? "" : "hidden"}`}>

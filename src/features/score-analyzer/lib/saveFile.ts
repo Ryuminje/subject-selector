@@ -4,6 +4,7 @@
 import type { NeisStudent } from "./neis";
 import type { Report } from "./types";
 import type { AdmissionPack } from "./admission";
+import type { Guideline } from "./guideline";
 
 export interface Note {
   career: string;
@@ -20,6 +21,8 @@ export interface SaveData {
   notes: Notes;
   /** 줄인 입결 자료(없을 수 있음) */
   admission?: AdmissionPack;
+  /** 모집요강 정리 JSON(대학별 반영 규칙) */
+  guidelines?: Guideline[];
 }
 
 interface Envelope {
@@ -129,5 +132,6 @@ export async function decodeSave(text: string, password: string): Promise<SaveDa
     files: Array.isArray(data.files) ? data.files : [],
     notes: data.notes && typeof data.notes === "object" ? data.notes : {},
     admission: data.admission,
+    guidelines: Array.isArray(data.guidelines) ? data.guidelines : undefined,
   };
 }

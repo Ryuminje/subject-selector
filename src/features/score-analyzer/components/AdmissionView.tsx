@@ -8,6 +8,17 @@ import { buildPeople, peopleLabel } from "../lib/integrated";
 import { COMBOS, groupOf, weightedAverage } from "../lib/naesin";
 import { gradeOf, percentileMean } from "../lib/analyze";
 import type { NeisStudent } from "../lib/neis";
+import {
+  bestGyogwa,
+  evalSuneungMin,
+  findGuideline,
+  findTrack,
+  guidelineKey,
+  parseGuidelines,
+  suneungMinFor,
+  type ExamGrades,
+  type Guideline,
+} from "../lib/guideline";
 import type { Report } from "../lib/types";
 
 interface Props {
@@ -18,6 +29,9 @@ interface Props {
   /** 선택한 학생(번호|이름). 모든 탭이 함께 씁니다. */
   selected: string;
   onSelect: (key: string) => void;
+  /** 모집요강 정리 JSON(대학별 반영 규칙) */
+  guidelines: Guideline[];
+  onGuidelines: (g: Guideline[]) => void;
 }
 
 const KIND_LABEL: Record<AdmKind, string> = { susi: "수시", jeongsi: "정시" };
@@ -39,7 +53,7 @@ function cutText(r: AdmRow | undefined) {
   return f(a ?? b);
 }
 
-export function AdmissionView({ admission, onChange, naesin, reports, selected, onSelect }: Props) {
+export function AdmissionView({ admission, onChange, naesin, reports, selected, onSelect, guidelines, onGuidelines }: Props) {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [kind, setKind] = useState<AdmKind>("susi");
@@ -51,16 +65,25 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function addFiles(list: FileList | File[]) {
-    const files = [...list].filter((x) => /\.xlsx?$/i.test(x.name));
+    const files = [...list].filter((x) => /\.(xlsx?|json)$/i.test(x.name));
     if (!files.length) {
-      setError("엑셀 파일(.xlsx)만 올릴 수 있습니다.");
+      setError("입결 엑셀(.xlsx)이나 모집요강 정리 파일(.json)만 올릴 수 있습니다.");
       return;
     }
     setError("");
     let next = admission;
+    let nextGuidelines = guidelines;
     for (const file of files) {
       setBusy(`"${file.name}" 읽는 중… (큰 파일은 10~20초 걸립니다)`);
       try {
+        if (/\.json$/i.test(file.name)) {
+          const incoming = parseGuidelines(await file.text());
+          // 같은 대학·구분·학년도는 새 파일로 바꿉니다(통합 파일은 여러 대학이 한꺼번에 들어옵니다)
+          const keys = new Set(incoming.map(guidelineKey));
+          nextGuidelines = [...nextGuidelines.filter((x) => !keys.has(guidelineKey(x))), ...incoming];
+          onGuidelines(nextGuidelines);
+          continue;
+        }
         const r = await readAdmissionXlsx(file);
         next = { ...next, [r.kind]: r.rows, sources: { ...next.sources, [r.kind]: file.name } };
         onChange(next);
@@ -97,17 +120,45 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
     const u = univ.trim();
     const d = dept.trim();
     if (!u && !d) return [];
+    const t1 = latestMock ? gradeOf(latestMock, "탐구1") : null;
+    const t2 = latestMock ? gradeOf(latestMock, "탐구2") : null;
+    const exam: ExamGrades | null = latestMock
+      ? {
+          국어: gradeOf(latestMock, "국어"),
+          수학: gradeOf(latestMock, "수학"),
+          영어: gradeOf(latestMock, "영어"),
+          탐구: t1 != null && t2 != null ? Math.min(t1, t2) : (t1 ?? t2),
+          탐구2: t1 != null && t2 != null ? Math.max(t1, t2) : null,
+        }
+      : null;
     return offers
       .filter((o) => (!u || o.univ.includes(u)) && (!d || o.dept.includes(d)) && (!type || o.type === type))
-      .map((o) => ({ o, j: judge(o, myScore), t: trend(o) }))
+      .map((o) => {
+        const g = findGuideline(guidelines, o.univ, kind);
+        // 대학이 정한 반영 교과·방식으로 다시 계산한 값이 있으면 그것으로 비교합니다.
+        let my = myScore;
+        let myNote: string | null = null;
+        if (kind === "susi" && g?.engine?.gyogwa && o.type === "교과" && person?.naesin) {
+          const r = bestGyogwa(person.naesin.courses, g.engine.gyogwa, { field: o.field, dept: o.dept, track: o.track });
+          if (r) {
+            my = r.value;
+            myNote = r.label;
+          }
+        }
+        const track = g ? findTrack(g, o.track) : undefined;
+        const rule = kind === "susi" ? suneungMinFor(track, o.dept, o.field) : undefined;
+        const ok = rule && exam ? evalSuneungMin(rule.rule, exam) : null;
+        return { o, j: judge(o, my), t: trend(o), my, myNote, g, rule, ok };
+      })
       .filter((x) => !fitFilter || x.j?.fit === fitFilter)
       .sort(
         (a, b) =>
           a.o.univ.localeCompare(b.o.univ, "ko") || a.o.dept.localeCompare(b.o.dept, "ko") || a.o.track.localeCompare(b.o.track, "ko"),
       );
-  }, [offers, univ, dept, type, fitFilter, myScore]);
+  }, [offers, univ, dept, type, fitFilter, myScore, guidelines, kind, person, latestMock]);
 
   const has = admission.susi.length > 0 || admission.jeongsi.length > 0;
+  const showMin = kind === "susi" && guidelines.some((g) => g.source.kind === "수시");
   const fitCount = useMemo(() => {
     const c: Record<Fit, number> = { safe: 0, fair: 0, reach: 0, high: 0 };
     for (const x of result) if (x.j) c[x.j.fit] += 1;
@@ -129,11 +180,13 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
           >
             <Upload className="w-6 h-6 text-amber-700" />
             <span className="text-sm font-bold">{busy ? "읽는 중…" : "엑셀을 끌어다 놓거나 눌러서 고르세요"}</span>
-            <span className="text-xs text-stone-600">대학어디가 수시·정시 입결자료 엑셀(&lsquo;대학자료&rsquo; 시트) · 두 파일을 함께 올릴 수 있습니다</span>
+            <span className="text-xs text-stone-600">
+              대학어디가 수시·정시 입결자료 엑셀(&lsquo;대학자료&rsquo; 시트)과 모집요강 정리 파일(.json)을 함께 올릴 수 있습니다
+            </span>
             <input
               ref={inputRef}
               type="file"
-              accept=".xlsx,.xls"
+              accept=".xlsx,.xls,.json"
               multiple
               disabled={!!busy}
               className="sr-only"
@@ -177,6 +230,33 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                   );
                 })}
             </ul>
+          )}
+          {guidelines.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-bold text-stone-700">모집요강 (대학별 반영 규칙) {guidelines.length}건</p>
+              <ul className="mt-1.5 space-y-1.5">
+                {guidelines.map((g) => (
+                  <li key={guidelineKey(g)} className="flex items-start gap-2 rounded-lg bg-stone-50 border border-stone-200 px-2.5 py-1.5 text-xs">
+                    <FileText className="w-4 h-4 shrink-0 text-stone-500 mt-0.5" />
+                    <span className="flex-1 min-w-0">
+                      <b className="block truncate">
+                        {g.source.shortName}
+                        {g.source.campus ? `(${g.source.campus})` : ""} · {g.source.kind} · {g.source.admissionYear}학년도
+                      </b>
+                      <span className={g.review.status === "확인됨" ? "text-emerald-700" : "text-amber-700"}>{g.review.status}</span>
+                      {g.engine?.gyogwa?.length ? " · 교과 계산 규칙 있음" : ""}
+                    </span>
+                    <button
+                      aria-label={`${g.source.shortName} ${g.source.kind} 모집요강 지우기`}
+                      onClick={() => onGuidelines(guidelines.filter((x) => guidelineKey(x) !== guidelineKey(g)))}
+                      className="p-0.5 text-stone-500 hover:text-stone-900"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </section>
 
@@ -366,13 +446,15 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                             {y} {kind === "susi" ? "등급컷" : "백분위컷"}
                           </th>
                         ))}
+                        <th className="p-2 border border-stone-200 text-center">내 성적</th>
                         <th className="p-2 border border-stone-200 text-center">판정</th>
                         <th className="p-2 border border-stone-200 text-center">컷 대비</th>
                         <th className="p-2 border border-stone-200 text-center">추세</th>
+                        {showMin && <th className="p-2 border border-stone-200">수능 최저</th>}
                       </tr>
                     </thead>
                     <tbody>
-                      {result.slice(0, MAX_ROWS).map(({ o, j, t }) => {
+                      {result.slice(0, MAX_ROWS).map(({ o, j, t, my, myNote, rule, ok }) => {
                         const base =
                           (j ? o.years.get(j.year) : undefined) ??
                           [...o.years.values()].sort((a, b) => (b.year ?? 0) - (a.year ?? 0))[0];
@@ -392,6 +474,16 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                                 {cutText(o.years.get(y))}
                               </td>
                             ))}
+                            <td className="p-2 border border-stone-200 text-center whitespace-nowrap" title={myNote ?? "공통 기준(대학별 규칙 없음)"}>
+                              {my == null ? (
+                                "—"
+                              ) : (
+                                <>
+                                  {f(my)}
+                                  {myNote ? <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] text-amber-800">대학 방식</span> : null}
+                                </>
+                              )}
+                            </td>
                             <td className="p-2 border border-stone-200 text-center">
                               {j ? (
                                 <span className={`rounded px-2 py-0.5 font-bold ${FIT_STYLE[j.fit]}`}>{FIT_LABEL[j.fit]}</span>
@@ -421,6 +513,24 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                                 <span className="text-emerald-700">쉬워짐</span>
                               )}
                             </td>
+                            {showMin && (
+                              <td className="p-2 border border-stone-200 text-xs">
+                                {rule ? (
+                                  <>
+                                    <span className="text-stone-700">{rule.rule}</span>{" "}
+                                    {ok == null ? (
+                                      <span className="text-stone-500">(자동 판정 불가)</span>
+                                    ) : ok ? (
+                                      <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-bold text-emerald-800">충족</span>
+                                    ) : (
+                                      <span className="rounded bg-rose-100 px-1.5 py-0.5 font-bold text-rose-800">미충족</span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="text-stone-400">—</span>
+                                )}
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
