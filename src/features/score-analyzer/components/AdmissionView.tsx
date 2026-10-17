@@ -154,7 +154,8 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
   }, [result]);
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 py-3 grid gap-3 lg:grid-cols-[320px_1fr] items-start">
+    // 입결 표는 열이 많아서 폭 상한을 크게 풉니다(넓은 화면에서는 가로 스크롤 없이 한 번에 보이게).
+    <div className="max-w-[2200px] mx-auto px-4 py-3 grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)] items-start">
       <aside className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1 items-start">
         <section className="rounded-2xl border border-stone-200 bg-white p-4">
           <h2 className="font-bold mb-2">1. 입결 자료 올리기</h2>
@@ -420,7 +421,7 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                         <th className="p-2 border border-stone-200 text-center" title="O: 이 줄에 그 대학 모집요강의 규칙(대학 방식 교과 환산 또는 수능최저 판정)이 실제로 반영됨">
                           모집요강 반영
                         </th>
-                        {showMin && <th className="p-2 border border-stone-200 min-w-[16rem]">수능 최저</th>}
+                        {showMin && <th className="p-2 border border-stone-200 min-w-[14rem]">수능 최저</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -503,7 +504,7 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                               );
                             })()}
                             {showMin && (
-                              <td className="p-2 border border-stone-200 text-xs whitespace-normal min-w-[16rem] max-w-[26rem]">
+                              <td className="p-2 border border-stone-200 text-xs whitespace-normal min-w-[14rem] max-w-[26rem]">
                                 {rule ? (
                                   <>
                                     <span className="text-stone-700">{rule.rule}</span>{" "}
