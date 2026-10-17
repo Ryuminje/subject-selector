@@ -413,7 +413,7 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                           </th>
                         ))}
                         <th className="p-2 border border-stone-200 text-center">내 성적</th>
-                        <th className="p-2 border border-stone-200 text-center">판정</th>
+                        <th className="p-2 border border-stone-200 text-center whitespace-nowrap">판정</th>
                         <th className="p-2 border border-stone-200 text-center">컷 대비</th>
                         <th className="p-2 border border-stone-200 text-center">추세</th>
                         <th className="p-2 border border-stone-200 text-center" title="O: 이 줄에 그 대학 모집요강의 규칙(대학 방식 교과 환산 또는 수능최저 판정)이 실제로 반영됨">
@@ -455,9 +455,9 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                                 </>
                               )}
                             </td>
-                            <td className="p-2 border border-stone-200 text-center">
+                            <td className="p-2 border border-stone-200 text-center whitespace-nowrap">
                               {j ? (
-                                <span className={`rounded px-2 py-0.5 font-bold ${FIT_STYLE[j.fit]}`}>{FIT_LABEL[j.fit]}</span>
+                                <span className={`inline-block whitespace-nowrap rounded px-2 py-0.5 font-bold ${FIT_STYLE[j.fit]}`}>{FIT_LABEL[j.fit]}</span>
                               ) : (
                                 <span className="text-stone-400">—</span>
                               )}
