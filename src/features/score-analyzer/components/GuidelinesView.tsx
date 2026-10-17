@@ -78,7 +78,7 @@ export function GuidelinesView({ guidelines, serverKeys, meta, state, onReload }
   }
 
   return (
-    <div className="max-w-[1100px] mx-auto px-4 py-3 grid gap-3">
+    <div className="max-w-[2200px] mx-auto px-4 py-3 grid gap-3">
       <section className="rounded-2xl border border-stone-200 bg-white p-4" aria-live="polite">
         <h2 className="font-bold mb-2">서버에 올라간 모집요강</h2>
         {state === "loading" && <p className="text-sm text-stone-700">서버에서 확인하는 중…</p>}
@@ -176,7 +176,7 @@ export function GuidelinesView({ guidelines, serverKeys, meta, state, onReload }
         {shown.length === 0 ? (
           <p className="text-sm text-stone-600">조건에 맞는 모집요강이 없습니다.</p>
         ) : (
-          <ul className="grid gap-1.5 sm:grid-cols-2">
+          <ul className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {shown.map((g) => (
               <li key={guidelineKey(g)} className="flex items-start gap-2 rounded-lg bg-stone-50 border border-stone-200 px-2.5 py-1.5 text-xs">
                 <FileText className="w-4 h-4 shrink-0 text-stone-500 mt-0.5" />

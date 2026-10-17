@@ -163,7 +163,7 @@ export function NaesinView({ students, fileName, onChange, notes, onNote, select
           .filter((it): it is { label: string; value: number; color: string } => it.value != null);
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 py-3 grid gap-3 lg:grid-cols-[320px_1fr] items-start">
+    <div className="max-w-[2200px] mx-auto px-4 py-3 grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)] items-start">
       <aside className="print:hidden grid gap-3 sm:grid-cols-2 lg:grid-cols-1 items-start">
         <section className="rounded-2xl border border-stone-200 bg-white p-4">
           <h2 className="font-bold mb-2">1. 교과학습발달상황 올리기</h2>

@@ -272,7 +272,7 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
   return (
     <div className="min-h-screen bg-orange-50 text-stone-900 print:bg-white">
       <header className="print:hidden border-b border-stone-200 bg-white/90">
-        <div className="max-w-[1400px] mx-auto px-4 py-3 flex items-center gap-2 flex-wrap">
+        <div className="max-w-[2200px] mx-auto px-4 py-3 flex items-center gap-2 flex-wrap">
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-800 bg-white rounded-xl border border-stone-200 hover:bg-stone-50 whitespace-nowrap"
@@ -388,7 +388,7 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
       <div className={tab === "guideline" ? "" : "hidden"}>
         <GuidelinesView guidelines={allGuidelines} serverKeys={dbKeys} meta={dbMeta} state={dbState} onReload={reloadDb} />
       </div>
-      <div className={`max-w-[1400px] mx-auto px-4 py-3 grid gap-3 lg:grid-cols-[320px_1fr] items-start ${tab === "mock" ? "" : "hidden"}`}>
+      <div className={`max-w-[2200px] mx-auto px-4 py-3 grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)] items-start ${tab === "mock" ? "" : "hidden"}`}>
         {/* 왼쪽: 올리기·설정 */}
         <aside className="print:hidden grid gap-3 sm:grid-cols-2 lg:grid-cols-1 items-start">
           <section className="rounded-2xl border border-stone-200 bg-white p-4">

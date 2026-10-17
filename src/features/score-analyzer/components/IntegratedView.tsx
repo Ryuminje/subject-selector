@@ -54,7 +54,7 @@ export function IntegratedView({ naesin, reports, opts, goTo, notes, onNote, sel
   const hasMock = reports.length > 0;
 
   return (
-    <div className="max-w-[1400px] mx-auto px-4 py-3 space-y-3">
+    <div className="max-w-[2200px] mx-auto px-4 py-3 space-y-3">
       {(!hasNaesin || !hasMock) && (
         <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-start gap-2 flex-wrap">
           <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
