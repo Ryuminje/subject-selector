@@ -398,10 +398,11 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                         </span>
                       ))}
                   </p>
-                  <table className="w-full text-sm border-collapse min-w-[860px]">
+                  {/* 칸 안 글자는 줄바꿈하지 않고(whitespace-nowrap) 표가 넓어지게 둡니다. 창이 좁으면 가로로 밀어 보고, 대학 열은 왼쪽에 고정합니다. 긴 문장인 수능 최저 칸만 줄바꿈합니다. */}
+                  <table className="w-max min-w-full text-sm border-collapse whitespace-nowrap">
                     <thead>
                       <tr className="bg-stone-100 text-left">
-                        <th className="p-2 border border-stone-200">대학</th>
+                        <th className="p-2 border border-stone-200 sticky left-0 z-10 bg-stone-100">대학</th>
                         <th className="p-2 border border-stone-200">전형</th>
                         <th className="p-2 border border-stone-200">학과</th>
                         <th className="p-2 border border-stone-200 text-center">모집</th>
@@ -417,11 +418,9 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                         <th className="p-2 border border-stone-200 text-center">컷 대비</th>
                         <th className="p-2 border border-stone-200 text-center">추세</th>
                         <th className="p-2 border border-stone-200 text-center" title="O: 이 줄에 그 대학 모집요강의 규칙(대학 방식 교과 환산 또는 수능최저 판정)이 실제로 반영됨">
-                          모집요강
-                          <br />
-                          반영
+                          모집요강 반영
                         </th>
-                        {showMin && <th className="p-2 border border-stone-200">수능 최저</th>}
+                        {showMin && <th className="p-2 border border-stone-200 min-w-[16rem]">수능 최저</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -431,7 +430,7 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                           [...o.years.values()].sort((a, b) => (b.year ?? 0) - (a.year ?? 0))[0];
                         return (
                           <tr key={o.key}>
-                            <td className="p-2 border border-stone-200 whitespace-nowrap">{o.univ}</td>
+                            <td className="p-2 border border-stone-200 sticky left-0 z-10 bg-white">{o.univ}</td>
                             <td className="p-2 border border-stone-200">{o.track}</td>
                             <td className="p-2 border border-stone-200">{o.dept}</td>
                             <td className="p-2 border border-stone-200 text-center">{f(base?.quota, 0)}</td>
@@ -504,7 +503,7 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                               );
                             })()}
                             {showMin && (
-                              <td className="p-2 border border-stone-200 text-xs">
+                              <td className="p-2 border border-stone-200 text-xs whitespace-normal min-w-[16rem] max-w-[26rem]">
                                 {rule ? (
                                   <>
                                     <span className="text-stone-700">{rule.rule}</span>{" "}
