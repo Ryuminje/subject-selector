@@ -376,6 +376,30 @@ model AssistantMessage {
   @@index([threadId, createdAt])
 }
 
+// 대학별 모집요강 정리 JSON(성적분석기의 '모집요강' 탭이 쓰는 대학별 반영 규칙).
+//
+// 학교(테넌트)와 무관한 **전국 공용 참고 자료**라 School에 매달지 않았습니다. 읽기는 누구나
+// (공개 정보), 쓰기는 관리자만. PDF에서 AI가 정리한 값이라 `reviewStatus`가 "미확인"인 채로
+// 들어오며, 앱 화면이 그대로 보여 줍니다. 원본 JSON 전체를 `data`에 그대로 보관합니다 —
+// 스키마(Guideline, src/features/score-analyzer/lib/guideline.ts)가 바뀌어도 마이그레이션 없이 따라가려는 의도입니다.
+model AdmissionGuideline {
+  id String @id @default(cuid())
+
+  shortName     String // 입결 엑셀의 대학 이름과 맞추는 짧은 이름(예: 가천대)
+  campus        String @default("") // 없으면 빈 문자열(유일키에 NULL이 들어가지 않게)
+  kind          String // "수시" | "정시"
+  admissionYear Int
+
+  reviewStatus String @default("미확인")
+  data         Json
+
+  updatedBy String? // 마지막으로 올린 관리자 User.id (@relation 없음 — User는 auth CLI가 재생성)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([admissionYear, shortName, campus, kind])
+}
+
 // 로그인 계정(user/session/account/verification)은 better-auth CLI(`npx auth generate`)가
 // 이 파일에 직접 추가합니다 — 이 아래에 생성된 모델은 손으로 수정하지 말고,
 // schoolId/role/teacherId 같은 앱 전용 필드는 src/lib/auth.ts의 user.additionalFields로 정의하세요.

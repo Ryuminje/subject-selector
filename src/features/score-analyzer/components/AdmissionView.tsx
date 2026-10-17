@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { FileText, Info, ShieldCheck, Upload, X } from "lucide-react";
+import { useSession } from "@/lib/auth-client";
 import { readAdmissionXlsx, type AdmKind, type AdmRow, type AdmissionState } from "../lib/admission";
 import { FIT_LABEL, FIT_ORDER, REACH_GRADE, REACH_PCT, groupOffers, judge, trend, type Fit } from "../lib/compare";
 import { buildPeople, peopleLabel } from "../lib/integrated";
@@ -32,6 +33,11 @@ interface Props {
   /** 모집요강 정리 JSON(대학별 반영 규칙) */
   guidelines: Guideline[];
   onGuidelines: (g: Guideline[]) => void;
+  /** guidelines 중 DB(서버)에서 받아온 항목의 키. 이 항목은 여기서 지울 수 없습니다. */
+  dbKeys?: Set<string>;
+  /** 이 브라우저에서 직접 올린 항목(관리자가 DB 에 저장할 대상) */
+  localGuidelines?: Guideline[];
+  onSavedToDb?: () => Promise<void>;
 }
 
 const KIND_LABEL: Record<AdmKind, string> = { susi: "수시", jeongsi: "정시" };
@@ -53,9 +59,33 @@ function cutText(r: AdmRow | undefined) {
   return f(a ?? b);
 }
 
-export function AdmissionView({ admission, onChange, naesin, reports, selected, onSelect, guidelines, onGuidelines }: Props) {
+export function AdmissionView({ admission, onChange, naesin, reports, selected, onSelect, guidelines, onGuidelines, dbKeys, localGuidelines, onSavedToDb }: Props) {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
+
+  // 관리자만: 직접 올린 모집요강을 서버 DB 에 저장합니다. 모두에게 보이게 됩니다.
+  async function saveToDb() {
+    if (!localGuidelines?.length) return;
+    if (!window.confirm(`직접 올린 모집요강 ${localGuidelines.length}건을 서버에 저장합니다. 같은 대학·구분은 덮어씁니다. 계속할까요?`)) return;
+    setBusy("서버에 저장하는 중…");
+    setError("");
+    try {
+      const r = await fetch("/api/admission-guidelines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guidelines: localGuidelines }),
+      });
+      const d = (await r.json().catch(() => ({}))) as { saved?: number; error?: string };
+      if (!r.ok) throw new Error(d.error ?? "저장하지 못했습니다.");
+      await onSavedToDb?.();
+      setError(`서버에 ${d.saved}건 저장했습니다.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "저장하지 못했습니다.");
+    }
+    setBusy("");
+  }
   const [kind, setKind] = useState<AdmKind>("susi");
   const [univ, setUniv] = useState("");
   const [dept, setDept] = useState("");
@@ -233,7 +263,19 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
           )}
           {guidelines.length > 0 && (
             <div className="mt-3">
-              <p className="text-xs font-bold text-stone-700">모집요강 (대학별 반영 규칙) {guidelines.length}건</p>
+              <p className="text-xs font-bold text-stone-700">
+                모집요강 (대학별 반영 규칙) {guidelines.length}건
+                {dbKeys && dbKeys.size > 0 && <span className="ml-1 font-normal text-stone-600">· 서버 자료 {dbKeys.size}건은 자동으로 불러옵니다</span>}
+              </p>
+              {isAdmin && !!localGuidelines?.length && (
+                <button
+                  onClick={() => void saveToDb()}
+                  disabled={!!busy}
+                  className="mt-1.5 rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-800 disabled:opacity-50"
+                >
+                  직접 올린 {localGuidelines.length}건을 서버에 저장 (관리자)
+                </button>
+              )}
               <ul className="mt-1.5 space-y-1.5">
                 {guidelines.map((g) => (
                   <li key={guidelineKey(g)} className="flex items-start gap-2 rounded-lg bg-stone-50 border border-stone-200 px-2.5 py-1.5 text-xs">
@@ -246,13 +288,15 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                       <span className={g.review.status === "확인됨" ? "text-emerald-700" : "text-amber-700"}>{g.review.status}</span>
                       {g.engine?.gyogwa?.length ? " · 교과 계산 규칙 있음" : ""}
                     </span>
-                    <button
-                      aria-label={`${g.source.shortName} ${g.source.kind} 모집요강 지우기`}
-                      onClick={() => onGuidelines(guidelines.filter((x) => guidelineKey(x) !== guidelineKey(g)))}
-                      className="p-0.5 text-stone-500 hover:text-stone-900"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    {!(dbKeys?.has(guidelineKey(g)) && !localGuidelines?.includes(g)) && (
+                      <button
+                        aria-label={`${g.source.shortName} ${g.source.kind} 모집요강 지우기`}
+                        onClick={() => onGuidelines(guidelines.filter((x) => guidelineKey(x) !== guidelineKey(g)))}
+                        className="p-0.5 text-stone-500 hover:text-stone-900"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>

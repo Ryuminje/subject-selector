@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, FileText, FolderOpen, Printer, RotateCcw, Save, ShieldCheck, Upload, X } from "lucide-react";
 import { RadarChart, TrendChart, type TrendSeries } from "./Charts";
@@ -10,7 +10,7 @@ import { GuideLink } from "@/features/guide/components/GuideLink";
 import { NotesPanel } from "./NotesPanel";
 import { AdmissionView } from "./AdmissionView";
 import { EMPTY_ADMISSION, packAdmission, unpackAdmission, type AdmissionState } from "../lib/admission";
-import type { Guideline } from "../lib/guideline";
+import { guidelineKey, type Guideline } from "../lib/guideline";
 import { decodeSave, encodeSave, isEncrypted, personKey, type Note, type Notes } from "../lib/saveFile";
 import type { NeisStudent } from "../lib/neis";
 import { readReportPdf } from "../lib/readPdf";
@@ -51,7 +51,36 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
   // 입결 자료(대학어디가). 줄인 형태로 저장 파일에 함께 담깁니다.
   const [admission, setAdmission] = useState<AdmissionState>(EMPTY_ADMISSION);
   // 모집요강 정리 JSON(대학별 반영 규칙). 저장 파일에 함께 담깁니다.
+  // 이 브라우저에서 직접 올린 것(저장 파일에 담김). DB 에서 받아온 것은 따로 들고 있어 저장 파일을 부풀리지 않습니다.
   const [guidelines, setGuidelines] = useState<Guideline[]>([]);
+  const [dbGuidelines, setDbGuidelines] = useState<Guideline[]>([]);
+  const reloadDb = useCallback(async () => {
+    try {
+      const r = await fetch("/api/admission-guidelines", { cache: "no-store" });
+      const d = (await r.json()) as { guidelines?: Guideline[] };
+      setDbGuidelines((d.guidelines ?? []).filter((g) => g?.source?.shortName && g.source.kind));
+    } catch {
+      // 못 받아와도 직접 올리는 방식은 그대로 쓸 수 있습니다.
+    }
+  }, []);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/admission-guidelines")
+      .then((r) => r.json() as Promise<{ guidelines?: Guideline[] }>)
+      .then((d) => {
+        if (alive) setDbGuidelines((d.guidelines ?? []).filter((g) => g?.source?.shortName && g.source.kind));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  // 직접 올린 것이 같은 키의 DB 항목보다 우선합니다.
+  const allGuidelines = useMemo(() => {
+    const local = new Set(guidelines.map(guidelineKey));
+    return [...dbGuidelines.filter((g) => !local.has(guidelineKey(g))), ...guidelines];
+  }, [dbGuidelines, guidelines]);
+  const dbKeys = useMemo(() => new Set(dbGuidelines.map(guidelineKey)), [dbGuidelines]);
   // 내신 자료는 내신 탭과 수시·정시 통합 탭이 함께 쓰므로 여기서 들고 있습니다.
   const [naesin, setNaesin] = useState<{ students: NeisStudent[]; fileName: string }>({ students: [], fileName: "" });
   const [reports, setReports] = useState<Report[]>(initialReports);
@@ -339,8 +368,15 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
           reports={reports}
           selected={selected}
           onSelect={setSelected}
-          guidelines={guidelines}
-          onGuidelines={setGuidelines}
+          guidelines={allGuidelines}
+          // 화면은 DB 것과 직접 올린 것을 합쳐 보여 주므로, 돌려받을 때 DB 에서 온 항목(같은 객체)은 빼고 담습니다.
+          onGuidelines={(next) => setGuidelines(next.filter((g) => !dbGuidelines.includes(g)))}
+          dbKeys={dbKeys}
+          localGuidelines={guidelines}
+          onSavedToDb={async () => {
+            setGuidelines([]);
+            await reloadDb();
+          }}
         />
       </div>
       <div className={`max-w-[1400px] mx-auto px-4 py-3 grid gap-3 lg:grid-cols-[320px_1fr] items-start ${tab === "mock" ? "" : "hidden"}`}>

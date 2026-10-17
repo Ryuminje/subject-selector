@@ -4,6 +4,15 @@
 
 ---
 
+### 2026-10-17
+
+**대학별 모집요강을 NAS DB에 보관하고 성적분석기가 자동으로 불러오게 연결:**
+- **왜:** `_추출결과`의 모집요강 JSON 347건(2027학년도, AI가 PDF에서 정리, 전부 "미확인")을 매번 올리지 않고 앱에 **내장**처럼 쓰려는 요구. 파일 자체는 저장소에 커밋하지 않고 DB에만 둔다(이 JSON은 학생 정보가 아니라 공개 모집요강이지만 크기 2.5MB·미확인 값이라 코드와 분리).
+- **구성:** 모델 `AdmissionGuideline`(`shortName/campus/kind/admissionYear` 유일, 원본 JSON 통째로 `data Json`) · 마이그레이션 `20261017120000_add_admission_guideline` · `src/app/api/admission-guidelines/route.ts` (GET은 로그인 없이 누구나 + `Cache-Control: public, max-age=300`, POST는 관리자만, 한 문장 `INSERT … ON CONFLICT` 로 한꺼번에 덮어씀). 학교(테넌트)와 무관한 전국 공용이라 `School`에 안 달았다.
+- **앱:** `ScoreAnalyzerApp`이 열릴 때 GET으로 받아 `dbGuidelines`에 두고, 직접 올린 것(`guidelines`)과 합쳐(같은 키는 직접 올린 것 우선) `AdmissionView`에 넘긴다. **DB 항목은 학생 저장 파일에 담지 않는다**(파일이 1MB 불어나는 것 방지). DB 항목은 화면에서 지울 수 없고, 관리자(`role === "ADMIN"`)에게는 "직접 올린 N건을 서버에 저장" 버튼이 뜬다 → 갱신은 JSON을 올려 이 버튼으로.
+- **검증:** 로컬 가상 DB에서 마이그레이션 적용 → 관리자 로그인 후 347건 POST(`saved: 347`) → GET 347건 → 화면 "서버 자료 347건은 자동으로 불러옵니다". 로그인 없는 POST는 401. tsc·eslint 클린.
+- **운영 반영은 사람이 한다:** NAS DB 마이그레이션은 AI가 실행할 수 없다(AGENTS.md "운영 DB에 마이그레이션 적용하기"). 적용 순서는 마이그레이션 먼저, 코드 푸시 나중.
+
 ### 2026-10-14
 
 **내신-모의고사 성적 분석기(`/apps/score-analyzer`) 허브 등록 — 학년부(담임용) 부서 신설, `feature/score-analyzer` → `main`:**
