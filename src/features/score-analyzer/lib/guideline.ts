@@ -97,10 +97,50 @@ export function parseGuidelines(text: string): Guideline[] {
 export const guidelineKey = (g: Guideline) =>
   `${g.source.shortName}|${g.source.campus ?? ""}|${g.source.kind}|${g.source.admissionYear}`;
 
-/** 입결 엑셀의 대학 이름(예: 가천대)과 맞는 모집요강을 찾습니다. */
+/**
+ * 입결 엑셀의 대학 이름이 모집요강의 이름(shortName)과 다르거나, 캠퍼스가 여러 개인 대학일 때의 연결표.
+ * 키는 입결 엑셀의 '대학' 칸 그대로, 값은 모집요강의 shortName(+campus).
+ * campus 를 적은 곳은 입결에 캠퍼스 구분이 없어 대표 캠퍼스로 연결한 것입니다.
+ * (이 표는 JSON 형식으로 적어 두었습니다 — 별칭 자동 생성 스크립트가 같은 표를 읽습니다. 끝에 쉼표를 붙이지 마세요.)
+ */
+// UNIV_LINK-BEGIN
+export const UNIV_LINK: Record<string, { shortName: string; campus?: string }> = {
+  "감신대": { "shortName": "감리교신대" },
+  "꽃동네대": { "shortName": "가톨릭꽃동네대" },
+  "동국대": { "shortName": "동국대(서울)" },
+  "동국대(W)": { "shortName": "동국대(WISE)" },
+  "상명대": { "shortName": "상명대(서울)" },
+  "상명대(천)": { "shortName": "상명대(천안)" },
+  "서울신학대": { "shortName": "서울신대" },
+  "연세대": { "shortName": "연세대(서울)" },
+  "연세대(미)": { "shortName": "연세대(미래)" },
+  "전남대(여)": { "shortName": "전남대" },
+  "전남대(여수)": { "shortName": "전남대" },
+  "차의과대": { "shortName": "차의과학대" },
+  "추계예대": { "shortName": "추계예술대" },
+  "한국교통대": { "shortName": "국립한국교통대" },
+  "한국외대": { "shortName": "한국외국어대" },
+  "한국외대(글)": { "shortName": "한국외국어대" },
+  "한국체대": { "shortName": "한국체육대" },
+  "호남신학대": { "shortName": "호남신대" },
+  "화성과학대": { "shortName": "화성의과학대" },
+  "한양대": { "shortName": "한양대", "campus": "서울" },
+  "한양대(에)": { "shortName": "한양대", "campus": "ERICA" },
+  "강원대": { "shortName": "강원대", "campus": "춘천·삼척·도계" },
+  "국립창원대": { "shortName": "국립창원대", "campus": "창원" }
+};
+// UNIV_LINK-END
+
+/** 입결 엑셀의 대학 이름(예: 가천대)과 맞는 모집요강을 찾습니다. 연결표(UNIV_LINK)를 먼저 봅니다. */
 export function findGuideline(list: Guideline[], univ: string, kind: "susi" | "jeongsi"): Guideline | undefined {
   const k = kind === "susi" ? "수시" : "정시";
-  return list.find((g) => g.source.kind === k && (g.source.shortName === univ || g.source.university === univ));
+  const pool = list.filter((g) => g.source.kind === k);
+  const link = UNIV_LINK[univ];
+  if (link) {
+    const same = pool.filter((g) => g.source.shortName === link.shortName);
+    return (link.campus ? same.find((g) => g.source.campus === link.campus) : undefined) ?? same[0];
+  }
+  return pool.find((g) => g.source.shortName === univ || g.source.university === univ);
 }
 
 /** 입결 전형 이름에 해당하는 모집요강 전형 */
