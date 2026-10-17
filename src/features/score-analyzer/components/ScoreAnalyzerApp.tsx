@@ -11,6 +11,7 @@ import { NotesPanel } from "./NotesPanel";
 import { AdmissionView } from "./AdmissionView";
 import { EMPTY_ADMISSION, packAdmission, unpackAdmission, type AdmissionState } from "../lib/admission";
 import { guidelineKey, type Guideline } from "../lib/guideline";
+import { GuidelinesView, type GuidelineMeta } from "./GuidelinesView";
 import { decodeSave, encodeSave, isEncrypted, personKey, type Note, type Notes } from "../lib/saveFile";
 import type { NeisStudent } from "../lib/neis";
 import { readReportPdf } from "../lib/readPdf";
@@ -47,34 +48,44 @@ const fmt = (n: number | null, d = 2) => (n == null ? "—" : n.toFixed(d).repla
 const byExam = (a: Report, b: Report) => a.year - b.year || a.month - b.month;
 
 export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Report[] }) {
-  const [tab, setTab] = useState<"naesin" | "mock" | "integrated" | "admission">("naesin");
+  const [tab, setTab] = useState<"naesin" | "mock" | "integrated" | "admission" | "guideline">("naesin");
   // 입결 자료(대학어디가). 줄인 형태로 저장 파일에 함께 담깁니다.
   const [admission, setAdmission] = useState<AdmissionState>(EMPTY_ADMISSION);
   // 모집요강 정리 JSON(대학별 반영 규칙). 저장 파일에 함께 담깁니다.
   // 이 브라우저에서 직접 올린 것(저장 파일에 담김). DB 에서 받아온 것은 따로 들고 있어 저장 파일을 부풀리지 않습니다.
   const [guidelines, setGuidelines] = useState<Guideline[]>([]);
   const [dbGuidelines, setDbGuidelines] = useState<Guideline[]>([]);
+  const [dbMeta, setDbMeta] = useState<GuidelineMeta | null>(null);
+  const [dbState, setDbState] = useState<"loading" | "ok" | "error">("loading");
+  const applyDb = useCallback((d: { guidelines?: Guideline[]; meta?: GuidelineMeta }, ok: boolean) => {
+    if (!ok) {
+      setDbState("error");
+      return;
+    }
+    setDbGuidelines((d.guidelines ?? []).filter((g) => g?.source?.shortName && g.source.kind));
+    setDbMeta(d.meta ?? { count: d.guidelines?.length ?? 0, updatedAt: null });
+    setDbState("ok");
+  }, []);
+  // '다시 확인'과 관리자 업로드 직후에 쓰는 새로고침(브라우저 캐시를 건너뜁니다)
   const reloadDb = useCallback(async () => {
+    setDbState("loading");
     try {
       const r = await fetch("/api/admission-guidelines", { cache: "no-store" });
-      const d = (await r.json()) as { guidelines?: Guideline[] };
-      setDbGuidelines((d.guidelines ?? []).filter((g) => g?.source?.shortName && g.source.kind));
+      applyDb((await r.json()) as { guidelines?: Guideline[]; meta?: GuidelineMeta }, r.ok);
     } catch {
-      // 못 받아와도 직접 올리는 방식은 그대로 쓸 수 있습니다.
+      applyDb({}, false);
     }
-  }, []);
+  }, [applyDb]);
   useEffect(() => {
     let alive = true;
     fetch("/api/admission-guidelines")
-      .then((r) => r.json() as Promise<{ guidelines?: Guideline[] }>)
-      .then((d) => {
-        if (alive) setDbGuidelines((d.guidelines ?? []).filter((g) => g?.source?.shortName && g.source.kind));
-      })
-      .catch(() => {});
+      .then(async (r) => ({ d: (await r.json()) as { guidelines?: Guideline[]; meta?: GuidelineMeta }, ok: r.ok }))
+      .then(({ d, ok }) => alive && applyDb(d, ok))
+      .catch(() => alive && applyDb({}, false));
     return () => {
       alive = false;
     };
-  }, []);
+  }, [applyDb]);
   // 직접 올린 것이 같은 키의 DB 항목보다 우선합니다.
   const allGuidelines = useMemo(() => {
     const local = new Set(guidelines.map(guidelineKey));
@@ -281,6 +292,7 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
                 ["mock", "모의고사"],
                 ["integrated", "수시·정시 통합"],
                 ["admission", "입결 자료"],
+                ["guideline", "모집요강"],
               ] as const
             ).map(([k, label]) => (
               <button
@@ -300,7 +312,9 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
                 ? "교과학습발달상황 PDF를 올리면 내신 분석 자료가 만들어집니다"
                 : tab === "admission"
                   ? "대학어디가 입결 엑셀을 올리면 줄여서 저장 파일에 함께 담습니다"
-                  : "내신과 모의고사를 함께 올리면 수시·정시 성향을 비교해 줍니다"}
+                  : tab === "guideline"
+                    ? "서버에 올라간 대학별 모집요강을 확인합니다 (올리기는 관리자만)"
+                    : "내신과 모의고사를 함께 올리면 수시·정시 성향을 비교해 줍니다"}
           </span>
           <div className="ml-auto flex gap-2 flex-wrap items-center">
             {saveMsg && <span className="text-xs text-stone-600" role="status">{saveMsg}</span>}
@@ -369,15 +383,10 @@ export function ScoreAnalyzerApp({ initialReports = [] }: { initialReports?: Rep
           selected={selected}
           onSelect={setSelected}
           guidelines={allGuidelines}
-          // 화면은 DB 것과 직접 올린 것을 합쳐 보여 주므로, 돌려받을 때 DB 에서 온 항목(같은 객체)은 빼고 담습니다.
-          onGuidelines={(next) => setGuidelines(next.filter((g) => !dbGuidelines.includes(g)))}
-          dbKeys={dbKeys}
-          localGuidelines={guidelines}
-          onSavedToDb={async () => {
-            setGuidelines([]);
-            await reloadDb();
-          }}
         />
+      </div>
+      <div className={tab === "guideline" ? "" : "hidden"}>
+        <GuidelinesView guidelines={allGuidelines} serverKeys={dbKeys} meta={dbMeta} state={dbState} onReload={reloadDb} />
       </div>
       <div className={`max-w-[1400px] mx-auto px-4 py-3 grid gap-3 lg:grid-cols-[320px_1fr] items-start ${tab === "mock" ? "" : "hidden"}`}>
         {/* 왼쪽: 올리기·설정 */}

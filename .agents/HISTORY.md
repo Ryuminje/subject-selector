@@ -11,6 +11,7 @@
 - **구성:** 모델 `AdmissionGuideline`(`shortName/campus/kind/admissionYear` 유일, 원본 JSON 통째로 `data Json`) · 마이그레이션 `20261017120000_add_admission_guideline` · `src/app/api/admission-guidelines/route.ts` (GET은 로그인 없이 누구나 + `Cache-Control: public, max-age=300`, POST는 관리자만, 한 문장 `INSERT … ON CONFLICT` 로 한꺼번에 덮어씀). 학교(테넌트)와 무관한 전국 공용이라 `School`에 안 달았다.
 - **앱:** `ScoreAnalyzerApp`이 열릴 때 GET으로 받아 `dbGuidelines`에 두고, 직접 올린 것(`guidelines`)과 합쳐(같은 키는 직접 올린 것 우선) `AdmissionView`에 넘긴다. **DB 항목은 학생 저장 파일에 담지 않는다**(파일이 1MB 불어나는 것 방지). DB 항목은 화면에서 지울 수 없고, 관리자(`role === "ADMIN"`)에게는 "직접 올린 N건을 서버에 저장" 버튼이 뜬다 → 갱신은 JSON을 올려 이 버튼으로.
 - **검증:** 로컬 가상 DB에서 마이그레이션 적용 → 관리자 로그인 후 347건 POST(`saved: 347`) → GET 347건 → 화면 "서버 자료 347건은 자동으로 불러옵니다". 로그인 없는 POST는 401. tsc·eslint 클린.
+- **후속(같은 날): 입결 자료와 모집요강의 올리는 공간을 분리.** "입결 자료" 탭은 이제 **엑셀(.xlsx)만** 받는다. 새 "모집요강" 탭(`GuidelinesView.tsx`)이 서버 자료의 건수·대학 수·마지막 갱신 시각과 검색 목록을 **로그인 없이 누구에게나** 보여 주고("다시 확인" 버튼 포함), 모집요강 JSON을 올리는 칸은 `useSession().user.role === "ADMIN"`일 때만 뜬다(서버 POST도 관리자만이라 화면과 서버가 이중으로 막는다). GET 응답에 `meta {count, updatedAt}` 추가, 캐시는 60초로 줄여 일반 계정이 올라간 것을 빨리 확인하게 했다. 예전의 "직접 올린 JSON을 서버에 저장" 버튼과 입결 탭의 JSON 업로드는 없앴다(저장 파일에서 불러온 옛 모집요강은 그대로 적용되고, 목록에 "서버에 없음"으로 표시).
 - **운영 반영은 사람이 한다:** NAS DB 마이그레이션은 AI가 실행할 수 없다(AGENTS.md "운영 DB에 마이그레이션 적용하기"). 적용 순서는 마이그레이션 먼저, 코드 푸시 나중.
 
 ### 2026-10-14

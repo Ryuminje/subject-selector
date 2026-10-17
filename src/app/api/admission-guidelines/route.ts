@@ -12,12 +12,14 @@ export async function GET() {
   try {
     const rows = await prisma.admissionGuideline.findMany({
       orderBy: [{ shortName: "asc" }, { campus: "asc" }, { kind: "asc" }],
-      select: { data: true },
+      select: { data: true, updatedAt: true },
     });
+    // 일반 계정도 "서버에 올라가 있는지"를 확인할 수 있게 건수와 마지막 갱신 시각을 함께 줍니다.
+    const updatedAt = rows.reduce<Date | null>((m, r) => (!m || r.updatedAt > m ? r.updatedAt : m), null);
     return NextResponse.json(
-      { guidelines: rows.map((r) => r.data) },
+      { guidelines: rows.map((r) => r.data), meta: { count: rows.length, updatedAt } },
       // 자주 바뀌는 자료가 아니라 브라우저·CDN 이 잠시 들고 있어도 됩니다.
-      { headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=3600" } },
+      { headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=600" } },
     );
   } catch {
     return NextResponse.json({ guidelines: [], error: "모집요강을 불러오지 못했습니다." }, { status: 503 });
