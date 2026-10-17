@@ -133,7 +133,7 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
             myNote = r.label;
           }
         }
-        const track = g ? findTrack(g, o.track) : undefined;
+        const track = g ? findTrack(g, o.track, o.type) : undefined;
         const rule = kind === "susi" ? suneungMinFor(track, o.dept, o.field) : undefined;
         const ok = rule && exam ? evalSuneungMin(rule.rule, exam) : null;
         return { o, j: judge(o, my), t: trend(o), my, myNote, g, rule, ok };

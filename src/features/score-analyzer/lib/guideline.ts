@@ -144,8 +144,10 @@ export function findGuideline(list: Guideline[], univ: string, kind: "susi" | "j
 }
 
 /** 입결 전형 이름에 해당하는 모집요강 전형 */
-export function findTrack(g: Guideline, trackName: string): GuidelineTrack | undefined {
-  return (g.tracks ?? []).find((t) => t.aliases?.includes(trackName) || t.name === trackName);
+export function findTrack(g: Guideline, trackName: string, type?: string): GuidelineTrack | undefined {
+  const same = (g.tracks ?? []).filter((t) => t.aliases?.includes(trackName) || t.name === trackName);
+  // '교과(학생부)'처럼 교과·종합 양쪽에 같은 이름이 있을 수 있어, 입결의 교과/종합 구분이 맞는 전형을 먼저 봅니다.
+  return (type ? same.find((t) => t.type === type) : undefined) ?? same[0];
 }
 
 // ---- 교과 성적 계산 ----
