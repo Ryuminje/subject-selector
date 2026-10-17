@@ -416,11 +416,16 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                         <th className="p-2 border border-stone-200 text-center">판정</th>
                         <th className="p-2 border border-stone-200 text-center">컷 대비</th>
                         <th className="p-2 border border-stone-200 text-center">추세</th>
+                        <th className="p-2 border border-stone-200 text-center" title="O: 이 줄에 그 대학 모집요강의 규칙(대학 방식 교과 환산 또는 수능최저 판정)이 실제로 반영됨">
+                          모집요강
+                          <br />
+                          반영
+                        </th>
                         {showMin && <th className="p-2 border border-stone-200">수능 최저</th>}
                       </tr>
                     </thead>
                     <tbody>
-                      {result.slice(0, MAX_ROWS).map(({ o, j, t, my, myNote, rule, ok }) => {
+                      {result.slice(0, MAX_ROWS).map(({ o, j, t, my, myNote, g, rule, ok }) => {
                         const base =
                           (j ? o.years.get(j.year) : undefined) ??
                           [...o.years.values()].sort((a, b) => (b.year ?? 0) - (a.year ?? 0))[0];
@@ -479,6 +484,25 @@ export function AdmissionView({ admission, onChange, naesin, reports, selected, 
                                 <span className="text-emerald-700">쉬워짐</span>
                               )}
                             </td>
+                            {(() => {
+                              // O = 이 줄의 계산에 모집요강 규칙이 실제로 쓰였음(대학 방식 교과 환산 또는 수능최저 판정)
+                              const used = !!myNote || !!rule;
+                              const why = used
+                                ? [myNote ? "대학 방식 교과 환산 반영" : "", rule ? "수능최저 기준 반영" : ""].filter(Boolean).join(" · ")
+                                : !g
+                                  ? "이 대학 모집요강이 없어 공통 기준으로 계산"
+                                  : kind === "jeongsi"
+                                    ? "모집요강은 있으나 정시 계산에는 아직 쓰지 않음"
+                                    : "모집요강은 있으나 이 전형에 맞는 규칙이 없음";
+                              return (
+                                <td
+                                  className={`p-2 border border-stone-200 text-center font-bold ${used ? "text-emerald-700" : "text-stone-500"}`}
+                                  title={why}
+                                >
+                                  {used ? "O" : "X"}
+                                </td>
+                              );
+                            })()}
                             {showMin && (
                               <td className="p-2 border border-stone-200 text-xs">
                                 {rule ? (
