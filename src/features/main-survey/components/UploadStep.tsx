@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Upload, File as FileIcon, Trash2 } from "lucide-react";
+import { Upload, File as FileIcon, Trash2, Download } from "lucide-react";
 import { GradeTabs } from "./GradeTabs";
 import type { GradeKey, ProcessedStudent } from "../../../types";
 
@@ -11,6 +11,8 @@ interface UploadStepProps {
   uploadedFiles: { [key in GradeKey]: { name: string, size: number, data: string } | null };
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleRemoveFile: () => void;
+  /** 전입·전출을 반영한 설문 엑셀(수정본) 내려받기 */
+  handleDownloadEdited: () => void;
   setActiveTab: (tab: string) => void;
   previousHistoryFiles: { [key in GradeKey]: { name: string, size: number, data: string } | null };
   handlePrevHistoryFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -25,6 +27,7 @@ export function UploadStep({
   uploadedFiles,
   handleFileUpload,
   handleRemoveFile,
+  handleDownloadEdited,
   setActiveTab,
   previousHistoryFiles,
   handlePrevHistoryFileUpload,
@@ -86,7 +89,7 @@ export function UploadStep({
               </button>
             </div>
           ) : (
-            <div className="border border-stone-200 bg-stone-50 rounded-2xl p-6 flex flex-col justify-between h-[196px]">
+            <div className="border border-stone-200 bg-stone-50 rounded-2xl p-6 flex flex-col justify-between gap-3 min-h-[196px]">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-amber-100 text-stone-900 rounded-xl flex items-center justify-center border border-amber-300 flex-shrink-0">
                   <FileIcon className="w-6 h-6" />
@@ -103,6 +106,14 @@ export function UploadStep({
                   </span>
                 </div>
               </div>
+              <button
+                onClick={handleDownloadEdited}
+                title="4단계에서 추가·삭제한 전입·전출 학생을 반영한 설문 엑셀을 내려받습니다"
+                className="w-full py-2 bg-white hover:bg-emerald-50 text-emerald-700 text-sm font-medium rounded-lg transition-colors border border-emerald-600 flex items-center justify-center gap-1.5"
+              >
+                <Download className="w-4 h-4" />
+                수정본 엑셀 다운로드
+              </button>
               <div className="flex gap-2">
                 <button
                   onClick={() => setActiveTab("preview")}

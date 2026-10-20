@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import * as XLSX from "xlsx-js-style";
+import { downloadEditedSurveyWorkbook, findSurveyLayout, pickSurveySheetName } from "../lib/surveySheet";
 import type { GradeKey, HierarchyRule, ParsedCurriculumSubject, ProcessedStudent, SubjectCategory, SubjectMap, SubjectStat } from "../../../types";
 
 export function normalizeSubjectName(name: string): string {
@@ -90,89 +91,17 @@ export function useMainUploads(
       dataUrlReader.readAsDataURL(file);
 
       const wb = XLSX.read(arrayBuffer, { type: "array" });
-      const wsname = wb.SheetNames.length > 1 ? wb.SheetNames[1] : wb.SheetNames[0];
+      const wsname = pickSurveySheetName(wb);
       const ws = wb.Sheets[wsname];
       const sheetData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
 
-      let headerRowIndex = -1;
-      for (let i = 0; i < sheetData.length; i++) {
-        const row = sheetData[i];
-        if (Array.isArray(row)) {
-          const hasId = row.some(cell => String(cell || "").includes("학번"));
-          const hasName = row.some(cell => String(cell || "").includes("이름") || String(cell || "").includes("성명"));
-          if (hasId && hasName) {
-            headerRowIndex = i;
-            break;
-          }
-        }
-      }
-
-      if (headerRowIndex === -1) {
+      // 헤더 해석(2줄 병합 헤더·H열부터의 과목 매트릭스)은 수정본 엑셀 내보내기와 공유한다.
+      const layout = findSurveyLayout(sheetData);
+      if (!layout) {
         alert("수강신청 엑셀 파일에서 '학번'과 '이름(성명)' 열을 찾을 수 없습니다.");
         return;
       }
-
-      // 2줄로 된 병합 헤더 여부 감지
-      const row1 = sheetData[headerRowIndex];
-      const row2 = sheetData[headerRowIndex + 1];
-      const tempHeaders = row1.map(h => String(h || "").trim());
-      const idColIndex = tempHeaders.findIndex(h => h.includes("학번"));
-      const nameColIndex = tempHeaders.findIndex(h => h.includes("이름") || h.includes("성명"));
-
-      const hasMultiRowHeader = row2 &&
-        !row2[idColIndex] &&
-        !row2[nameColIndex] &&
-        row2.some(cell => typeof cell === "string" && String(cell).trim().length > 0);
-
-      const blocklist = ["순번", "학년", "학번", "이름", "성명", "성별", "과정", "메모", "과목수", "합계", "총계"];
-      const headers: string[] = [];
-      const maxLength = Math.max(row1.length, row2 ? row2.length : 0);
-
-      // 상위 헤더의 병합 영역 복원 (Forward-fill) - 희소 배열(sparse array) 대응을 위해 for 루프 사용
-      const parentHeaders: string[] = [];
-      let lastParentHeader = "";
-      for (let colIndex = 0; colIndex < maxLength; colIndex++) {
-        const val = String(row1[colIndex] || "").trim();
-        if (val) {
-          lastParentHeader = val;
-        }
-        parentHeaders.push(lastParentHeader);
-      }
-
-      // 과목 선택 매트릭스는 H열(0-based 인덱스 7)부터 시작한다고 가정합니다.
-      // 그 이전 열(순번/학년/반/성별/과정 등 메타데이터)은 학번·이름 열을 제외하곤 과목으로 파싱하지 않습니다.
-      const SUBJECT_MATRIX_START_COL = 7;
-
-      for (let colIndex = 0; colIndex < maxLength; colIndex++) {
-        const val1 = String(row1[colIndex] || "").trim();
-        const val2 = row2 ? String(row2[colIndex] || "").trim() : "";
-        const parentHeader = parentHeaders[colIndex] || "";
-
-        if (colIndex < SUBJECT_MATRIX_START_COL && colIndex !== idColIndex && colIndex !== nameColIndex) {
-          headers.push("");
-          continue;
-        }
-
-        if (hasMultiRowHeader) {
-          if (blocklist.some(b => val1.includes(b))) {
-            headers.push(val1);
-          } else if (parentHeader.includes("지정")) {
-            // 지정과목 열은 파싱에서 완전히 제외
-            headers.push("");
-          } else {
-            // 본조사 파일의 매트릭스 형태 대응: 상위 헤더(그룹명)와 과목명을 결합
-            headers.push(val2 ? `${parentHeader}::${val2}` : val1);
-          }
-        } else {
-          if (val1.includes("지정")) {
-            headers.push("");
-          } else {
-            headers.push(val1);
-          }
-        }
-      }
-
-      const startDataRowIndex = hasMultiRowHeader ? headerRowIndex + 2 : headerRowIndex + 1;
+      const { headers, startDataRowIndex } = layout;
 
       const dataObjects: any[] = [];
       for (let i = startDataRowIndex; i < sheetData.length; i++) {
@@ -637,7 +566,52 @@ export function useMainUploads(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeGrade, rawSheetData, subjectMap, hierarchyRules, previousSubjectMap, parsedCurriculumList]);
 
+  // 전입·전출: 표는 rawSheetData에서 다시 계산되므로 여기만 고치면 통계·출력·저장이 따라온다.
+  const removeStudent = (studentId: string) => {
+    setRawSheetData(prev => ({
+      ...prev,
+      [activeGrade]: (prev[activeGrade] || []).filter(row => {
+        const idKey = Object.keys(row).find(k => k.includes("학번"));
+        return !idKey || String(row[idKey]).trim() !== studentId;
+      }),
+    }));
+  };
+
+  /** 전입생 추가. selectedKeys는 체크한 "그룹::과목" 열 이름. 성공하면 null, 실패하면 이유를 돌려준다. */
+  const addStudent = (studentId: string, name: string, selectedKeys: string[]): string | null => {
+    const rows = rawSheetData[activeGrade] || [];
+    const id = studentId.trim();
+    if (!/^\d{4,}$/.test(id)) return "학번은 숫자 4자리 이상으로 입력해 주세요.";
+    if (!name.trim()) return "이름을 입력해 주세요.";
+    const first = rows[0];
+    const idKey = (first && Object.keys(first).find(k => k.includes("학번"))) || "학번";
+    const nameKey = (first && Object.keys(first).find(k => k.includes("이름") || k.includes("성명"))) || "이름";
+    if (rows.some(r => String(r[idKey]).trim() === id)) return "이미 같은 학번의 학생이 있습니다.";
+
+    const row: Record<string, unknown> = { __manual: true };
+    rows.forEach(r => Object.keys(r).forEach(k => { if (k.includes("::") && !(k in row)) row[k] = ""; }));
+    row[idKey] = id;
+    row[nameKey] = name.trim();
+    selectedKeys.forEach(k => { row[k] = "O"; });
+
+    const at = rows.findIndex(r => Number(String(r[idKey]).trim()) > Number(id));
+    const next = at === -1 ? [...rows, row] : [...rows.slice(0, at), row, ...rows.slice(at)];
+    setRawSheetData(prev => ({ ...prev, [activeGrade]: next }));
+    return null;
+  };
+
+  /** 전입·전출을 반영한 수정본 설문 엑셀 내려받기 */
+  const downloadEditedFile = () => {
+    const file = uploadedFiles[activeGrade];
+    if (!file) return;
+    const err = downloadEditedSurveyWorkbook(file.data, rawSheetData[activeGrade] || [], file.name);
+    if (err) alert(err);
+  };
+
   return {
+    removeStudent,
+    addStudent,
+    downloadEditedFile,
     uploadedFiles, setUploadedFiles,
     processedData, setProcessedData,
     rawSheetData, setRawSheetData,

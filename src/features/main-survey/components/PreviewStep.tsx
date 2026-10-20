@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Download, FileDown } from "lucide-react";
+import { FileText, Download, FileDown, UserPlus, Trash2 } from "lucide-react";
 import { GradeTabs } from "./GradeTabs";
+import { AddStudentModal } from "./AddStudentModal";
 import { ConfirmationDownloadModal } from "./ConfirmationDownloadModal";
 import type { GradeKey, ProcessedStudent, SelectedSubjectHours, SubjectMap } from "../../../types";
 
@@ -11,6 +12,10 @@ interface PreviewStepProps {
   setActiveGrade: (grade: GradeKey) => void;
   handleExport: () => void;
   activeData: ProcessedStudent[];
+  /** 이 학년의 업로드 원본 행(전입생 추가 때 선택 가능한 과목 목록의 출처) */
+  rawRows: Record<string, unknown>[];
+  onRemoveStudent: (studentId: string) => void;
+  onAddStudent: (studentId: string, name: string, selectedKeys: string[]) => string | null;
   /** 학생별 확인서(.docx)에 선택과목의 교과군·학점을 채우기 위한 이 학년의 편성표 데이터 */
   selectedSubjectHours: SelectedSubjectHours[];
   subjectMap: SubjectMap;
@@ -23,10 +28,14 @@ export function PreviewStep({
   setActiveGrade,
   handleExport,
   activeData,
+  rawRows,
+  onRemoveStudent,
+  onAddStudent,
   selectedSubjectHours,
   subjectMap,
 }: PreviewStepProps) {
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const maxSem1 = activeData.length > 0 ? Math.max(4, ...activeData.map(d => d.semester1.length)) : 4;
   const maxSem1_2 = activeData.length > 0 ? Math.max(0, ...activeData.map(d => (d.semester1_2 || []).length)) : 0;
   const maxSem2 = activeData.length > 0 ? Math.max(4, ...activeData.map(d => d.semester2.length)) : 4;
@@ -39,6 +48,15 @@ export function PreviewStep({
           4단계: 수강신청(본조사) 결과 및 다운로드
         </h2>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* 전입생 추가 — 표는 업로드 원본에서 다시 계산되므로 원본 행을 늘리는 방식 */}
+          <button
+            onClick={() => setIsAddOpen(true)}
+            className="px-6 py-3 bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 font-medium rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50"
+            disabled={rawRows.length === 0}
+          >
+            <UserPlus className="w-4 h-4" />
+            전입생 추가
+          </button>
           {/* 학생별 확인서 — 학생이 자기 신청 내역을 확인하고 서명해 보관하는 서식(.docx) */}
           <button
             onClick={() => setIsConfirmationOpen(true)}
@@ -68,6 +86,13 @@ export function PreviewStep({
         subjectMap={subjectMap}
       />
 
+      <AddStudentModal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        rawRows={rawRows}
+        onAdd={onAddStudent}
+      />
+
       <GradeTabs activeGrade={activeGrade} setActiveGrade={setActiveGrade} />
 
       {activeData.length === 0 ? (
@@ -82,7 +107,7 @@ export function PreviewStep({
                 <tr>
                   <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-0 z-40 bg-white min-w-[50px] max-w-[50px] border-r border-stone-200 text-center">순번</th>
                   <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[50px] z-40 bg-white min-w-[80px] max-w-[80px] border-r border-stone-200 text-center">학번</th>
-                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[130px] z-40 bg-white min-w-[80px] max-w-[80px] border-r border-stone-200 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)]">이름</th>
+                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 left-[130px] z-40 bg-white min-w-[150px] max-w-[150px] border-r border-stone-200 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)]">이름</th>
                   <th className="px-2 py-2.5 text-center whitespace-nowrap sticky top-0 z-10 bg-white border-r border-stone-200" colSpan={maxSem1}>1학기</th>
                   {maxSem1_2 > 0 && <th className="px-2 py-2.5 text-center whitespace-nowrap sticky top-0 z-10 bg-white border-r border-stone-200" colSpan={maxSem1_2}>1~2학기</th>}
                   <th className="px-2 py-2.5 text-center whitespace-nowrap sticky top-0 z-10 bg-white border-r border-stone-200" colSpan={maxSem2}>2학기</th>
@@ -90,6 +115,7 @@ export function PreviewStep({
                   <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-white text-center">사회</th>
                   <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-white text-center">과학</th>
                   <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-white">비고(중복)</th>
+                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-white text-center">전출</th>
                 </tr>
               </thead>
               <tbody>
@@ -97,7 +123,7 @@ export function PreviewStep({
                   <tr key={idx} className="group border-b border-stone-200 hover:bg-stone-100">
                     <td className="px-2 py-2.5 whitespace-nowrap sticky left-0 z-20 bg-white group-hover:bg-white min-w-[50px] max-w-[50px] border-r border-stone-200 text-center">{idx + 1}</td>
                     <td className="px-2 py-2.5 font-medium text-stone-900 whitespace-nowrap sticky left-[50px] z-20 bg-white group-hover:bg-white min-w-[80px] max-w-[80px] border-r border-stone-200 text-center">{row.studentId}</td>
-                    <td className="px-2 py-2.5 whitespace-nowrap sticky left-[130px] z-20 bg-white group-hover:bg-white min-w-[80px] max-w-[80px] border-r border-stone-200 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)]">{row.name}</td>
+                    <td className="px-2 py-2.5 whitespace-nowrap sticky left-[130px] z-20 bg-white group-hover:bg-white min-w-[150px] max-w-[150px] border-r border-stone-200 text-center shadow-[2px_0_5px_rgba(0,0,0,0.3)]">{row.name}{row.originalRow?.__manual && <span className="ml-1 px-1 py-0.5 rounded bg-violet-100 text-violet-700 text-[10px] font-semibold align-middle">수동 추가</span>}</td>
                     {Array.from({ length: maxSem1 }).map((_, i) => {
                       const subject = row.semester1[i] || "";
                       const isDuplicate = subject && row.duplicateSubjects?.some(d => normS(d) === normS(subject));
@@ -156,6 +182,16 @@ export function PreviewStep({
                           {category} 과목 이수 필요
                         </span>
                       ))}
+                    </td>
+                    <td className="px-2 py-2.5 text-center">
+                      <button
+                        onClick={() => { if (window.confirm(`${row.studentId} ${row.name} 학생을 목록에서 삭제할까요?\n(전출 처리 — 통계·출력에서도 빠집니다)`)) onRemoveStudent(row.studentId); }}
+                        className="p-1.5 rounded-lg text-stone-400 hover:text-rose-700 hover:bg-rose-50 transition-colors"
+                        aria-label={`${row.name} 삭제`}
+                        title="전출: 목록에서 삭제"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </td>
                   </tr>
                 ))}

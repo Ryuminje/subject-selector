@@ -42,6 +42,9 @@ export function MainSurveyTab() {
     previousSubjectMap, setPreviousSubjectMap,
     subjectStats, setSubjectStats,
     totalClasses, setTotalClasses,
+    removeStudent,
+    addStudent,
+    downloadEditedFile,
     handleFileUpload,
     handlePrevHistoryFileUpload,
     handleRemoveFile,
@@ -327,6 +330,7 @@ export function MainSurveyTab() {
                       uploadedFiles={uploadedFiles}
                       handleFileUpload={handleFileUpload}
                       handleRemoveFile={handleRemoveFile}
+                      handleDownloadEdited={downloadEditedFile}
                       setActiveTab={setActiveTab}
                       previousHistoryFiles={previousHistoryFiles}
                       handlePrevHistoryFileUpload={handlePrevHistoryFileUpload}
@@ -341,6 +345,9 @@ export function MainSurveyTab() {
                       setActiveGrade={setActiveGrade}
                       handleExport={handleExport}
                       activeData={activeData}
+                      rawRows={rawSheetData[activeGrade] || []}
+                      onRemoveStudent={removeStudent}
+                      onAddStudent={addStudent}
                       selectedSubjectHours={selectedSubjectHours[activeGrade]}
                       subjectMap={subjectMap[activeGrade]}
                     />
