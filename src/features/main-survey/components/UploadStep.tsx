@@ -1,8 +1,10 @@
 "use client";
 
-import React from "react";
-import { Upload, File as FileIcon, Trash2, Download } from "lucide-react";
+import React, { useState } from "react";
+import { Upload, File as FileIcon, Trash2, Download, GraduationCap, RotateCcw } from "lucide-react";
 import { GradeTabs } from "./GradeTabs";
+import { PromotionModal } from "./PromotionModal";
+import type { PromotionDecision, RawRow } from "../lib/promotion";
 import type { GradeKey, ProcessedStudent } from "../../../types";
 
 interface UploadStepProps {
@@ -11,8 +13,14 @@ interface UploadStepProps {
   uploadedFiles: { [key in GradeKey]: { name: string, size: number, data: string } | null };
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleRemoveFile: () => void;
-  /** 전입·전출을 반영한 설문 엑셀(수정본) 내려받기 */
-  handleDownloadEdited: () => void;
+  /** 전입·전출·진급을 반영한 설문 엑셀(수정본) 내려받기. includeOldId 면 옛 학번 열을 덧붙인다. */
+  handleDownloadEdited: (includeOldId: boolean) => void;
+  /** 이 학년의 학생 원본 행(진급 명단 점검용) */
+  rawRows: RawRow[];
+  onApplyPromotion: (decisions: PromotionDecision[]) => void;
+  onUndoPromotion: () => void;
+  /** 진급 적용된 학생이 있는지 */
+  isPromoted: boolean;
   setActiveTab: (tab: string) => void;
   previousHistoryFiles: { [key in GradeKey]: { name: string, size: number, data: string } | null };
   handlePrevHistoryFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -28,6 +36,10 @@ export function UploadStep({
   handleFileUpload,
   handleRemoveFile,
   handleDownloadEdited,
+  rawRows,
+  onApplyPromotion,
+  onUndoPromotion,
+  isPromoted,
   setActiveTab,
   previousHistoryFiles,
   handlePrevHistoryFileUpload,
@@ -35,6 +47,8 @@ export function UploadStep({
   previousSubjectMap,
   processedData,
 }: UploadStepProps) {
+  const [isPromotionOpen, setIsPromotionOpen] = useState(false);
+  const [withOldId, setWithOldId] = useState(false);
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
@@ -106,14 +120,48 @@ export function UploadStep({
                   </span>
                 </div>
               </div>
-              <button
-                onClick={handleDownloadEdited}
-                title="4단계에서 추가·삭제한 전입·전출 학생을 반영한 설문 엑셀을 내려받습니다"
-                className="w-full py-2 bg-white hover:bg-emerald-50 text-emerald-700 text-sm font-medium rounded-lg transition-colors border border-emerald-600 flex items-center justify-center gap-1.5"
-              >
-                <Download className="w-4 h-4" />
-                수정본 엑셀 다운로드
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsPromotionOpen(true)}
+                  title="이전학번·이름·진급학번 명단으로 학번을 진급학번으로 바꿉니다"
+                  className="flex-1 py-2 bg-white hover:bg-amber-50 text-amber-800 text-sm font-medium rounded-lg transition-colors border border-amber-500 flex items-center justify-center gap-1.5"
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  진급 학번 적용
+                </button>
+                {isPromoted && (
+                  <button
+                    onClick={() => { if (window.confirm("진급 학번 적용을 되돌릴까요?\n(진급 적용 때 삭제한 학생은 돌아오지 않습니다)")) onUndoPromotion(); }}
+                    title="진급 적용을 되돌려 옛 학번으로 돌아갑니다"
+                    className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 text-sm font-medium rounded-lg transition-colors border border-stone-300 flex items-center gap-1.5"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    되돌리기
+                  </button>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                <button
+                  onClick={() => handleDownloadEdited(withOldId)}
+                  title="4단계에서 추가·삭제한 전입·전출 학생과 진급 학번을 반영한 설문 엑셀을 내려받습니다"
+                  className="w-full py-2 bg-white hover:bg-emerald-50 text-emerald-700 text-sm font-medium rounded-lg transition-colors border border-emerald-600 flex items-center justify-center gap-1.5"
+                >
+                  <Download className="w-4 h-4" />
+                  수정본 엑셀 다운로드
+                </button>
+                {isPromoted && (
+                  <label className="flex items-center gap-1.5 text-xs text-stone-700 cursor-pointer select-none">
+                    <input type="checkbox" checked={withOldId} onChange={e => setWithOldId(e.target.checked)} className="w-3.5 h-3.5 accent-emerald-600" />
+                    옛 학번도 함께 출력 (오른쪽 끝에 &quot;이전학번&quot; 열 추가)
+                  </label>
+                )}
+              </div>
+              <PromotionModal
+                isOpen={isPromotionOpen}
+                onClose={() => setIsPromotionOpen(false)}
+                rawRows={rawRows}
+                onApply={onApplyPromotion}
+              />
               <div className="flex gap-2">
                 <button
                   onClick={() => setActiveTab("preview")}

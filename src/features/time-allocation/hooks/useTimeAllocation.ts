@@ -139,6 +139,8 @@ export interface TimeAllocationApi {
   setRawText: (t: string) => void;
   loadFromPaste: () => void;
   loadFromMain: (snap: MainSurveySnapshot) => void;
+  /** 이미 만든 배정(배치·설정)은 그대로 두고, 명단의 학번·반만 본조사의 진급 학번으로 바꿉니다. */
+  updateIdsFromMain: (snap: MainSurveySnapshot) => void;
   loadSampleText: (t: string) => void;
 
   // 그리드 설정 (학기별)
@@ -323,6 +325,47 @@ export function useTimeAllocation(): TimeAllocationApi {
           kind: "info",
         });
         return { ...prev, [activeGrade]: next };
+      });
+    },
+    [activeGrade],
+  );
+
+  const updateIdsFromMain = useCallback(
+    (snap: MainSurveySnapshot) => {
+      setGrades((prev) => {
+        const g = prev[activeGrade];
+        if (!g.roster) {
+          setMessage({ text: "먼저 명단을 불러오세요.", kind: "error" });
+          return prev;
+        }
+        // 진급을 적용한 본조사 학생: 옛 학번 → 새 학번·반·번호
+        const byOld = new Map<string, { id: string; classNum: string; no: string; oldId: string }>();
+        (snap.processedData?.[activeGrade] ?? []).forEach((p) => {
+          const old = p.originalRow?.__oldId ? String(p.originalRow.__oldId).trim() : "";
+          if (old) byOld.set(old, { id: p.studentId, classNum: p.classNum, no: String(p.num || ""), oldId: old });
+        });
+        if (byOld.size === 0) {
+          setMessage({ text: "본조사에 진급 학번을 적용한 학생이 없습니다. 본조사 3단계에서 먼저 진급 학번을 적용하세요.", kind: "error" });
+          return prev;
+        }
+        let updated = 0;
+        const students = g.roster.students.map((st) => {
+          const m = byOld.get(st.id.trim());
+          if (!m) return st;
+          updated++;
+          return { ...st, id: m.id, classNum: m.classNum, no: m.no || st.no, oldId: m.oldId };
+        });
+        // 학생 번호(인덱스)에 묶인 저장값이 없어 새 학번 순서로 다시 정렬해도 배치는 영향받지 않는다
+        students.sort((a, b) => Number(a.id) - Number(b.id));
+        const notFound = g.roster.students.length - updated;
+        setMessage({
+          text:
+            `학번 갱신 완료: ${updated}명 변경` +
+            (notFound ? `, ${notFound}명은 진급 기록이 없어 그대로 둠` : "") +
+            ". 반이 바뀐 학생의 반 고정 공통과목(구획)은 새 반 기준으로 다시 계산됩니다 — 미배정이 생겼다면 ② 타임 배정에서 배정 최적화를 눌러 정리하세요.",
+          kind: "info",
+        });
+        return { ...prev, [activeGrade]: { ...g, roster: { ...g.roster, students } } };
       });
     },
     [activeGrade],
@@ -705,6 +748,7 @@ export function useTimeAllocation(): TimeAllocationApi {
     setRawText,
     loadFromPaste,
     loadFromMain,
+    updateIdsFromMain,
     loadSampleText,
     setCap,
     setAllowOver,

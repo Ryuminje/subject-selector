@@ -27,6 +27,7 @@ export interface RosterStudent {
   id: string; // 학번
   name: string;
   classNum?: string; // 반 라벨(앱 데이터 경로는 명시, TSV 경로는 학번에서 유도)
+  oldId?: string; // 진급 적용 전 학번(진급을 적용한 학생만) — 내보내기에서 "이전학번"으로 선택 출력
   cnt: number; // "과목수" 열(없으면 0) — 붙여넣기 누락 검증용
   choices: number[]; // subjects 인덱스, 오름차순
 }

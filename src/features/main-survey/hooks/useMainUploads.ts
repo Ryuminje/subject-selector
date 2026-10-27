@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import * as XLSX from "xlsx-js-style";
 import { downloadEditedSurveyWorkbook, findSurveyLayout, pickSurveySheetName } from "../lib/surveySheet";
+import { applyPromotion, countClasses, hasPromoted, undoPromotion, type PromotionDecision } from "../lib/promotion";
 import type { GradeKey, HierarchyRule, ParsedCurriculumSubject, ProcessedStudent, SubjectCategory, SubjectMap, SubjectStat } from "../../../types";
 
 export function normalizeSubjectName(name: string): string {
@@ -366,7 +367,8 @@ export function useMainUploads(
 
       // Match student's previously completed subjects
       let completedBefore: string[] = [];
-      const cleanStudentId = studentId.replace(/\s+/g, "");
+      // 진급 적용 후에도 이전 이수 이력은 옛 학번 기준이라 원래 학번으로 찾는다
+      const cleanStudentId = String(row.__oldId ?? studentId).replace(/\s+/g, "");
       const matchedKey = Object.keys(historyMap).find(k => k.replace(/\s+/g, "") === cleanStudentId);
 
       if (matchedKey) {
@@ -600,18 +602,38 @@ export function useMainUploads(
     return null;
   };
 
-  /** 전입·전출을 반영한 수정본 설문 엑셀 내려받기 */
-  const downloadEditedFile = () => {
+  /** 전입·전출·진급을 반영한 수정본 설문 엑셀 내려받기. includeOldId 면 옛 학번 열을 덧붙인다. */
+  const downloadEditedFile = (includeOldId = false) => {
     const file = uploadedFiles[activeGrade];
     if (!file) return;
-    const err = downloadEditedSurveyWorkbook(file.data, rawSheetData[activeGrade] || [], file.name);
+    const err = downloadEditedSurveyWorkbook(file.data, rawSheetData[activeGrade] || [], file.name, { includeOldId });
     if (err) alert(err);
   };
+
+  /** 진급 명단 적용: 학번을 바꾸고(또는 삭제 표시한 학생은 빼고) 반 수를 새 학번 기준으로 다시 센다. */
+  const applyPromotionDecisions = (decisions: PromotionDecision[]) => {
+    const next = applyPromotion(rawSheetData[activeGrade] || [], decisions);
+    setRawSheetData(prev => ({ ...prev, [activeGrade]: next }));
+    const n = countClasses(next);
+    if (n > 0) setTotalClasses(prev => ({ ...prev, [activeGrade]: n }));
+  };
+
+  const undoPromotionAll = () => {
+    const next = undoPromotion(rawSheetData[activeGrade] || []);
+    setRawSheetData(prev => ({ ...prev, [activeGrade]: next }));
+    const n = countClasses(next);
+    if (n > 0) setTotalClasses(prev => ({ ...prev, [activeGrade]: n }));
+  };
+
+  const isPromoted = hasPromoted(rawSheetData[activeGrade] || []);
 
   return {
     removeStudent,
     addStudent,
     downloadEditedFile,
+    applyPromotionDecisions,
+    undoPromotionAll,
+    isPromoted,
     uploadedFiles, setUploadedFiles,
     processedData, setProcessedData,
     rawSheetData, setRawSheetData,

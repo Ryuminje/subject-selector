@@ -45,6 +45,9 @@ export function MainSurveyTab() {
     removeStudent,
     addStudent,
     downloadEditedFile,
+    applyPromotionDecisions,
+    undoPromotionAll,
+    isPromoted,
     handleFileUpload,
     handlePrevHistoryFileUpload,
     handleRemoveFile,
@@ -331,6 +334,10 @@ export function MainSurveyTab() {
                       handleFileUpload={handleFileUpload}
                       handleRemoveFile={handleRemoveFile}
                       handleDownloadEdited={downloadEditedFile}
+                      rawRows={rawSheetData[activeGrade] || []}
+                      onApplyPromotion={applyPromotionDecisions}
+                      onUndoPromotion={undoPromotionAll}
+                      isPromoted={isPromoted}
                       setActiveTab={setActiveTab}
                       previousHistoryFiles={previousHistoryFiles}
                       handlePrevHistoryFileUpload={handlePrevHistoryFileUpload}

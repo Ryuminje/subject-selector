@@ -1,17 +1,19 @@
 "use client";
 
 import React from "react";
-import { Database, FileDown, Trash2, Upload } from "lucide-react";
+import { Database, FileDown, GraduationCap, Trash2, Upload } from "lucide-react";
 import type { TimeAllocationApi } from "../hooks/useTimeAllocation";
 
 interface Props {
   api: TimeAllocationApi;
   onLoadFromMain: () => void;
+  /** 이미 만든 배정은 두고 학번·반만 진급 학번으로 갱신 */
+  onUpdateIds: () => void;
 }
 
 const SAMPLE_URL = "/sample-time-allocation.tsv";
 
-export function DataInputStep({ api, onLoadFromMain }: Props) {
+export function DataInputStep({ api, onLoadFromMain, onUpdateIds }: Props) {
   const { state, message } = api;
   const roster = state.roster;
 
@@ -43,6 +45,15 @@ export function DataInputStep({ api, onLoadFromMain }: Props) {
         >
           <Database className="w-4 h-4" /> 본조사에서 불러오기
         </button>
+        {roster && (
+          <button
+            onClick={onUpdateIds}
+            title="이미 만든 배정(과목 배치·설정)은 그대로 두고, 명단의 학번·반만 본조사의 진급 학번으로 바꿉니다"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-amber-50 text-amber-800 text-sm font-semibold rounded-xl border border-amber-500 transition-colors"
+          >
+            <GraduationCap className="w-4 h-4" /> 진급 학번 갱신 (배정 유지)
+          </button>
+        )}
         <button
           onClick={loadSample}
           className="inline-flex items-center gap-2 px-4 py-2 bg-stone-200 hover:bg-stone-300 text-stone-800 text-sm font-semibold rounded-xl transition-colors"

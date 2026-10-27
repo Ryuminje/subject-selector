@@ -18,6 +18,8 @@ export function exportStudentTimesXlsx(
   assign: Assignment,
   fileName: string,
   sectionLabels?: Map<string, string>,
+  /** 진급한 학생의 옛 학번을 맨 오른쪽 "이전학번" 열로 덧붙인다 */
+  includeOldId = false,
 ): void {
   const multiSemester = ctx.semesterKeys.length > 1;
   const widthOf = (key: string) => ctx.bySemester[key]?.ownTimes ?? ctx.numTimes;
@@ -28,6 +30,7 @@ export function exportStudentTimesXlsx(
     for (let t = 0; t < widthOf(key); t++) timeHeader.push(timeLabel(ctx, t) + "타임");
   });
   timeHeader.push("미배정");
+  if (includeOldId) timeHeader.push("이전학번");
 
   const aoa: (string | number)[][] = [];
   let headerRowIdx = 0;
@@ -37,6 +40,7 @@ export function exportStudentTimesXlsx(
       semesterRow.push(key, ...Array(widthOf(key) - 1).fill(""));
     });
     semesterRow.push("");
+    if (includeOldId) semesterRow.push("");
     aoa.push(semesterRow);
     headerRowIdx = 1;
   }
@@ -51,6 +55,7 @@ export function exportStudentTimesXlsx(
       st.name,
       ...ctx.semesterKeys.flatMap((key) => bySem[key]),
       assign.unassigned[i].map((s) => ctx.subjects[s].name).join(", "),
+      ...(includeOldId ? [st.oldId ?? ""] : []),
     ]);
   });
 

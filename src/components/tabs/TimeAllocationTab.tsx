@@ -54,16 +54,25 @@ export function TimeAllocationTab() {
     api.loadFromMain(getMain() ?? {});
   };
 
+  const updateIds = () => {
+    const getMain = (window as unknown as { getMainBackup?: () => MainSurveySnapshot }).getMainBackup;
+    if (!getMain) {
+      window.alert("본조사 탭을 찾을 수 없습니다.");
+      return;
+    }
+    api.updateIdsFromMain(getMain() ?? {});
+  };
+
   // 리로스쿨용 내보내기는 본조사 탭이 들고 있는 "원본 업로드 파일"을 다시 엽니다.
   // 4단계에서 전입생을 추가하거나 전출 학생을 삭제했다면 그 변경을 먼저 원본에 입힌 파일을 씁니다
   // (원본 그대로 열면 전입생 행이 없어 결과에서 빠집니다).
-  const mainFileData = () => {
+  const mainFileData = (opts?: { includeOldId?: boolean }) => {
     const getMain = (window as unknown as { getMainBackup?: () => MainSurveySnapshot }).getMainBackup;
     const snap = getMain?.();
     const data = snap?.uploadedFiles?.[api.activeGrade]?.data;
     const rows = snap?.rawSheetData?.[api.activeGrade];
     if (!data || !rows) return data;
-    return editedSurveyDataUrl(data, rows) ?? data;
+    return editedSurveyDataUrl(data, rows, { includeOldId: opts?.includeOldId }) ?? data;
   };
 
   // 다른 탭들과 동일한 저장/불러오기 번들 — MainSurveyTab.tsx 의 handleSaveBackup/handleLoadBackup 과 같은 로직.
@@ -220,7 +229,7 @@ export function TimeAllocationTab() {
 
       <div className="px-10 py-6">
         <GradeTabs activeGrade={api.activeGrade} setActiveGrade={api.setActiveGrade} />
-        {step === "input" && <DataInputStep api={api} onLoadFromMain={loadFromMain} />}
+        {step === "input" && <DataInputStep api={api} onLoadFromMain={loadFromMain} onUpdateIds={updateIds} />}
         {step === "alloc" && <AllocationGridStep api={api} />}
         {/* 계산기는 끄지 않고 숨기기만 합니다 — 단계를 옮겼다 오면 입력이 지워져 버립니다(실제로 겪음). */}
         <div className={step === "teacher" ? "block" : "hidden"}>

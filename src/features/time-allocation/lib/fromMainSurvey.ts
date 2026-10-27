@@ -119,6 +119,7 @@ export function rosterFromMainSurvey(
       id: p.studentId,
       name: p.name,
       classNum: p.classNum,
+      oldId: p.originalRow?.__oldId ? String(p.originalRow.__oldId) : undefined,
       cnt: 0, // 본조사 경로엔 "과목수" 열이 없음 — 누락 검증은 붙여넣기 전용
       choices,
     };

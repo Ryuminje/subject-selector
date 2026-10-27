@@ -77,9 +77,15 @@ export function findSurveyLayout(sheetData: unknown[][]): SurveyLayout | null {
  * 업로드한 원본 엑셀에서 전출 학생 행을 빼고 전입 학생 행을 끼워 넣은 통합문서를 만든다.
  * 칸을 통째로 옮겨 서식(글꼴·테두리·병합·열 너비)을 그대로 유지하고, 전입 행은 이웃 학생 행의 서식을 따른다.
  * 실패하면 이유(문자열)를 돌려준다.
- * @param rawRows 앱이 들고 있는 현재 학생 행(추가·삭제가 반영된 상태)
+ * 진급을 적용한 학생(행에 __oldId)은 새 학번·학년·반으로 쓰고 새 학번 순서로 다시 정렬한다.
+ * @param rawRows 앱이 들고 있는 현재 학생 행(추가·삭제·진급이 반영된 상태)
+ * @param opts.includeOldId 맨 오른쪽에 "이전학번" 열을 덧붙인다(진급한 학생만 값이 있다)
  */
-export function buildEditedSurveyWorkbook(dataUrl: string, rawRows: Record<string, unknown>[]): XLSX.WorkBook | string {
+export interface EditedSurveyOptions {
+  includeOldId?: boolean;
+}
+
+export function buildEditedSurveyWorkbook(dataUrl: string, rawRows: Record<string, unknown>[], opts: EditedSurveyOptions = {}): XLSX.WorkBook | string {
   const wb = XLSX.read(dataUrl.slice(dataUrl.indexOf(",") + 1), { type: "base64", cellStyles: true });
   const wsName = pickSurveySheetName(wb);
   const ws = wb.Sheets[wsName];
@@ -96,17 +102,20 @@ export function buildEditedSurveyWorkbook(dataUrl: string, rawRows: Record<strin
     const k = Object.keys(r).find(k => k.includes("학번"));
     return k ? String(r[k]).trim() : "";
   };
-  const keepIds = new Set(rawRows.map(idOfRaw));
+  // 원본 파일에 적힌 학번(= 진급 전 학번)으로 앱의 현재 행을 찾는다
+  const rawByOrigId = new Map(rawRows.filter(r => !r.__manual).map(r => [String(r.__oldId ?? idOfRaw(r)).trim(), r]));
 
-  // 출력 행 = 원본 행 번호(src) 또는 전입 행(src: null, 서식 견본 tmpl)
-  type OutRow = { src: number | null; tmpl: number; id: string };
+  // 출력 행 = 원본 행 번호(src) 또는 전입 행(src: null, 서식 견본 tmpl). id 는 출력할 학번, origId 는 원본의 학번
+  type OutRow = { src: number | null; tmpl: number; id: string; origId: string };
   const isStudent = (r: number) => /^\d{4,}/.test(idAt(r));
   const students: OutRow[] = [];
   const tail: number[] = [];
   for (let r = startDataRowIndex; r < sheetData.length; r++) {
     if (!sheetData[r] || sheetData[r].length === 0) continue;
-    if (isStudent(r)) { if (keepIds.has(idAt(r))) students.push({ src: r, tmpl: r, id: idAt(r) }); }
-    else tail.push(r);
+    if (isStudent(r)) {
+      const raw = rawByOrigId.get(idAt(r));
+      if (raw) students.push({ src: r, tmpl: r, id: idOfRaw(raw), origId: idAt(r) });
+    } else tail.push(r);
   }
   const firstStudentRow = students[0]?.tmpl ?? startDataRowIndex;
 
@@ -121,30 +130,49 @@ export function buildEditedSurveyWorkbook(dataUrl: string, rawRows: Record<strin
     const at = students.findIndex(s => Number(s.id) > Number(id));
     const pos = at === -1 ? students.length : at;
     const tmpl = students[pos - 1]?.tmpl ?? students[pos]?.tmpl ?? firstStudentRow;
-    students.splice(pos, 0, { src: null, tmpl, id });
+    students.splice(pos, 0, { src: null, tmpl, id, origId: String(r.__oldId ?? id) });
   });
+  // 진급으로 학번이 바뀐 학생이 있으면 새 학번 순서로 다시 정렬한다(정렬은 안정적이라 나머지 순서는 유지)
+  if (students.some(s => s.origId !== s.id)) students.sort((a, b) => Number(a.id) - Number(b.id));
 
   const next: XLSX.WorkSheet = {};
   const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
   const lastCol = Math.max(range.e.c, headers.length - 1);
+  const oldIdCol = lastCol + 1; // "이전학번" 열(옵션)
   const copyRow = (from: number, to: number) => {
     for (let c = 0; c <= lastCol; c++) {
       const cell = ws[XLSX.utils.encode_cell({ r: from, c })];
       if (cell) next[XLSX.utils.encode_cell({ r: to, c })] = { ...cell };
     }
   };
-  const put = (r: number, c: number, v: string | number, tmpl: number) => {
-    const style = ws[XLSX.utils.encode_cell({ r: tmpl, c })]?.s;
+  const put = (r: number, c: number, v: string | number, tmpl: number, styleCol = c) => {
+    const style = ws[XLSX.utils.encode_cell({ r: tmpl, c: styleCol })]?.s;
     next[XLSX.utils.encode_cell({ r, c })] = { t: typeof v === "number" ? "n" : "s", v, ...(style ? { s: style } : {}) };
   };
 
   for (let r = 0; r < startDataRowIndex; r++) copyRow(r, r);
 
-  const idHeaderRow = sheetData.find(h => h?.some(c => String(c ?? "").includes("학번"))) ?? [];
+  const idHeaderIdx = sheetData.findIndex(h => h?.some(c => String(c ?? "").includes("학번")));
+  const idHeaderRow = sheetData[idHeaderIdx] ?? [];
+  // 학번·학년·반 칸을 학번에서 채운다 (5자리 20101 → 2학년 1반, 4자리 2101 → 2학년 1반).
+  // 학번 칸이 원본에서 숫자였으면 숫자로, 문자였으면 문자로 맞춘다.
+  const writeIdFields = (out: number, id: string, tmpl: number) => {
+    put(out, idCol, ws[XLSX.utils.encode_cell({ r: tmpl, c: idCol })]?.t === "n" ? Number(id) : id, tmpl);
+    const cls = id.length >= 5 ? Number(id.substring(1, 3)) : Number(id.substring(1, 2));
+    idHeaderRow.forEach((h, c) => {
+      const t = String(h ?? "").trim();
+      if (t === "학년") put(out, c, Number(id[0]), tmpl);
+      else if (t === "반") put(out, c, cls, tmpl);
+    });
+  };
+
+  if (opts.includeOldId && idHeaderIdx >= 0) put(idHeaderIdx, oldIdCol, "이전학번", idHeaderIdx, idCol);
+
   let out = startDataRowIndex;
   students.forEach((s, i) => {
     if (s.src !== null) {
       copyRow(s.src, out);
+      if (s.id !== s.origId) writeIdFields(out, s.id, s.src); // 진급한 학생
     } else {
       // 서식만 견본 행에서 가져오고 값은 새로 채운다
       for (let c = 0; c <= lastCol; c++) {
@@ -152,43 +180,40 @@ export function buildEditedSurveyWorkbook(dataUrl: string, rawRows: Record<strin
         if (style) next[XLSX.utils.encode_cell({ r: out, c })] = { t: "s", v: "", s: style };
       }
       const row = added.get(s.id)!;
-      // 학번 칸이 원본에서 숫자였으면 숫자로, 문자였으면 문자로 맞춘다
-      put(out, idCol, ws[XLSX.utils.encode_cell({ r: s.tmpl, c: idCol })]?.t === "n" ? Number(s.id) : s.id, s.tmpl);
+      writeIdFields(out, s.id, s.tmpl);
       const nameKey = Object.keys(row).find(k => k.includes("이름") || k.includes("성명"));
       put(out, nameCol, String(nameKey ? row[nameKey] : ""), s.tmpl);
-      // 학년·반 열은 학번에서 채운다 (5자리 20101 → 2학년 1반, 4자리 2101 → 2학년 1반)
-      const cls = s.id.length >= 5 ? Number(s.id.substring(1, 3)) : Number(s.id.substring(1, 2));
-      idHeaderRow.forEach((h, c) => {
-        const t = String(h ?? "").trim();
-        if (t === "학년") put(out, c, Number(s.id[0]), s.tmpl);
-        else if (t === "반") put(out, c, cls, s.tmpl);
-      });
       // 앱 안에서는 "O"로 들고 있지만 리로스쿨 원본 서식의 선택 표시는 숫자 1이다
       headers.forEach((h, c) => { if (h.includes("::") && row[h] === "O") put(out, c, 1, s.tmpl); });
     }
     if (seqCol >= 0) put(out, seqCol, i + 1, s.tmpl);
+    if (opts.includeOldId && s.origId !== s.id) put(out, oldIdCol, s.origId, s.tmpl, idCol);
     out++;
   });
   tail.forEach(r => { copyRow(r, out); out++; });
 
-  next["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(out - 1, 0), c: lastCol } });
-  if (ws["!cols"]) next["!cols"] = ws["!cols"];
+  const endCol = opts.includeOldId ? oldIdCol : lastCol;
+  next["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(out - 1, 0), c: endCol } });
+  if (ws["!cols"]) {
+    next["!cols"] = [...ws["!cols"]];
+    if (opts.includeOldId) next["!cols"][oldIdCol] = { wch: 12 };
+  }
   if (ws["!merges"]) next["!merges"] = ws["!merges"].filter(m => m.e.r < startDataRowIndex);
   wb.Sheets[wsName] = next;
   return wb;
 }
 
 /** 수정본을 파일로 내려받는다. 성공하면 null, 실패하면 이유를 돌려준다. */
-export function downloadEditedSurveyWorkbook(dataUrl: string, rawRows: Record<string, unknown>[], fileName: string): string | null {
-  const wb = buildEditedSurveyWorkbook(dataUrl, rawRows);
+export function downloadEditedSurveyWorkbook(dataUrl: string, rawRows: Record<string, unknown>[], fileName: string, opts: EditedSurveyOptions = {}): string | null {
+  const wb = buildEditedSurveyWorkbook(dataUrl, rawRows, opts);
   if (typeof wb === "string") return wb;
   XLSX.writeFile(wb, fileName.replace(/\.(xlsx|xls|csv)$/i, "") + "_수정본.xlsx");
   return null;
 }
 
 /** 수정본을 data URL로 돌려준다(리로스쿨용 내보내기가 원본 대신 이걸 다시 열어 쓴다). 실패하면 null. */
-export function editedSurveyDataUrl(dataUrl: string, rawRows: Record<string, unknown>[]): string | null {
-  const wb = buildEditedSurveyWorkbook(dataUrl, rawRows);
+export function editedSurveyDataUrl(dataUrl: string, rawRows: Record<string, unknown>[], opts: EditedSurveyOptions = {}): string | null {
+  const wb = buildEditedSurveyWorkbook(dataUrl, rawRows, opts);
   if (typeof wb === "string") return null;
   const b64 = XLSX.write(wb, { type: "base64", bookType: "xlsx", cellStyles: true });
   return "data:application/octet-stream;base64," + b64;

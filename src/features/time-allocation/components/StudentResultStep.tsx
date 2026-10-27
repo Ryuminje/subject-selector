@@ -13,7 +13,7 @@ interface Props {
   api: TimeAllocationApi;
   fileLabel: string;
   /** 본조사 탭에 업로드된 원본 엑셀(data URL) — 리로스쿨용 내보내기에만 씁니다. */
-  getMainFileData?: () => string | undefined;
+  getMainFileData?: (opts?: { includeOldId?: boolean }) => string | undefined;
 }
 
 export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
@@ -21,6 +21,8 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
   const { state, ctx, studentAssign: assign, numTimes, semesterKeys } = api;
   const [onlyUnassigned, setOnlyUnassigned] = useState(false);
   const [msg, setMsg] = useState<string>("");
+  // 진급 학번을 적용한 학생이 있을 때만 보이는 옵션 — 내보내기에 옛 학번 열을 덧붙인다
+  const [withOldId, setWithOldId] = useState(false);
 
   // 분반이 타임 수보다 많아 겹친(A1/A2) 칸의 라벨 — 학생 루프 밖에서 한 번만 계산해 아래
   // 화면·TSV·Excel·리로스쿨 내보내기가 전부 같은 값을 공유합니다. 데이터가 없으면 빈 맵
@@ -55,12 +57,12 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
   };
 
   const exportXlsx = () => {
-    exportStudentTimesXlsx(rowsCtx, assign, `${fileLabel}_타임배정`, sectionLabels);
+    exportStudentTimesXlsx(rowsCtx, assign, `${fileLabel}_타임배정`, sectionLabels, withOldId);
     setMsg("엑셀 파일을 내려받았습니다.");
   };
 
   const exportRiro = () => {
-    const data = getMainFileData?.();
+    const data = getMainFileData?.({ includeOldId: withOldId });
     if (!data) {
       setMsg("본조사 탭에 업로드된 원본 엑셀이 없습니다. 본조사 탭에서 파일을 먼저 올리세요.");
       return;
@@ -104,6 +106,17 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
         >
           <ClipboardCopy className="w-4 h-4" /> TSV 복사
         </button>
+        {rosterSubjects && state.roster.students.some((s) => s.oldId) && (
+          <label className="inline-flex items-center gap-1.5 text-sm text-stone-700">
+            <input
+              type="checkbox"
+              checked={withOldId}
+              onChange={(e) => setWithOldId(e.target.checked)}
+              className="w-4 h-4 accent-emerald-600"
+            />
+            옛 학번도 함께 출력
+          </label>
+        )}
         <label className="inline-flex items-center gap-1.5 text-sm text-stone-700">
           <input
             type="checkbox"
