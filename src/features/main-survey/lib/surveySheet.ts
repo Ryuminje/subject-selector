@@ -163,7 +163,8 @@ export function buildEditedSurveyWorkbook(dataUrl: string, rawRows: Record<strin
         if (t === "학년") put(out, c, Number(s.id[0]), s.tmpl);
         else if (t === "반") put(out, c, cls, s.tmpl);
       });
-      headers.forEach((h, c) => { if (h.includes("::") && row[h] === "O") put(out, c, "O", s.tmpl); });
+      // 앱 안에서는 "O"로 들고 있지만 리로스쿨 원본 서식의 선택 표시는 숫자 1이다
+      headers.forEach((h, c) => { if (h.includes("::") && row[h] === "O") put(out, c, 1, s.tmpl); });
     }
     if (seqCol >= 0) put(out, seqCol, i + 1, s.tmpl);
     out++;
