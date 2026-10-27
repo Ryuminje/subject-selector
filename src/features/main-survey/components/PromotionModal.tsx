@@ -158,8 +158,11 @@ export function PromotionModal({ isOpen, onClose, rawRows, onApply }: PromotionM
                                 ? <span className="text-amber-700">명단에 없음</span>
                                 : <span className="text-rose-700">이름 다름 (명단: {r.listName})</span>}
                             </td>
-                            <td className="px-3 py-2 whitespace-nowrap">{r.key}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{r.name}</td>
+                            <td className="px-3 py-2 whitespace-nowrap">{r.key || <span className="text-stone-400">(학번 없음)</span>}</td>
+                            <td className="px-3 py-2">
+                              <div className="whitespace-nowrap font-medium">{r.name || <span className="text-stone-400">(이름 없음)</span>}</div>
+                              <div className="text-xs text-stone-500">{r.info}</div>
+                            </td>
                             <td className="px-3 py-2">
                               <input
                                 value={r.newId}

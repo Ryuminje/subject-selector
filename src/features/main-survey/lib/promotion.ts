@@ -86,6 +86,8 @@ export interface ReviewRow {
   /** 모달에서 고칠 수 있는 진급학번. 비어 있으면 학번을 바꾸지 않는다. */
   newId: string;
   remove: boolean;
+  /** 누구인지 알아보기 위한 정보: 현재 학년-반-번호와 신청한 과목 */
+  info: string;
 }
 
 export interface PromotionReview {
@@ -94,19 +96,42 @@ export interface PromotionReview {
   unusedEntries: PromotionEntry[];
 }
 
+/** 점검 화면에서 학생을 알아보기 위한 한 줄 설명: "2학년 1반 3번 · 신청 과목 4개: 독서, 정치 …" */
+function describeRow(row: RawRow): string {
+  const id = currentIdOf(row);
+  const where = isStudentId(id)
+    ? id.length >= 5
+      ? `${id[0]}학년 ${Number(id.substring(1, 3))}반 ${Number(id.substring(3))}번`
+      : `${id[0]}학년 ${id[1]}반 ${Number(id.substring(2))}번`
+    : "학번 확인 불가";
+  const picked = Object.keys(row)
+    .filter(k => k.includes("::") && ["1", "o", "y", "이수", "참여"].includes(String(row[k] ?? "").trim().toLowerCase()))
+    .map(k => k.split("::")[1].trim());
+  const shown = picked.slice(0, 4).join(", ") + (picked.length > 4 ? " …" : "");
+  return picked.length ? `${where} · 신청 과목 ${picked.length}개: ${shown}` : `${where} · 신청 과목 없음`;
+}
+
 export function reviewPromotion(rawRows: RawRow[], entries: PromotionEntry[]): PromotionReview {
   const byOld = new Map<string, PromotionEntry>();
   entries.forEach(e => byOld.set(e.oldId, e));
   const used = new Set<string>();
-  const rows: ReviewRow[] = rawRows.map(r => {
-    const key = originalIdOf(r);
-    const name = nameOf(r);
-    const e = byOld.get(key);
-    if (!e) return { key, name, status: "missing", newId: "", remove: false };
-    used.add(key);
-    const same = !e.name || norm(e.name) === norm(name);
-    return { key, name, status: same ? "match" : "nameMismatch", listName: e.name, newId: e.newId, remove: false };
-  });
+  const rows: ReviewRow[] = rawRows
+    // 학번도 이름도 없는 빈 줄이나 합계 줄은 학생이 아니라서 점검 대상에서 뺀다
+    .filter(r => {
+      const id = originalIdOf(r);
+      const name = nameOf(r);
+      return !((!id && !name) || /합계|총계/.test(id + name));
+    })
+    .map(r => {
+      const key = originalIdOf(r);
+      const name = nameOf(r);
+      const info = describeRow(r);
+      const e = byOld.get(key);
+      if (!e) return { key, name, status: "missing" as const, newId: "", remove: false, info };
+      used.add(key);
+      const same = !e.name || norm(e.name) === norm(name);
+      return { key, name, status: same ? ("match" as const) : ("nameMismatch" as const), listName: e.name, newId: e.newId, remove: false, info };
+    });
   return { rows, unusedEntries: entries.filter(e => !used.has(e.oldId)) };
 }
 
