@@ -14,6 +14,8 @@ export interface MainSurveySnapshot {
   standardClassSize?: Partial<Record<GradeKey, number>>;
   /** 업로드했던 원본 수강신청 엑셀(data URL) — 리로스쿨용 내보내기가 이걸 그대로 다시 엽니다. */
   uploadedFiles?: Partial<Record<GradeKey, { name: string; size: number; data: string } | null>>;
+  /** 4단계에서 전입·전출을 반영한 학생 원본 행 — 리로스쿨용 내보내기가 원본 파일에 이 변경을 입힐 때 씁니다. */
+  rawSheetData?: Partial<Record<GradeKey, Record<string, unknown>[]>>;
 }
 
 export interface MainSurveyRosterResult {

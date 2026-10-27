@@ -14,6 +14,7 @@ import { AllocationGridStep } from "../../features/time-allocation/components/Al
 import { StudentResultStep } from "../../features/time-allocation/components/StudentResultStep";
 import { TeacherPlanStep } from "../../features/time-allocation/components/TeacherPlanStep";
 import type { MainSurveySnapshot } from "../../features/time-allocation/lib/fromMainSurvey";
+import { editedSurveyDataUrl } from "../../features/main-survey/lib/surveySheet";
 import { GuideLink } from "@/features/guide/components/GuideLink";
 
 const STEPS = [
@@ -53,10 +54,16 @@ export function TimeAllocationTab() {
     api.loadFromMain(getMain() ?? {});
   };
 
-  // 리로스쿨용 내보내기는 본조사 탭이 들고 있는 "원본 업로드 파일"을 그대로 다시 엽니다.
+  // 리로스쿨용 내보내기는 본조사 탭이 들고 있는 "원본 업로드 파일"을 다시 엽니다.
+  // 4단계에서 전입생을 추가하거나 전출 학생을 삭제했다면 그 변경을 먼저 원본에 입힌 파일을 씁니다
+  // (원본 그대로 열면 전입생 행이 없어 결과에서 빠집니다).
   const mainFileData = () => {
     const getMain = (window as unknown as { getMainBackup?: () => MainSurveySnapshot }).getMainBackup;
-    return getMain?.()?.uploadedFiles?.[api.activeGrade]?.data;
+    const snap = getMain?.();
+    const data = snap?.uploadedFiles?.[api.activeGrade]?.data;
+    const rows = snap?.rawSheetData?.[api.activeGrade];
+    if (!data || !rows) return data;
+    return editedSurveyDataUrl(data, rows) ?? data;
   };
 
   // 다른 탭들과 동일한 저장/불러오기 번들 — MainSurveyTab.tsx 의 handleSaveBackup/handleLoadBackup 과 같은 로직.
