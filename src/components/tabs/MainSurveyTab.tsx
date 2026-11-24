@@ -8,6 +8,11 @@ import { useMainClassSummary } from "../../features/main-survey/hooks/useMainCla
 import { BaseDataNotice } from "../../features/year-data/components/BaseDataNotice";
 import { AddStudentModal } from "../../features/main-survey/components/AddStudentModal";
 import { useYearData } from "../../features/year-data/YearDataContext";
+import { useCohortState, usePrefixedCohortMap } from "../../features/year-data/useCohortState";
+import { GRADE_OFFSETS, KEY_PREFIX_BY_GRADE, KEY_PREFIX_BY_LABEL } from "../../features/year-data/lib/cohortStore";
+import { DemandCarryOver } from "../../features/main-survey/components/DemandCarryOver";
+import { cohortOfGradeKey } from "../../features/year-data/lib/cohortCurriculum";
+import { outcomeKey } from "../../features/year-data/lib/demandOutcome";
 import { excludedIdSet, fileStudentsFromRows, isExcludedRow } from "../../features/year-data/lib/roster";
 import { UploadStep } from "../../features/main-survey/components/UploadStep";
 import { PreviewStep } from "../../features/main-survey/components/PreviewStep";
@@ -23,7 +28,12 @@ export function MainSurveyTab() {
   const [activeTab, setActiveTab] = useState("upload");
   const [activeGrade, setActiveGrade] = useState<GradeKey>("grade1");
   // 기초자료 학생 명단: 전출·퇴학은 이 탭의 계산에서 빼고, 전입생은 명단에서 골라 과목만 입력한다
-  const { roster } = useYearData();
+  const { roster, demandResults, workYear } = useYearData();
+  // 수요조사에서 가져온 과목별 결과(3단계 과목 개설 여부 표의 비교 열에 쓴다)
+  const demandOutcomes = useMemo(() => {
+    const r = demandResults[String(cohortOfGradeKey(workYear, activeGrade))];
+    return r ? new Map(r.outcomes.map((o) => [outcomeKey(o.semester, o.subject), o])) : undefined;
+  }, [demandResults, workYear, activeGrade]);
   const excludedIds = useMemo(() => excludedIdSet(roster), [roster]);
   const [addTarget, setAddTarget] = useState<{ id: string; name: string } | null>(null);
 
@@ -55,14 +65,15 @@ export function MainSurveyTab() {
     handleRemovePrevHistoryFile,
   } = useMainUploads(activeGrade, parsedCurriculumList, subjectMap, hierarchyRules, excludedIds);
 
-  const [standardClassSize, setStandardClassSize] = useState<{ [key in GradeKey]: number }>({ pre1: 25, grade1: 25, grade2: 25 });
-  const [manualClassCounts, setManualClassCounts] = useState<{ [subjectKey: string]: number }>({});
+  // 학년 자리별 값은 입학년도 기준으로 보관(작업 학년도를 바꿔도 입학년도를 따라감)
+  const [standardClassSize, setStandardClassSize] = useCohortState<GradeKey, number>("main.standardClassSize", GRADE_OFFSETS, 25);
+  const [manualClassCounts, setManualClassCounts] = usePrefixedCohortMap<number>("main.manualClassCounts", KEY_PREFIX_BY_LABEL);
   const [editingClasses, setEditingClasses] = useState<{ [subjectKey: string]: boolean }>({});
   const [teacherCounts, setTeacherCounts] = useState<{ [category: string]: number }>({});
   const [headTeacherReductions, setHeadTeacherReductions] = useState<{ [category: string]: number }>({});
   const [headTeacherCategoryInput, setHeadTeacherCategoryInput] = useState<string>("");
   const [editingTeachers, setEditingTeachers] = useState<{ [category: string]: boolean }>({});
-  const [manualStep5Classes, setManualStep5Classes] = useState<{ [key: string]: string }>({});
+  const [manualStep5Classes, setManualStep5Classes] = usePrefixedCohortMap<string>("main.manualStep5Classes", KEY_PREFIX_BY_GRADE);
   const [editingStep5Classes, setEditingStep5Classes] = useState<{ [key: string]: boolean }>({});
   // 7단계(교과별 시수 조정) — 6단계와 완전히 따로 쓰는 연습판
   const [hoursSim, setHoursSim] = useState<SimCategory[]>([]);
@@ -302,9 +313,10 @@ export function MainSurveyTab() {
                 <BaseDataNotice
                   grade={activeGrade}
                   students={fileStudentsFromRows(rawSheetData[activeGrade] || [])}
-                  defaultBasis={isPromoted ? "new" : "old"}
-                  onEnterSubjects={setAddTarget}
+                  // 전입생의 학번: 진급 학번을 적용한 뒤라면 진급학번, 아니면 올해 학번으로 설문 행에 넣는다
+                  onEnterSubjects={(s) => setAddTarget({ id: isPromoted && s.newId ? s.newId : s.id, name: s.name })}
                 />
+                <DemandCarryOver grade={activeGrade} mainStats={subjectStats[activeGrade] || []} />
                 <div className="bg-white/70 backdrop-blur-xl border border-stone-200 rounded-3xl p-8 shadow-xl">
                   {activeTab === "upload" && (
                     <UploadStep
@@ -348,6 +360,7 @@ export function MainSurveyTab() {
                       setManualStep5Classes={setManualStep5Classes}
                       editingStep5Classes={editingStep5Classes}
                       setEditingStep5Classes={setEditingStep5Classes}
+                      demandOutcomes={demandOutcomes}
                     />
                   )}
                   {activeTab === "categorySummary" && (

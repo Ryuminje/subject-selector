@@ -29,6 +29,8 @@ import {
 } from "./lib/cohortCurriculum";
 import type { PromotionEntry } from "../main-survey/lib/promotion";
 import { rosterToPromotionEntries, type RosterStudent } from "./lib/roster";
+import type { DemandResult } from "./lib/demandOutcome";
+import type { CohortStore } from "./lib/cohortStore";
 
 export type PerGrade<T> = { [key in GradeKey]: T };
 type Setter<T> = React.Dispatch<React.SetStateAction<PerGrade<T>>>;
@@ -66,16 +68,28 @@ export interface YearData {
   setRoster: React.Dispatch<React.SetStateAction<RosterStudent[]>>;
   /** 명단에서 계산한 진급 학번 쌍(올해 학번 → 진급학번, 전출·퇴학 제외). 본조사 진급 적용이 씁니다. */
   promotionEntries: PromotionEntry[];
+  /** 본조사로 가져온 수요조사 결과(과목별 신청자·개설 반 수·폐강) — 입학년도별 */
+  demandResults: Record<string, DemandResult>;
+  setDemandResults: React.Dispatch<React.SetStateAction<Record<string, DemandResult>>>;
+  /** 각 탭이 학년 자리별로 들고 있던 데이터(업로드·결과·학급 수·변경 탭 …)를 입학년도 기준으로 보관: 저장소[이름][입학년도] */
+  cohortStore: CohortStore;
+  setCohortStore: React.Dispatch<React.SetStateAction<CohortStore>>;
+  /** 한 이름의 입학년도별 값을 (현재 값, 작업 학년도) → 새 값으로 갱신(useCohortState 가 쓴다) */
+  updateCohortStore: (
+    name: string,
+    fn: (cur: Record<string, unknown> | undefined, workYear: number) => Record<string, unknown> | undefined,
+  ) => void;
 }
 
 const YearDataContext = createContext<YearData | null>(null);
 
 export function YearDataProvider({ children }: { children: React.ReactNode }) {
   // 작업 학년도와 입학년도별 편성표는 한 상태로 묶어, setter 가 항상 최신 작업 학년도를 보고 갱신하게 한다
-  const [store, setStore] = useState<{ workYear: number; cohorts: Cohorts }>({ workYear: 2027, cohorts: {} });
-  const { workYear, cohorts } = store;
+  const [store, setStore] = useState<{ workYear: number; cohorts: Cohorts; cohortStore: CohortStore }>({ workYear: 2027, cohorts: {}, cohortStore: {} });
+  const { workYear, cohorts, cohortStore } = store;
   const [hierarchy, setHierarchy] = useState<HierarchyRule[]>([]);
   const [roster, setRoster] = useState<RosterStudent[]>([]);
+  const [demandResults, setDemandResults] = useState<Record<string, DemandResult>>({});
   const promotionEntries = useMemo(() => rosterToPromotionEntries(roster, workYear), [roster, workYear]);
 
   const updateCohorts = useCallback(
@@ -90,6 +104,17 @@ export function YearDataProvider({ children }: { children: React.ReactNode }) {
     (u) => updateCohorts((prev) => (typeof u === "function" ? u(prev) : u)),
     [updateCohorts],
   );
+  const setCohortStore = useCallback<React.Dispatch<React.SetStateAction<CohortStore>>>(
+    (u) => setStore((s) => ({ ...s, cohortStore: typeof u === "function" ? u(s.cohortStore) : u })),
+    [],
+  );
+  const updateCohortStore = useCallback<YearData["updateCohortStore"]>((name, fn) => {
+    setStore((s) => {
+      const cur = s.cohortStore[name];
+      const next = fn(cur, s.workYear);
+      return next === cur ? s : { ...s, cohortStore: { ...s.cohortStore, [name]: next ?? {} } };
+    });
+  }, []);
   const setWorkYear = useCallback<React.Dispatch<React.SetStateAction<number>>>(
     (u) => setStore((s) => ({ ...s, workYear: typeof u === "function" ? u(s.workYear) : u })),
     [],
@@ -167,8 +192,10 @@ export function YearDataProvider({ children }: { children: React.ReactNode }) {
       workYear, setWorkYear,
       roster, setRoster,
       promotionEntries,
+      demandResults, setDemandResults,
+      cohortStore, setCohortStore, updateCohortStore,
     }),
-    [views, setters, hierarchyRules, setHierarchyRules, applyCurriculumFile, setCategoryOverride, cohorts, setCohorts, hierarchy, workYear, setWorkYear, roster, promotionEntries],
+    [views, setters, hierarchyRules, setHierarchyRules, applyCurriculumFile, setCategoryOverride, cohorts, setCohorts, hierarchy, workYear, setWorkYear, roster, promotionEntries, demandResults, cohortStore, setCohortStore, updateCohortStore],
   );
 
   return <YearDataContext.Provider value={value}>{children}</YearDataContext.Provider>;

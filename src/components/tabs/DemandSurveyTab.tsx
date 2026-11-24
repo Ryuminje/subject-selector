@@ -7,6 +7,8 @@ import { useDemandUploads } from "../../features/demand-survey/hooks/useDemandUp
 import { useDemandClassSummary } from "../../features/demand-survey/hooks/useDemandClassSummary";
 import { BaseDataNotice } from "../../features/year-data/components/BaseDataNotice";
 import { useYearData } from "../../features/year-data/YearDataContext";
+import { useCohortState, usePrefixedCohortMap } from "../../features/year-data/useCohortState";
+import { GRADE_OFFSETS, KEY_PREFIX_BY_GRADE, KEY_PREFIX_BY_LABEL } from "../../features/year-data/lib/cohortStore";
 import { excludedIdSet, fileStudentsFromRows } from "../../features/year-data/lib/roster";
 import { UploadStep } from "../../features/demand-survey/components/UploadStep";
 import { PreviewStep } from "../../features/demand-survey/components/PreviewStep";
@@ -46,14 +48,15 @@ export function DemandSurveyTab() {
     handleRemovePrevHistoryFile,
   } = useDemandUploads(activeGrade, parsedCurriculumList, subjectMap, hierarchyRules, excludedIds);
 
-  const [standardClassSize, setStandardClassSize] = useState<{ [key in GradeKey]: number }>({ pre1: 25, grade1: 25, grade2: 25 });
-  const [manualClassCounts, setManualClassCounts] = useState<{ [subjectKey: string]: number }>({});
+  // 학년 자리별 값은 입학년도 기준으로 보관(작업 학년도를 바꿔도 입학년도를 따라감)
+  const [standardClassSize, setStandardClassSize] = useCohortState<GradeKey, number>("demand.standardClassSize", GRADE_OFFSETS, 25);
+  const [manualClassCounts, setManualClassCounts] = usePrefixedCohortMap<number>("demand.manualClassCounts", KEY_PREFIX_BY_LABEL);
   const [editingClasses, setEditingClasses] = useState<{ [subjectKey: string]: boolean }>({});
   const [teacherCounts, setTeacherCounts] = useState<{ [category: string]: number }>({});
   const [headTeacherReductions, setHeadTeacherReductions] = useState<{ [category: string]: number }>({});
   const [headTeacherCategoryInput, setHeadTeacherCategoryInput] = useState<string>("");
   const [editingTeachers, setEditingTeachers] = useState<{ [category: string]: boolean }>({});
-  const [manualStep5Classes, setManualStep5Classes] = useState<{ [key: string]: string }>({});
+  const [manualStep5Classes, setManualStep5Classes] = usePrefixedCohortMap<string>("demand.manualStep5Classes", KEY_PREFIX_BY_GRADE);
   const [editingStep5Classes, setEditingStep5Classes] = useState<{ [key: string]: boolean }>({});
 
   if (typeof window !== "undefined") {

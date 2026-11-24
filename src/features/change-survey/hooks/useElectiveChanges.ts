@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
+import { useCohortState } from "../../year-data/useCohortState";
+import { CHANGE_OFFSETS } from "../../year-data/lib/cohortStore";
 import type { ChangeGradeKey, ElectiveChange, GradeStringArrays, TimetableData } from "../types";
 import type { StudentTimeData } from "../../../types";
 import { normalizeSubject, sameSubject } from "../lib/subjectMatch";
@@ -33,21 +35,22 @@ export function useElectiveChanges(
   grade2HistoryData: Record<string, Record<string, string[]>> = {},
   grade3Sem1HistoryData: Record<string, Record<string, string[]>> = {},
 ) {
-  const [electiveChanges, setElectiveChanges] = useState<Record<string, any[]>>({ grade2: [], grade3: [] });
-  const [electiveChangesArbitrary, setElectiveChangesArbitrary] = useState<Record<string, any[]>>({ grade2: [], grade3: [] });
+  // 학년 자리(2학년/3학년)별 신청·설정은 입학년도 기준으로 보관한다(작업 학년도를 바꿔도 입학년도를 따라감)
+  const [electiveChanges, setElectiveChanges] = useCohortState<ChangeGradeKey, any[]>("change.electiveChanges", CHANGE_OFFSETS, []);
+  const [electiveChangesArbitrary, setElectiveChangesArbitrary] = useCohortState<ChangeGradeKey, any[]>("change.electiveChangesArbitrary", CHANGE_OFFSETS, []);
   // 학년별로 독립적으로 켜고 끌 수 있도록 학년별 boolean으로 관리한다.
-  const [enableOptimization, setEnableOptimization] = useState<Record<ChangeGradeKey, boolean>>({ grade2: false, grade3: false });
+  const [enableOptimization, setEnableOptimization] = useCohortState<ChangeGradeKey, boolean>("change.enableOptimization", CHANGE_OFFSETS, false);
   // 교체 불가 과목(논술·체육+진로처럼 학급 기준으로 들어가는 과목). 학생 단위로 고정한다 —
   // 이 과목을 듣는 학생의 그 타임은 바뀌지 않지만, 같은 타임의 다른 과목을 듣는 학생은 교체할 수 있다.
-  const [lockedSubjects, setLockedSubjects] = useState<Record<ChangeGradeKey, string[]>>({ grade2: [], grade3: [] });
+  const [lockedSubjects, setLockedSubjects] = useCohortState<ChangeGradeKey, string[]>("change.lockedSubjects", CHANGE_OFFSETS, []);
 
   // 확정(freeze): 확정된 학생의 최종 스케줄/로그를 얼려두고, 이후 계산은
   // 이 값을 출발점으로 삼아 확정된 학생을 다시 건드리지 않도록 한다.
-  const [confirmedLog, setConfirmedLog] = useState<Record<ChangeGradeKey, Record<string, ChangeLogEntry[]>>>({ grade2: {}, grade3: {} });
-  const [confirmedBaseSchedules, setConfirmedBaseSchedules] = useState<Record<ChangeGradeKey, Record<string, Record<string, string>>>>({ grade2: {}, grade3: {} });
+  const [confirmedLog, setConfirmedLog] = useCohortState<ChangeGradeKey, Record<string, ChangeLogEntry[]>>("change.confirmedLog", CHANGE_OFFSETS, {});
+  const [confirmedBaseSchedules, setConfirmedBaseSchedules] = useCohortState<ChangeGradeKey, Record<string, Record<string, string>>>("change.confirmedBaseSchedules", CHANGE_OFFSETS, {});
   // 확정을 여러 번 반복해도(확정→추가→확정→추가…) 매번의 직전 상태를 스택으로
   // 쌓아두고, 확정 취소를 누를 때마다 한 단계씩 그 이전 상태로 되돌아간다.
-  const [confirmHistory, setConfirmHistory] = useState<Record<ChangeGradeKey, PreConfirmSnapshot[]>>({ grade2: [], grade3: [] });
+  const [confirmHistory, setConfirmHistory] = useCohortState<ChangeGradeKey, PreConfirmSnapshot[]>("change.confirmHistory", CHANGE_OFFSETS, []);
 
   // --- Global Load Balancer (Auto-Balancing) ---
   useEffect(() => {

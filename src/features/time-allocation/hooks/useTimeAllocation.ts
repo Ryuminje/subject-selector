@@ -11,6 +11,8 @@
 // 프로젝트 JSON 저장은 getBackup()/loadBackup() 로 노출합니다.
 
 import { useCallback, useMemo, useState } from "react";
+import { useCohortState } from "../../year-data/useCohortState";
+import { GRADE_OFFSETS } from "../../year-data/lib/cohortStore";
 import type { GradeKey } from "../../../types";
 import {
   ALL_GRADE_KEYS,
@@ -73,6 +75,7 @@ function stateForRoster(
   const realKeys = keys.filter((k) => k !== NO_SEMESTER_KEY).sort();
   const defaultKey = realKeys.length > 1 ? realKeys[realKeys.length - 1] : null;
   const selected = roster.subjects.map((s) => {
+    if (s.closed) return false; // 본조사에서 폐강된 과목은 배정 대상이 아님
     if (anyPick) return s.group === lastGroup;
     if (!defaultKey) return true;
     const k = semesterKeyOf(s);
@@ -177,7 +180,8 @@ export interface TimeAllocationApi {
 }
 
 export function useTimeAllocation(): TimeAllocationApi {
-  const [grades, setGrades] = useState<GradeMap>(freshGradeMap);
+  // 학년 자리별 배정 결과는 입학년도 기준으로 보관한다(작업 학년도를 바꿔도 입학년도를 따라감)
+  const [grades, setGrades] = useCohortState<GradeKey, TimeAllocGradeState>("timeAlloc.grades", GRADE_OFFSETS, emptyGradeState());
   const [activeGrade, setActiveGrade] = useState<GradeKey>("grade1");
   const [message, setMessage] = useState<Msg>(null);
 
@@ -317,15 +321,19 @@ export function useTimeAllocation(): TimeAllocationApi {
     (snap: MainSurveySnapshot) => {
       setGrades((prev) => {
         const g = prev[activeGrade];
-        const { roster, sectionHints, error } = rosterFromMainSurvey(snap, activeGrade);
+        const { roster, sectionHints, error, summary } = rosterFromMainSurvey(snap, activeGrade);
         if (error) {
           setMessage({ text: error, kind: "error" });
           return prev;
         }
         const next = stateForRoster(g, roster, "main", "", sectionHints);
+        // 본조사 3단계에서 정한 개설 여부를 그대로 반영했음을 알린다(폐강 제외 · 반 수 미확정 안내)
+        const notes: string[] = [];
+        if (summary?.closed.length) notes.push(`폐강 ${summary.closed.length}과목은 배정에서 뺐습니다(학생 신청 ${summary.droppedChoices}건 제외: ${summary.closed.join(", ")})`);
+        if (summary?.unsettled.length) notes.push(`개설 반 수가 아직 확정되지 않은 ${summary.unsettled.length}과목은 기본 반 수로 잡았습니다 — 본조사 3단계에서 확정하세요(${summary.unsettled.join(", ")})`);
         setMessage({
-          text: `본조사에서 불러오기 완료: 학생 ${roster.students.length}명, 과목 ${roster.subjects.length}개`,
-          kind: "info",
+          text: `본조사에서 불러오기 완료: 학생 ${roster.students.length}명, 과목 ${roster.subjects.length}개${notes.length ? ` · ${notes.join(" · ")}` : ""}`,
+          kind: notes.length ? "error" : "info",
         });
         return { ...prev, [activeGrade]: next };
       });

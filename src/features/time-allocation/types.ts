@@ -20,6 +20,10 @@ export interface RosterSubject {
   count: number; // 신청 인원
   col: number; // TSV 원본 열 위치(앱 데이터 경로는 순번). 1·2학기 동명 과목을 열로 구분합니다.
   semester?: string; // 앱 데이터 경로에서만 채움("1학기"/"2학기")
+  /** 본조사 3단계(과목 개설 여부)에서 폐강된 과목 — 불러올 때 배정 대상에서 빠지고 학생들의 신청도 제외됩니다 */
+  closed?: boolean;
+  /** 개설 반 수가 아직 숫자로 확정되지 않은 과목("논의", "2~3" 등) — 기본 반 수로 잡고 본조사에서 확정하라고 안내합니다 */
+  unsettled?: boolean;
 }
 
 export interface RosterStudent {

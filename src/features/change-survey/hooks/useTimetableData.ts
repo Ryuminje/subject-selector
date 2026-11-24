@@ -1,18 +1,16 @@
-import { useState } from "react";
-import type { ChangeGradeKey, TimetableData, GradeStringArrays } from "../types";
+import { useCohortState } from "../../year-data/useCohortState";
+import { CHANGE_OFFSETS } from "../../year-data/lib/cohortStore";
+import type { ChangeGradeKey, TimetableData } from "../types";
 
 const initialTimeSlots = ["A", "B", "C", "D", "E", "F", "G"];
 const initialColsG2 = Array.from({ length: 9 }, (_, i) => `2-${i + 1}`);
 const initialColsG3 = Array.from({ length: 9 }, (_, i) => `3-${i + 1}`);
 
 export function useTimetableData(changeActiveGrade: ChangeGradeKey) {
-  const [timeSlots, setTimeSlots] = useState<GradeStringArrays>({
-    grade2: [...initialTimeSlots], grade3: [...initialTimeSlots]
-  });
-  const [classCols, setClassCols] = useState<GradeStringArrays>({
-    grade2: [...initialColsG2], grade3: [...initialColsG3]
-  });
-  const [timetableData, setTimetableData] = useState<TimetableData>({ grade2: {}, grade3: {} });
+  // 학년 자리(2학년/3학년)별 시간표는 입학년도 기준으로 보관한다(작업 학년도를 바꿔도 입학년도를 따라감)
+  const [timeSlots, setTimeSlots] = useCohortState<ChangeGradeKey, string[]>("change.timeSlots", CHANGE_OFFSETS, () => [...initialTimeSlots]);
+  const [classCols, setClassCols] = useCohortState<ChangeGradeKey, string[]>("change.classCols", CHANGE_OFFSETS, (k) => (k === "grade2" ? [...initialColsG2] : [...initialColsG3]));
+  const [timetableData, setTimetableData] = useCohortState<ChangeGradeKey, TimetableData[ChangeGradeKey]>("change.timetableData", CHANGE_OFFSETS, {});
 
   const handleTimetablePaste = (e: React.ClipboardEvent, startRowIndex: number, startColIndex: number, field: "subject" | "teacher") => {
     e.preventDefault();

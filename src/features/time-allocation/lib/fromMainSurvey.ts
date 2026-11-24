@@ -19,6 +19,8 @@ export interface MainSurveySnapshot {
 }
 
 export interface MainSurveyRosterResult {
+  /** 본조사에서 가져올 때의 요약(불러오기 안내용) */
+  summary?: { closed: string[]; droppedChoices: number; unsettled: string[] };
   roster: RosterModel;
   /** 과목 idx 별 분반 수 힌트. -1 이면 힌트 없음(호출부에서 기본값 계산). */
   sectionHints: number[];
@@ -87,6 +89,9 @@ export function rosterFromMainSurvey(
     const raw = snap.manualStep5Classes?.[manualKey] ?? baseRemark;
     const n = Number(raw);
     sectionHints[idx] = Number.isFinite(n) && n > 0 ? n : -1;
+    // 폐강된 과목은 배정 대상에서 뺀다. 반 수가 숫자로 확정되지 않은 과목(논의·범위)은 안내만 한다.
+    if (raw === "폐강") subjects[idx].closed = true;
+    else if (!(Number.isFinite(n) && n > 0)) subjects[idx].unsettled = true;
   });
 
   // 학생: 학기별 선택 이름 → 과목 idx
@@ -99,6 +104,7 @@ export function rosterFromMainSurvey(
     return undefined;
   };
 
+  let droppedChoices = 0;
   const rosterStudents: RosterStudent[] = students.map((p, i) => {
     const chosen = new Set<number>();
     (p.semester1 ?? []).forEach((n) => {
@@ -113,6 +119,10 @@ export function rosterFromMainSurvey(
       const x = findIdx(n, "s2");
       if (x !== undefined) chosen.add(x);
     });
+    // 폐강된 과목은 학생의 신청에서 뺀다(개설되지 않는 과목에는 배정할 수 없음)
+    const before = chosen.size;
+    [...chosen].forEach((x) => subjects[x].closed && chosen.delete(x));
+    droppedChoices += before - chosen.size;
     const choices = [...chosen].sort((a, b) => a - b);
     return {
       no: String(p.num || i + 1),
@@ -159,5 +169,10 @@ export function rosterFromMainSurvey(
   return {
     roster: { groups: newGroups, subjects: newSubjects, students: remappedStudents },
     sectionHints: newSectionHints,
+    summary: {
+      closed: newSubjects.filter((s) => s.closed).map((s) => `${s.semester ?? ""} ${s.name}`.trim()),
+      droppedChoices,
+      unsettled: newSubjects.filter((s) => s.unsettled).map((s) => `${s.semester ?? ""} ${s.name}`.trim()),
+    },
   };
 }

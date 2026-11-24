@@ -9,7 +9,7 @@ import { ChevronDown, ChevronUp, Database, UserCheck } from "lucide-react";
 import type { GradeKey } from "../../../types";
 import { useYearData } from "../YearDataContext";
 import { cohortOfGradeKey } from "../lib/cohortCurriculum";
-import { isExcluded, reconcileRoster, type FileStudent, type IdBasis, type RosterStudent } from "../lib/roster";
+import { isExcluded, latestIdOf, reconcileRoster, type FileStudent, type RosterStudent } from "../lib/roster";
 
 export const OPEN_BASE_DATA_EVENT = "open-base-data";
 
@@ -17,30 +17,32 @@ interface Props {
   grade: GradeKey;
   /** 이 탭이 지금 가진 학생들(학번·이름). 주면 명단과 대조한다. */
   students?: FileStudent[];
-  /** 대조에 쓸 학번의 처음 선택(이전학번/진급학번) */
-  defaultBasis?: IdBasis;
-  /** 주면 명단의 전입생 옆에 [과목 입력] 버튼이 나온다(본조사) */
-  onEnterSubjects?: (s: { id: string; name: string }) => void;
+  /** 주면 명단의 전입생 옆에 [과목 입력] 버튼이 나온다(본조사). id = 올해 학번, newId = 진급학번(있으면) */
+  onEnterSubjects?: (s: { id: string; name: string; newId?: string }) => void;
 }
 
-export function BaseDataNotice({ grade, students, defaultBasis = "old", onEnterSubjects }: Props) {
+export function BaseDataNotice({ grade, students, onEnterSubjects }: Props) {
   const { isCurriculumParsed, selectedSubjectHours, hierarchyRules, roster, workYear } = useYearData();
-  const [basis, setBasis] = useState<IdBasis>(defaultBasis);
   const [open, setOpen] = useState(false);
   const ready = isCurriculumParsed[grade];
   const activeCount = roster.filter((s) => !isExcluded(s)).length;
   const cohort = cohortOfGradeKey(workYear, grade);
-  const rec = students ? reconcileRoster(roster, students, cohort, basis, workYear) : null;
+  // 학번은 학년별로 누적돼 있어서 파일의 학번이 진급 전·후 어느 것이든 자동으로 같은 학생에 연결된다
+  const rec = students ? reconcileRoster(roster, students, cohort) : null;
   // 이 탭에 아직 올린 파일이 없으면(학생 0명) 모두 "없음"으로 떠서 오히려 혼란이라 대조 줄을 숨긴다
   const showRec = !!rec && rec.hasRoster && (students?.length ?? 0) > 0;
 
   // 전입생(명단에 있고 이 탭에 아직 없는 학생)은 따로 "신청 입력 필요"로 보여 준다
   const transferMissing = rec ? rec.missing.filter((s) => s.status === "전입") : [];
   const otherMissing = rec ? rec.missing.filter((s) => s.status !== "전입") : [];
+  // 목록에 보여 줄 학번 = 올해(이 학년도 작업 시점) 학번, 없으면 가장 높은 학년의 학번
   const idOf = (s: RosterStudent) => {
     const g = workYear - s.cohort;
-    const slot = g <= 0 ? 1 : basis === "old" ? g : g + 1;
-    return s.ids[Math.min(3, Math.max(1, slot)) as 1 | 2 | 3] ?? "";
+    return s.ids[Math.min(3, Math.max(1, g)) as 1 | 2 | 3] ?? latestIdOf(s);
+  };
+  const nextIdOf = (s: RosterStudent) => {
+    const g = workYear - s.cohort;
+    return g >= 1 && g < 3 ? s.ids[(g + 1) as 2 | 3] : undefined;
   };
 
   const issues = rec ? rec.missing.length + rec.unknown.length + rec.nameMismatch.length + rec.excludedInFile.length : 0;
@@ -80,19 +82,8 @@ export function BaseDataNotice({ grade, students, defaultBasis = "old", onEnterS
             {rec.unknown.length > 0 && <span className="font-semibold text-rose-700">명단에 없음 {rec.unknown.length}명</span>}
             {rec.nameMismatch.length > 0 && <span className="font-semibold text-rose-700">이름 다름 {rec.nameMismatch.length}명</span>}
             {rec.excludedInFile.length > 0 && <span className="text-stone-600">제외 학생 {rec.excludedInFile.length}명(자동 제외)</span>}
-            <label className="ml-auto flex items-center gap-1.5 text-xs">
-              대조 학번
-              <select
-                value={basis}
-                onChange={(e) => setBasis(e.target.value as IdBasis)}
-                className="px-2 py-1 border border-stone-300 rounded-md bg-white text-stone-700"
-              >
-                <option value="old">이전학번(올해 학번)</option>
-                <option value="new">진급학번</option>
-              </select>
-            </label>
             {issues > 0 && (
-              <button onClick={() => setOpen((v) => !v)} className="inline-flex items-center gap-1 underline underline-offset-2 font-medium">
+              <button onClick={() => setOpen((v) => !v)} className="ml-auto inline-flex items-center gap-1 underline underline-offset-2 font-medium">
                 {open ? "접기" : "자세히"} {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
             )}
@@ -106,7 +97,7 @@ export function BaseDataNotice({ grade, students, defaultBasis = "old", onEnterS
                       <span>{idOf(s) || "(학번 없음)"} {s.name}</span>
                       {onEnterSubjects && idOf(s) && (
                         <button
-                          onClick={() => onEnterSubjects({ id: idOf(s), name: s.name })}
+                          onClick={() => onEnterSubjects({ id: idOf(s), name: s.name, newId: nextIdOf(s) })}
                           className="px-2 py-0.5 rounded-md bg-sky-600 hover:bg-sky-500 text-white"
                         >
                           과목 입력
@@ -140,7 +131,7 @@ export function BaseDataNotice({ grade, students, defaultBasis = "old", onEnterS
           )}
           {rec.noId.length > 0 && (
             <div className="px-4 pb-2 text-xs text-stone-500">
-              명단에 이 기준 학번이 없는 학생 {rec.noId.length}명은 대조에서 빠졌습니다(대조 학번을 바꿔 보세요).
+              명단에 학번이 하나도 없는 학생 {rec.noId.length}명은 대조에서 빠졌습니다.
             </div>
           )}
         </div>

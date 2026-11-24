@@ -405,6 +405,12 @@ export function AllocationGridStep({ api, fileLabel = "" }: Props) {
                     className={`border border-stone-200 px-2 py-1 font-medium ${state.selected[col.idx] ? "" : "text-stone-300"}`}
                   >
                     {subs[col.idx].name}
+                    {subs[col.idx].closed && (
+                      <span className="ml-1 px-1 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-semibold align-middle" title="본조사 3단계에서 폐강된 과목 — 배정 대상에서 제외됨">폐강</span>
+                    )}
+                    {subs[col.idx].unsettled && !subs[col.idx].closed && (
+                      <span className="ml-1 px-1 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-semibold align-middle" title="개설 반 수가 아직 확정되지 않음 — 본조사 3단계에서 확정하세요">미확정</span>
+                    )}
                   </th>
                 ) : (
                   <th key={`c-${col.ci}`} className="border border-stone-200 px-2 py-1 font-medium bg-emerald-50/60">

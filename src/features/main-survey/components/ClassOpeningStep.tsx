@@ -4,6 +4,7 @@ import { CheckCircle2, Download, RotateCcw } from "lucide-react";
 import { GradeTabs } from "./GradeTabs";
 import { getAveragePerClass, getClassRecommendation } from "../hooks/useMainClassSummary";
 import type { GradeKey, SubjectStat } from "../../../types";
+import { outcomeKey, type SubjectOutcome } from "../../year-data/lib/demandOutcome";
 
 interface ClassOpeningStepProps {
   activeGrade: GradeKey;
@@ -16,6 +17,8 @@ interface ClassOpeningStepProps {
   setManualStep5Classes: React.Dispatch<React.SetStateAction<{ [key: string]: string }>>;
   editingStep5Classes: { [key: string]: boolean };
   setEditingStep5Classes: React.Dispatch<React.SetStateAction<{ [key: string]: boolean }>>;
+  /** 수요조사에서 가져온 과목별 결과(키 = outcomeKey(학기, 과목)). 있으면 "수요조사 결과" 비교 열을 보여 준다. */
+  demandOutcomes?: Map<string, SubjectOutcome>;
 }
 
 export function ClassOpeningStep({
@@ -29,6 +32,7 @@ export function ClassOpeningStep({
   setManualStep5Classes,
   editingStep5Classes,
   setEditingStep5Classes,
+  demandOutcomes,
 }: ClassOpeningStepProps) {
   const stats = subjectStats[activeGrade] || [];
   const standardSize = standardClassSize[activeGrade] || 25;
@@ -162,6 +166,7 @@ export function ClassOpeningStep({
                   <th className="px-4 py-3 text-center border-r border-stone-200 min-w-[120px]">신청자 수(평균)</th>
                   <th className="px-4 py-3 text-center border-r border-stone-200 min-w-[120px]">개설 반 수</th>
                   <th className="px-4 py-3 text-center min-w-[120px]">개설여부</th>
+                  {demandOutcomes && <th className="px-4 py-3 text-center border-l border-stone-200 min-w-[170px]">수요조사 결과</th>}
                 </tr>
               </thead>
               <tbody>
@@ -232,6 +237,27 @@ export function ClassOpeningStep({
                       <td className="px-4 py-3.5 text-center align-middle">
                         <span className={openingStyle}>{openingStatus}</span>
                       </td>
+                      {demandOutcomes && (() => {
+                        const o = demandOutcomes.get(outcomeKey(row.semester, row.subject));
+                        // 수요조사에서 폐강했는데 본조사에 신청이 있으면 눈에 띄게
+                        const closedButApplied = o?.status === "폐강" && row.applicants > 0;
+                        return (
+                          <td className="px-4 py-3.5 text-center align-middle border-l border-stone-200">
+                            {!o ? (
+                              <span className="text-stone-400" title="수요조사에는 없던 과목입니다">-</span>
+                            ) : (
+                              <span className={o.status === "폐강" ? "text-rose-700 font-medium" : "text-stone-700"}>
+                                {o.applicants}명 → {o.status === "폐강" ? "폐강" : /^\d/.test(o.remark) ? `${o.remark}반` : o.remark}
+                              </span>
+                            )}
+                            {closedButApplied && (
+                              <span className="ml-1.5 px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[11px] font-semibold align-middle" title="수요조사에서 폐강된 과목인데 본조사에 신청이 있습니다">
+                                폐강 과목
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })()}
                     </tr>
                   );
                 })}

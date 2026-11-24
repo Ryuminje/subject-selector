@@ -1,22 +1,18 @@
-import { useState } from "react";
+import { useCohortState } from "../../year-data/useCohortState";
+import { CHANGE_OFFSETS } from "../../year-data/lib/cohortStore";
 import * as XLSX from "xlsx-js-style";
 import type { StudentTimeData } from "../../../types";
 import type { ChangeGradeKey } from "../types";
 
 export function useChangeUploads(changeActiveGrade: ChangeGradeKey) {
-  const [sampleRawData, setSampleRawData] = useState<{ grade2: string | null, grade3: string | null }>({ grade2: null, grade3: null });
-  const [parsedSampleData, setParsedSampleData] = useState<{
-    grade2: StudentTimeData[],
-    grade3: StudentTimeData[]
-  }>({ grade2: [], grade3: [] });
+  // 학년 자리(2학년/3학년)별 데이터는 입학년도 기준으로 보관한다(작업 학년도를 바꿔도 입학년도를 따라감 — year-data/useCohortState)
+  const [sampleRawData, setSampleRawData] = useCohortState<ChangeGradeKey, string | null>("change.sampleRawData", CHANGE_OFFSETS, null);
+  const [parsedSampleData, setParsedSampleData] = useCohortState<ChangeGradeKey, StudentTimeData[]>("change.parsedSampleData", CHANGE_OFFSETS, []);
 
-  const [grade2HistoryData, setGrade2HistoryData] = useState<Record<string, Record<string, string[]>>>({ grade2: {}, grade3: {} });
-  const [grade3Sem1HistoryData, setGrade3Sem1HistoryData] = useState<Record<string, Record<string, string[]>>>({ grade2: {}, grade3: {} });
-  const [extraUploads, setExtraUploads] = useState<Record<string, { grade2Optional: boolean; grade3Sem1: boolean }>>({ grade2: { grade2Optional: false, grade3Sem1: false }, grade3: { grade2Optional: false, grade3Sem1: false } });
-  const [changeUploadNames, setChangeUploadNames] = useState<Record<string, { timetable: string | null; grade2Optional: string | null; grade3Sem1: string | null }>>({
-    grade2: { timetable: null, grade2Optional: null, grade3Sem1: null },
-    grade3: { timetable: null, grade2Optional: null, grade3Sem1: null }
-  });
+  const [grade2HistoryData, setGrade2HistoryData] = useCohortState<ChangeGradeKey, Record<string, string[]>>("change.grade2HistoryData", CHANGE_OFFSETS, {});
+  const [grade3Sem1HistoryData, setGrade3Sem1HistoryData] = useCohortState<ChangeGradeKey, Record<string, string[]>>("change.grade3Sem1HistoryData", CHANGE_OFFSETS, {});
+  const [extraUploads, setExtraUploads] = useCohortState<ChangeGradeKey, { grade2Optional: boolean; grade3Sem1: boolean }>("change.extraUploads", CHANGE_OFFSETS, { grade2Optional: false, grade3Sem1: false });
+  const [changeUploadNames, setChangeUploadNames] = useCohortState<ChangeGradeKey, { timetable: string | null; grade2Optional: string | null; grade3Sem1: string | null }>("change.changeUploadNames", CHANGE_OFFSETS, { timetable: null, grade2Optional: null, grade3Sem1: null });
 
   const handleDeleteSampleUpload = () => {
     if (confirm("업로드된 파일을 삭제하시겠습니까?")) {

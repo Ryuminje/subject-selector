@@ -15,6 +15,7 @@ import { WorkYearSetting, cohortLabels } from "../../features/year-data/componen
 import { useYearData } from "../../features/year-data/YearDataContext";
 import { mergeRoster, sanitizeRoster } from "../../features/year-data/lib/roster";
 import { sanitizeCohorts } from "../../features/year-data/lib/cohortCurriculum";
+import { sanitizeCohortStore } from "../../features/year-data/lib/cohortStore";
 import type { HierarchyRule } from "../../types";
 import type { PromotionEntry } from "../../features/main-survey/lib/promotion";
 import type { GradeKey } from "../../types";
@@ -46,7 +47,7 @@ export function BaseDataTab() {
   const [activeGrade, setActiveGrade] = useState<GradeKey>("grade1");
   const [isExampleModalOpen, setIsExampleModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { workYear, setWorkYear, roster, setRoster, cohorts, setCohorts, hierarchy, setHierarchy } = useYearData();
+  const { workYear, setWorkYear, roster, setRoster, cohorts, setCohorts, hierarchy, setHierarchy, demandResults, setDemandResults, cohortStore, setCohortStore } = useYearData();
 
   const {
     parsedCurriculumList,
@@ -62,9 +63,13 @@ export function BaseDataTab() {
   // 저장하기·불러오기 번들(다른 탭들과 같은 파일)에 기초자료의 작업 학년도·학생 명단이 같이 들어가게 합니다.
   useEffect(() => {
     const w = window as Win;
-    w.getBaseBackup = () => ({ workYear, roster, cohorts, hierarchy });
+    w.getBaseBackup = () => ({ workYear, roster, cohorts, hierarchy, demandResults, cohortStore });
     w.loadBaseBackup = (p) => {
-      const b = (p ?? {}) as { workYear?: number; roster?: unknown; promotionEntries?: PromotionEntry[]; cohorts?: unknown; hierarchy?: HierarchyRule[] };
+      const b = (p ?? {}) as { workYear?: number; roster?: unknown; promotionEntries?: PromotionEntry[]; cohorts?: unknown; hierarchy?: HierarchyRule[]; demandResults?: unknown; cohortStore?: unknown };
+      // 각 탭의 학년 자리별 데이터(입학년도 기준 저장소). 없는 옛 파일은 각 탭 백업의 학년별 값이 이미 채워 둔 상태를 그대로 둔다.
+      if (b.cohortStore && typeof b.cohortStore === "object") setCohortStore(sanitizeCohortStore(b.cohortStore));
+      // 본조사로 가져온 수요조사 결과(없는 옛 파일은 그대로 둔다)
+      if (b.demandResults && typeof b.demandResults === "object") setDemandResults(b.demandResults as typeof demandResults);
       // 입학년도 편성표·공통 위계(새 형식). 없는 옛 파일은 각 탭 백업의 학년별 값이 이미 채워 둔 상태를 그대로 둔다.
       if (b.cohorts && typeof b.cohorts === "object") setCohorts(sanitizeCohorts(b.cohorts));
       if (Array.isArray(b.hierarchy)) setHierarchy(b.hierarchy);
@@ -80,7 +85,7 @@ export function BaseDataTab() {
       delete w.getBaseBackup;
       delete w.loadBaseBackup;
     };
-  }, [workYear, roster, cohorts, hierarchy, setWorkYear, setRoster, setCohorts, setHierarchy]);
+  }, [workYear, roster, cohorts, hierarchy, demandResults, cohortStore, setWorkYear, setRoster, setCohorts, setHierarchy, setDemandResults, setCohortStore]);
 
   // 단계 컴포넌트의 "다음 단계" 버튼이 옛 탭 id("upload")를 넘기면 이 탭의 마지막 단계로 보냅니다.
   const goTo = (tab: string) => setActiveTab(tab === "upload" ? "promotion" : (tab as BaseTab));

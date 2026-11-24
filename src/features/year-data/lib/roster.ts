@@ -200,19 +200,14 @@ export function rosterToPromotionEntries(roster: RosterStudent[], workYear: numb
 
 // ───────── 다른 탭의 데이터와 대조 / 제외 ─────────
 
-/** 대조에 쓸 학번: old = 올해(이전) 학번, new = 진급 학번 */
-export type IdBasis = "old" | "new";
 export interface FileStudent {
   id: string;
   name: string;
 }
 
-/** 학생의 학번을 기준(old/new)에 맞춰 꺼낸다. 예비 1학년(입학 예정)은 1학년 학번 칸을 쓴다. */
-export function idOfStudent(s: RosterStudent, basis: IdBasis, workYear: number): string | undefined {
-  const g = currentGradeOfCohort(s.cohort, workYear);
-  let slot = g <= 0 ? 1 : basis === "old" ? g : g + 1;
-  if (slot < 1) slot = 1;
-  return slot > 3 ? undefined : s.ids[slot as 1 | 2 | 3];
+/** 학생의 학번들 중 가장 높은 학년의 것(명단 목록에 보여 줄 대표 학번) */
+export function latestIdOf(s: RosterStudent): string {
+  return s.ids[3] ?? s.ids[2] ?? s.ids[1] ?? "";
 }
 
 export interface ReconcileResult {
@@ -227,27 +222,25 @@ export interface ReconcileResult {
   excludedInFile: { file: FileStudent; student: RosterStudent }[];
   /** 학번은 같은데 이름이 다름 */
   nameMismatch: { file: FileStudent; student: RosterStudent }[];
-  /** 이 기준 학번이 명단에 비어 있어 대조할 수 없는 학생 */
+  /** 학번이 하나도 없어 대조할 수 없는 학생 */
   noId: RosterStudent[];
 }
 
 const normName = (s: string) => s.replace(/\s+/g, "");
 
-/** 파일(탭이 가진 학생들)과 명단을 대조한다. cohort = 그 학년 화면의 입학년도 */
-export function reconcileRoster(
-  roster: RosterStudent[],
-  files: FileStudent[],
-  cohort: number,
-  basis: IdBasis,
-  workYear: number,
-): ReconcileResult {
+/**
+ * 파일(탭이 가진 학생들)과 명단을 대조한다. cohort = 그 학년 화면의 입학년도.
+ * 학번은 학년별로 누적돼 있고(한 입학년도 안에서 학번 첫 글자가 학년이라 겹치지 않음) 파일의 학번이
+ * 어느 학년 때 것이든(진급 전·후) 그 학생의 학번들 중 하나와 맞으면 같은 학생으로 본다.
+ */
+export function reconcileRoster(roster: RosterStudent[], files: FileStudent[], cohort: number): ReconcileResult {
   const inCohort = roster.filter((s) => s.cohort === cohort);
   const res: ReconcileResult = { hasRoster: inCohort.length > 0, matched: 0, missing: [], unknown: [], excludedInFile: [], nameMismatch: [], noId: [] };
   if (!inCohort.length) return res;
   const byId = new Map<string, RosterStudent>();
   for (const s of inCohort) {
-    const id = idOfStudent(s, basis, workYear);
-    if (id) byId.set(id, s);
+    const ids = Object.values(s.ids).filter((id): id is string => !!id);
+    if (ids.length) ids.forEach((id) => byId.set(id, s));
     else res.noId.push(s);
   }
   const seen = new Set<string>();
@@ -262,7 +255,7 @@ export function reconcileRoster(
     else if (s.name && f.name && normName(s.name) !== normName(f.name)) res.nameMismatch.push({ file: f, student: s });
     else res.matched++;
   }
-  res.missing = inCohort.filter((s) => !isExcluded(s) && !seen.has(s.key) && idOfStudent(s, basis, workYear));
+  res.missing = inCohort.filter((s) => !isExcluded(s) && !seen.has(s.key) && latestIdOf(s));
   return res;
 }
 

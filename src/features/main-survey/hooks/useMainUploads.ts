@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { isExcludedRow } from "../../year-data/lib/roster";
+import { useCohortState } from "../../year-data/useCohortState";
+import { GRADE_OFFSETS } from "../../year-data/lib/cohortStore";
 import * as XLSX from "xlsx-js-style";
 import { downloadEditedSurveyWorkbook, findSurveyLayout, pickSurveySheetName } from "../lib/surveySheet";
 import { applyPromotion, countClasses, hasPromoted, undoPromotion, type PromotionDecision } from "../lib/promotion";
@@ -66,13 +68,14 @@ export function useMainUploads(
   /** 기초자료 학생 명단에서 전출·퇴학으로 표시된 학번들 — 이 학생들의 행은 계산·출력에서 뺀다(원본 행은 그대로 보존) */
   excludedIds?: ReadonlySet<string>,
 ) {
-  const [uploadedFiles, setUploadedFiles] = useState<{ [key in GradeKey]: { name: string, size: number, data: string } | null }>({ pre1: null, grade1: null, grade2: null });
-  const [processedData, setProcessedData] = useState<{ [key in GradeKey]: ProcessedStudent[] }>({ pre1: [], grade1: [], grade2: [] });
-  const [rawSheetData, setRawSheetData] = useState<{ [key in GradeKey]: any[] }>({ pre1: [], grade1: [], grade2: [] });
-  const [previousHistoryFiles, setPreviousHistoryFiles] = useState<{ [key in GradeKey]: { name: string, size: number, data: string } | null }>({ pre1: null, grade1: null, grade2: null });
-  const [previousSubjectMap, setPreviousSubjectMap] = useState<{ [key in GradeKey]: { [studentId: string]: { name: string, subjects: string[] } } }>({ pre1: {}, grade1: {}, grade2: {} });
-  const [subjectStats, setSubjectStats] = useState<{ [key in GradeKey]: SubjectStat[] }>({ pre1: [], grade1: [], grade2: [] });
-  const [totalClasses, setTotalClasses] = useState<{ [key in GradeKey]: number }>({ pre1: 10, grade1: 10, grade2: 10 });
+  // 학년 자리별 데이터는 입학년도 기준으로 보관한다(작업 학년도를 바꿔도 데이터가 입학년도를 따라감 — year-data/useCohortState)
+  const [uploadedFiles, setUploadedFiles] = useCohortState<GradeKey, { name: string, size: number, data: string } | null>("main.uploadedFiles", GRADE_OFFSETS, null);
+  const [processedData, setProcessedData] = useCohortState<GradeKey, ProcessedStudent[]>("main.processedData", GRADE_OFFSETS, []);
+  const [rawSheetData, setRawSheetData] = useCohortState<GradeKey, any[]>("main.rawSheetData", GRADE_OFFSETS, []);
+  const [previousHistoryFiles, setPreviousHistoryFiles] = useCohortState<GradeKey, { name: string, size: number, data: string } | null>("main.previousHistoryFiles", GRADE_OFFSETS, null);
+  const [previousSubjectMap, setPreviousSubjectMap] = useCohortState<GradeKey, { [studentId: string]: { name: string, subjects: string[] } }>("main.previousSubjectMap", GRADE_OFFSETS, {});
+  const [subjectStats, setSubjectStats] = useCohortState<GradeKey, SubjectStat[]>("main.subjectStats", GRADE_OFFSETS, []);
+  const [totalClasses, setTotalClasses] = useCohortState<GradeKey, number>("main.totalClasses", GRADE_OFFSETS, 10);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
