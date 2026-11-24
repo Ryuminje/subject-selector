@@ -3,12 +3,14 @@
 import React, { useId } from "react";
 import { Plus, Trash2, Lock } from "lucide-react";
 import type { ChangeGradeKey, ElectiveChange, GradeStringArrays, TimetableData } from "../types";
-import { findSlotsWithSubject, isKnownSubject } from "../lib/subjectMatch";
+import { findSlotsWithSubject, isKnownSubject, sameSubject } from "../lib/subjectMatch";
 
 interface ElectiveChangeTableProps {
   title: string;
   /** 2단계 학생 데이터에 나오는 과목명 — 변경전/변경후 자동완성 후보이자 "일치하지 않음" 판정 기준. */
   subjectOptions: string[];
+  /** 교체 불가 과목 — 입력은 허용하되 칸을 표시하고, 계산에서는 실패로 처리된다 */
+  lockedSubjects?: string[];
   titleColorClass: string;
   changeActiveGrade: ChangeGradeKey;
   data: Record<string, ElectiveChange[]>;
@@ -24,6 +26,7 @@ interface ElectiveChangeTableProps {
 export function ElectiveChangeTable({
   title,
   subjectOptions,
+  lockedSubjects = [],
   titleColorClass,
   changeActiveGrade,
   data,
@@ -39,11 +42,18 @@ export function ElectiveChangeTable({
   const colCount = enablePinning ? 8 : 7;
   // 신청자/임의 변경 표가 한 화면에 같이 뜨므로 datalist id가 겹치지 않게 합니다.
   const listId = useId();
+  const isLockedSubject = (value: string) => !!value && lockedSubjects.some((l) => sameSubject(l, value));
   const subjectInputClass = (value: string) =>
-    `w-full border rounded px-2 py-1.5 focus:outline-none focus:ring-1 text-center text-sm ${isKnownSubject(value || "", subjectOptions)
-      ? "bg-white/70 border-stone-300 text-stone-800 focus:border-amber-400 focus:ring-amber-500"
-      : "bg-rose-50 border-rose-400 text-rose-700 focus:ring-rose-500"
+    `w-full border rounded px-2 py-1.5 focus:outline-none focus:ring-1 text-center text-sm ${isLockedSubject(value)
+      ? "bg-amber-100 border-amber-500 text-amber-900 font-semibold focus:ring-amber-500"
+      : isKnownSubject(value || "", subjectOptions)
+        ? "bg-white/70 border-stone-300 text-stone-800 focus:border-amber-400 focus:ring-amber-500"
+        : "bg-rose-50 border-rose-400 text-rose-700 focus:ring-rose-500"
     }`;
+  const subjectTitle = (value: string) =>
+    isLockedSubject(value)
+      ? "교체 불가 과목입니다 — 계산에서 실패로 처리됩니다"
+      : isKnownSubject(value || "", subjectOptions) ? undefined : "학생 데이터에 없는 과목명입니다";
 
   return (
     <div className="bg-stone-100 border border-stone-200 rounded-2xl overflow-hidden shadow-inner">
@@ -215,7 +225,7 @@ export function ElectiveChangeTable({
                           onChange={e => updateItem("beforeSubject", e.target.value)}
                           onBlur={handleBlur}
                           className={subjectInputClass(item.beforeSubject)}
-                          title={isKnownSubject(item.beforeSubject || "", subjectOptions) ? undefined : "학생 데이터에 없는 과목명입니다"}
+                          title={subjectTitle(item.beforeSubject || "")}
                         />
                       </td>
                       <td className="px-2 py-2 text-center text-stone-500 border-r border-stone-300">→</td>
@@ -236,7 +246,7 @@ export function ElectiveChangeTable({
                           onBlur={handleBlur}
                           list={listId}
                           className={subjectInputClass(item.afterSubject)}
-                          title={isKnownSubject(item.afterSubject || "", subjectOptions) ? undefined : "학생 데이터에 없는 과목명입니다"}
+                          title={subjectTitle(item.afterSubject || "")}
                         />
                       </td>
                       {enablePinning && (() => {

@@ -5,6 +5,7 @@ import { FileText, Download, Lock, CheckCircle2, Undo2, Trash2, AlertTriangle } 
 import type { ChangeGradeKey, ElectiveChange, GradeStringArrays, TimetableData } from "../types";
 import type { StudentTimeData } from "../../../types";
 import { ElectiveChangeTable } from "./ElectiveChangeTable";
+import { LockedSubjectsCard } from "./LockedSubjectsCard";
 import { changeSubjectOptionsOf } from "../lib/subjectMatch";
 
 type AdjustmentLog = Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary'; pinned?: boolean; chain?: 3; warning?: string }[]>;
@@ -18,6 +19,9 @@ interface ApplicationStepProps {
   setElectiveChangesArbitrary: React.Dispatch<React.SetStateAction<Record<string, ElectiveChange[]>>>;
   enableOptimization: Record<ChangeGradeKey, boolean>;
   setEnableOptimization: React.Dispatch<React.SetStateAction<Record<ChangeGradeKey, boolean>>>;
+  /** 교체 불가 과목(학년별) — 이 과목을 듣는 학생의 그 칸은 교체 계산에서 고정된다 */
+  lockedSubjects: Record<ChangeGradeKey, string[]>;
+  setLockedSubjects: React.Dispatch<React.SetStateAction<Record<ChangeGradeKey, string[]>>>;
   handleExportChanges: () => void;
   adjustmentLog: AdjustmentLog;
   parsedSampleData: { grade2: StudentTimeData[]; grade3: StudentTimeData[] };
@@ -40,6 +44,8 @@ export function ApplicationStep({
   setElectiveChangesArbitrary,
   enableOptimization,
   setEnableOptimization,
+  lockedSubjects,
+  setLockedSubjects,
   handleExportChanges,
   adjustmentLog,
   parsedSampleData,
@@ -95,11 +101,19 @@ export function ApplicationStep({
         </div>
       </div>
 
+      <LockedSubjectsCard
+        subjectOptions={subjectOptions}
+        locked={lockedSubjects[changeActiveGrade] || []}
+        setLocked={(next) => setLockedSubjects(prev => ({ ...prev, [changeActiveGrade]: next }))}
+        gradeLabel={changeActiveGrade === "grade2" ? "2학년" : "3학년"}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         <div className="flex flex-col gap-6 w-full min-w-0">
           <ElectiveChangeTable
             subjectOptions={subjectOptions}
+            lockedSubjects={lockedSubjects[changeActiveGrade] || []}
             title="변경 신청 입력(신청자)"
             titleColorClass="text-stone-800"
             changeActiveGrade={changeActiveGrade}
@@ -111,6 +125,7 @@ export function ApplicationStep({
           />
           <ElectiveChangeTable
             subjectOptions={subjectOptions}
+            lockedSubjects={lockedSubjects[changeActiveGrade] || []}
             title="인원 균등 분배를 위한 임의 변경"
             titleColorClass="text-emerald-700"
             changeActiveGrade={changeActiveGrade}

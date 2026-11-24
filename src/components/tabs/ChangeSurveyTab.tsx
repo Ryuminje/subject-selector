@@ -58,6 +58,7 @@ export function ChangeSurveyTab() {
     electiveChanges, setElectiveChanges,
     electiveChangesArbitrary, setElectiveChangesArbitrary,
     enableOptimization, setEnableOptimization,
+    lockedSubjects, setLockedSubjects,
     adjustmentLog,
     adjustmentLogByGrade,
     confirmedBaseSchedules, setConfirmedBaseSchedules,
@@ -97,7 +98,8 @@ export function ChangeSurveyTab() {
     sampleRawData,
     confirmedLog,
     confirmedBaseSchedules,
-    confirmHistory
+    confirmHistory,
+    lockedSubjects
   });
 
   (window as any).loadChangeBackup = (parsed: any) => {
@@ -112,6 +114,8 @@ export function ChangeSurveyTab() {
     if (parsed.electiveChanges) setElectiveChanges(parsed.electiveChanges);
     if (parsed.timeSlots) setTimeSlots(parsed.timeSlots);
     if (parsed.classCols) setClassCols(parsed.classCols);
+    // 교체 불가 과목: 없는 옛 백업은 "지정 없음"으로 초기화해 직전 화면의 지정이 남지 않게 한다
+    setLockedSubjects(parsed.lockedSubjects ?? { grade2: [], grade3: [] });
     // 확정 관련 세 필드는 (다른 필드와 달리) 파일에 없으면 메모리에 남은 값을
     // 그대로 두지 않고 명시적으로 "확정 없음" 상태로 초기화한다 — 그래야 확정
     // 기능이 없던(또는 확정을 한 번도 안 한) 옛 백업을 불러왔을 때, 방금 전까지
@@ -404,6 +408,8 @@ export function ChangeSurveyTab() {
                       electiveChangesArbitrary={electiveChangesArbitrary}
                       setElectiveChangesArbitrary={setElectiveChangesArbitrary}
                       enableOptimization={enableOptimization}
+                      lockedSubjects={lockedSubjects}
+                      setLockedSubjects={setLockedSubjects}
                       setEnableOptimization={setEnableOptimization}
                       handleExportChanges={handleExportChanges}
                       adjustmentLog={adjustmentLog}

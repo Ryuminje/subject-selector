@@ -37,6 +37,9 @@ export function useElectiveChanges(
   const [electiveChangesArbitrary, setElectiveChangesArbitrary] = useState<Record<string, any[]>>({ grade2: [], grade3: [] });
   // 학년별로 독립적으로 켜고 끌 수 있도록 학년별 boolean으로 관리한다.
   const [enableOptimization, setEnableOptimization] = useState<Record<ChangeGradeKey, boolean>>({ grade2: false, grade3: false });
+  // 교체 불가 과목(논술·체육+진로처럼 학급 기준으로 들어가는 과목). 학생 단위로 고정한다 —
+  // 이 과목을 듣는 학생의 그 타임은 바뀌지 않지만, 같은 타임의 다른 과목을 듣는 학생은 교체할 수 있다.
+  const [lockedSubjects, setLockedSubjects] = useState<Record<ChangeGradeKey, string[]>>({ grade2: [], grade3: [] });
 
   // 확정(freeze): 확정된 학생의 최종 스케줄/로그를 얼려두고, 이후 계산은
   // 이 값을 출발점으로 삼아 확정된 학생을 다시 건드리지 않도록 한다.
@@ -78,6 +81,8 @@ export function useElectiveChanges(
     };
 
     const gradeConfirmedSchedules = confirmedBaseSchedules[changeActiveGrade] || {};
+    const lockedList = lockedSubjects[changeActiveGrade] || [];
+    const isLockedSubject = (subject: string | undefined) => !!subject && lockedList.some(l => sameSubject(l, subject));
 
     const vSchedules: Record<string, Record<string, string>> = {};
     const lockedStudents = new Set([
@@ -174,6 +179,8 @@ export function useElectiveChanges(
                     const subjB = sched[slotB];
 
                     if (!subjA || !subjB) continue;
+                    // 교체 불가 과목을 듣는 학생의 그 칸은 맞바꾸지 않는다
+                    if (isLockedSubject(subjA) || isLockedSubject(subjB)) continue;
 
                     const normA = normalizeSubject(subjA);
                     const normB = normalizeSubject(subjB);
@@ -249,7 +256,7 @@ export function useElectiveChanges(
        [changeActiveGrade]: sortedGenerated
     }));
 
-  }, [enableOptimization, electiveChanges, parsedSampleData, timetableData, timeSlots, classCols, changeActiveGrade, confirmedBaseSchedules]);
+  }, [enableOptimization, electiveChanges, parsedSampleData, timetableData, timeSlots, classCols, changeActiveGrade, confirmedBaseSchedules, lockedSubjects]);
 
   const pendingResult = useMemo(() => {
     // 학년별로 따로 담습니다 — 학번이 두 학년 명단에 겹치면(예: 학년 초 학번 미갱신) 한 맵에
@@ -270,6 +277,11 @@ export function useElectiveChanges(
       const gradeTimetable = timetableData[grade] || {};
       const gradeTimeSlots = timeSlots[grade] || [];
       const gradeCols = classCols[grade] || [];
+      // 교체 불가 과목: 변경 전·후 과목이 될 수 없고, 이 과목을 듣는 학생의 그 칸은 다른 교체로 밀려 옮겨지지도 않는다.
+      const gradeLocked = lockedSubjects[grade] || [];
+      const isLocked = (subject: string | undefined): boolean => !!subject && gradeLocked.some(l => sameSubject(l, subject));
+      const lockedRequestSubject = (c: { beforeSubject: string; afterSubject: string }): string | undefined =>
+        [c.beforeSubject, c.afterSubject].find(s => isLocked(s));
 
       // Build a map: timeslot -> Set of subjects available in that timeslot
       const subjectsInTimeSlot: Record<string, Set<string>> = {};
@@ -332,10 +344,10 @@ export function useElectiveChanges(
       // X(변경전 자리) ← Z타임 과목, Y ← 변경후 과목, Z ← Y타임 과목. Z는 X·Y가 아닌 타임.
       const findThreeStepSwaps = (sched: Record<string, string>, beforeSlot: string, afterSlot: string) => {
         const subjY = sched[afterSlot];
-        if (!subjY) return [];
+        if (!subjY || isLocked(subjY)) return [];
         return gradeTimeSlots
           .filter((z: string) =>
-            z !== beforeSlot && z !== afterSlot && !!sched[z] &&
+            z !== beforeSlot && z !== afterSlot && !!sched[z] && !isLocked(sched[z]) &&
             subjectExistsInSlot(subjY, z) && subjectExistsInSlot(sched[z], beforeSlot))
           .map((z: string) => ({ zSlot: z, subjY, subjZ: sched[z] }));
       };
@@ -371,6 +383,13 @@ export function useElectiveChanges(
           if (!targetStudent) {
             if (!log[c.studentId]) log[c.studentId] = [];
             log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: '학생을 찾을 수 없음', source: c.source });
+            return;
+          }
+
+          const lockedReq = lockedRequestSubject(c);
+          if (lockedReq) {
+            if (!log[c.studentId]) log[c.studentId] = [];
+            log[c.studentId].push({ beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `교체 불가 과목: '${lockedReq}'`, source: c.source });
             return;
           }
 
@@ -433,6 +452,10 @@ export function useElectiveChanges(
             const studentSubjectInAfterSlot = currentSchedule[afterSlot] as string;
             if (!studentSubjectInAfterSlot) {
               lastFailedReason = `${afterSlot}타임 수강 과목 없음`;
+              continue;
+            }
+            if (isLocked(studentSubjectInAfterSlot)) {
+              lastFailedReason = `${afterSlot}타임에 교체 불가 과목('${studentSubjectInAfterSlot}')을 수강 중`;
               continue;
             }
 
@@ -565,6 +588,11 @@ export function useElectiveChanges(
               }
 
               const c = studentChanges[changeIndex];
+              const lockedReq = lockedRequestSubject(c);
+              if (lockedReq) {
+                dfs(changeIndex + 1, currentSched, [...currentLogs, { beforeStr: c.beforeSubject, afterStr: c.afterSubject, status: 'failed', reason: `교체 불가 과목: '${lockedReq}'`, source: c.source }], currentMaxCost, successCount);
+                return;
+              }
               let beforeSlot: string | null = null;
               for (const [slot, subject] of Object.entries(currentSched)) {
                 if (sameSubject(subject as string, c.beforeSubject)) {
@@ -619,6 +647,10 @@ export function useElectiveChanges(
                 const studentSubjectInAfterSlot = currentSched[afterSlot] as string;
                 if (!studentSubjectInAfterSlot) {
                   lastFailedReason = `${afterSlot}타임 수강 과목 없음`;
+                  continue;
+                }
+                if (isLocked(studentSubjectInAfterSlot)) {
+                  lastFailedReason = `${afterSlot}타임에 교체 불가 과목('${studentSubjectInAfterSlot}')을 수강 중`;
                   continue;
                 }
 
@@ -712,7 +744,7 @@ export function useElectiveChanges(
     });
 
     return { log: logByGrade, finalSchedules };
-  }, [parsedSampleData, electiveChanges, electiveChangesArbitrary, timetableData, timeSlots, classCols, enableOptimization, confirmedBaseSchedules, grade2HistoryData, grade3Sem1HistoryData]);
+  }, [parsedSampleData, electiveChanges, electiveChangesArbitrary, timetableData, timeSlots, classCols, enableOptimization, confirmedBaseSchedules, grade2HistoryData, grade3Sem1HistoryData, lockedSubjects]);
 
   // 확정된(얼려둔) 로그와, 지금 표에 남아있는 신청을 계산한 결과를 학년별로 합쳐서 보여준다.
   const adjustmentLogByGrade = useMemo(() => {
@@ -802,6 +834,7 @@ export function useElectiveChanges(
     electiveChanges, setElectiveChanges,
     electiveChangesArbitrary, setElectiveChangesArbitrary,
     enableOptimization, setEnableOptimization,
+    lockedSubjects, setLockedSubjects,
     adjustmentLog,
     adjustmentLogByGrade,
     confirmedBaseSchedules, setConfirmedBaseSchedules,
