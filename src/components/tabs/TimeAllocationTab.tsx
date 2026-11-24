@@ -230,7 +230,7 @@ export function TimeAllocationTab() {
       <div className="px-10 py-6">
         <GradeTabs activeGrade={api.activeGrade} setActiveGrade={api.setActiveGrade} />
         {step === "input" && <DataInputStep api={api} onLoadFromMain={loadFromMain} onUpdateIds={updateIds} />}
-        {step === "alloc" && <AllocationGridStep api={api} />}
+        {step === "alloc" && <AllocationGridStep api={api} fileLabel={GRADE_FILE_LABEL[api.activeGrade]} />}
         {/* 계산기는 끄지 않고 숨기기만 합니다 — 단계를 옮겼다 오면 입력이 지워져 버립니다(실제로 겪음). */}
         <div className={step === "teacher" ? "block" : "hidden"}>
           <TeacherPlanStep />

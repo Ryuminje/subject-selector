@@ -20,6 +20,7 @@ import {
   semesterKeyOf,
   type Assignment,
   type CommonSubject,
+  type RoomPin,
   type RosterModel,
   type SemesterSettings,
   type TimeAllocGradeState,
@@ -156,6 +157,8 @@ export interface TimeAllocationApi {
   toggleFixedCap: (idx: number) => void;
   setFixedCap: (idx: number, n: number) => void;
   toggleCell: (idx: number, t: number, mode?: "add" | "remove") => void;
+  /** 타임별 시간표 엑셀의 특별실 고정을 정하거나(pin) 풉니다(null). 확정 여부와 무관. */
+  setRoomPin: (key: string, pin: RoomPin | null) => void;
   runOptimize: () => void;
   resetPlacement: () => void;
   setConfirmed: (v: boolean) => void;
@@ -531,6 +534,17 @@ export function useTimeAllocation(): TimeAllocationApi {
     [patch],
   );
 
+  const setRoomPin = useCallback(
+    (key: string, pin: RoomPin | null) =>
+      patch((g) => {
+        const roomPins = { ...(g.roomPins ?? {}) };
+        if (pin) roomPins[key] = { col: Math.max(1, Math.round(pin.col) || 1), label: pin.label };
+        else delete roomPins[key];
+        return { ...g, roomPins };
+      }),
+    [patch],
+  );
+
   // mode 없이 부르면(빈 칸 클릭) 자동으로 add/remove 를 판단 — 채워진 칸이면 겹친 분반 중
   // 하나만 제거(전부 지우지 않음), 비어 있으면 추가. "+" 컨트롤은 채워진 칸에서도 항상
   // "add"를 명시해 분반을 겹쳐 넣습니다.
@@ -760,6 +774,7 @@ export function useTimeAllocation(): TimeAllocationApi {
     setSection,
     toggleFixedCap,
     setFixedCap,
+    setRoomPin,
     toggleCell,
     runOptimize,
     resetPlacement,

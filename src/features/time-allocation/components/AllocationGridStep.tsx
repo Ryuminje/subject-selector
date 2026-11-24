@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { CheckCircle2, RotateCcw, Sparkles, Wand2, XCircle } from "lucide-react";
+import { CheckCircle2, Download, RotateCcw, Sparkles, Wand2, XCircle } from "lucide-react";
+import { buildTimetableEntries, exportTimetableXlsx } from "../lib/exportTimetable";
 import type { TimeAllocationApi } from "../hooks/useTimeAllocation";
 import { CommonSubjectEditor } from "./CommonSubjectEditor";
 import { classesAt, commonCells } from "../lib/gridModel";
@@ -12,16 +13,22 @@ import { NO_SEMESTER_KEY, semesterKeyOf } from "../types";
 
 interface Props {
   api: TimeAllocationApi;
+  /** 내려받는 엑셀 파일 이름 앞부분(예: "2학년") */
+  fileLabel?: string;
 }
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const GROUP_TINT = ["bg-amber-50", "bg-sky-50", "bg-violet-50"];
 
-export function AllocationGridStep({ api }: Props) {
+export function AllocationGridStep({ api, fileLabel = "" }: Props) {
   const { state, ctx, assign, numTimes, perTime, message, semesterKeys } = api;
   const roster = state.roster;
   const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [timetableMsg, setTimetableMsg] = useState("");
+  // 시간표 엑셀에 담을 학기. 고르기 전(null)에는 지금 보고 있는 학기 탭을 따른다.
+  const [exportKey, setExportKey] = useState<string | null>(null);
   const settingsKey = activeKey && semesterKeys.includes(activeKey) ? activeKey : semesterKeys[0];
+  const timetableKey = exportKey && semesterKeys.includes(exportKey) ? exportKey : settingsKey;
 
   if (!roster || !ctx || !settingsKey) {
     return <p className="text-sm text-stone-500 py-8">먼저 ① 데이터 입력에서 자료를 불러오세요.</p>;
@@ -33,6 +40,14 @@ export function AllocationGridStep({ api }: Props) {
   const N = roster.students.length;
   const dis = state.confirmed;
   const settings = api.settingsOf(settingsKey);
+
+  // 타임별 시간표 엑셀 — 고른 학기의 항목(과목·구획)과 특별실 고정
+  const tctx = { numTimes, startLetter: state.startLetter, subjects: subs, semesterKeys, bySemester: ctx.bySemester };
+  const ttSemester = timetableKey === NO_SEMESTER_KEY ? undefined : timetableKey;
+  const ttEntries = buildTimetableEntries(tctx, state.placement, { includeBands: true, semester: ttSemester });
+  const pins = state.roomPins ?? {};
+  const pinnedEntries = ttEntries.filter((e) => pins[e.key]);
+  const unpinnedEntries = ttEntries.filter((e) => !pins[e.key]);
 
   const studentsOf = (keys: string[]) =>
     roster.students.filter((st) => keys.includes(classKey(st.id))).length;
@@ -229,12 +244,109 @@ export function AllocationGridStep({ api }: Props) {
         >
           <RotateCcw className="w-4 h-4" /> 초기화
         </button>
+        <button
+          onClick={() => {
+            // 열 번호의 학년은 "내년 학년"(현재 1학년 → 2-1, 2-2 …). 지금 보고 있는 학기 탭의 배치만 담는다.
+            const gradeNo = { pre1: 1, grade1: 2, grade2: 3 }[api.activeGrade] ?? 1;
+            const r = exportTimetableXlsx(
+              tctx,
+              state.placement,
+              `${fileLabel}_타임별시간표${ttSemester ? `_${ttSemester}` : ""}`,
+              { gradeNo, includeBands: true, semester: ttSemester, pins },
+            );
+            setTimetableMsg(
+              `타임별 시간표를 내려받았습니다 (${r.times}개 타임 · ${r.cols}열` +
+                (r.moved ? ` · 열이 바뀐 과목 ${r.moved}개)` : " · 모든 과목이 같은 열)") +
+                (r.released.length ? ` ⚠ 같은 열에 타임이 겹쳐 고정을 풀었습니다: ${r.released.join(", ")}` : ""),
+            );
+          }}
+          title="고른 학기의 배치를 타임(행) × 2-1, 2-2 …(열) 시간표로 내려받습니다. 같은 과목은 같은 열(안 되면 옆 열)에 놓고, 교사명 줄은 비워 둡니다."
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold rounded-xl"
+        >
+          <Download className="w-4 h-4" /> 타임별 시간표 엑셀
+        </button>
+        {semesterKeys.length > 1 && (
+          <label className="inline-flex items-center gap-1.5 text-sm text-stone-700" title="학기마다 같은 타임 문자(A, B…)를 쓰므로 시간표는 한 학기씩 내려받습니다">
+            내보낼 학기
+            <select
+              value={timetableKey}
+              onChange={(e) => setExportKey(e.target.value)}
+              className="px-2 py-1.5 border border-stone-300 rounded-lg bg-white text-sm"
+            >
+              {semesterKeys.map((k) => (
+                <option key={k} value={k}>{k === NO_SEMESTER_KEY ? "연간" : k}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        {timetableMsg && <span className="text-sm text-stone-600">{timetableMsg}</span>}
         {message && (
           <span className={`text-sm ${message.kind === "error" ? "text-rose-600" : "text-stone-600"}`}>
             {message.text}
           </span>
         )}
       </div>
+
+      <details
+        className="bg-white/70 border border-stone-200 rounded-xl px-4 py-2 text-sm"
+        open={pinnedEntries.length > 0}
+      >
+        <summary className="cursor-pointer font-semibold text-stone-700">
+          특별실 고정 (타임별 시간표 엑셀){pinnedEntries.length ? ` · ${pinnedEntries.length}개` : ""}
+        </summary>
+        <p className="mt-2 text-xs text-stone-500">
+          고정한 과목은 항상 지정한 열에 놓이고, 그 열에는 고정한 과목만 들어갑니다(다른 시간은 비움). 나머지 과목은 남은 열에 배치합니다.
+          같은 열에 여러 과목을 고정하려면 서로 타임이 겹치지 않아야 합니다. 구획 과목은 필요할 때만 고정하세요(반이 2개면 지정한 열부터 2열을 씁니다).
+          {semesterKeys.length > 1 && ` 지금은 ${timetableKey === NO_SEMESTER_KEY ? "연간" : timetableKey} 기준입니다.`}
+        </p>
+        <div className="mt-2 space-y-1.5">
+          {pinnedEntries.map((e) => (
+            <div key={e.key} className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-stone-800 min-w-[8rem]">
+                {e.name}
+                {e.kind === "band" && <span className="ml-1 text-xs text-emerald-700">(구획)</span>}
+              </span>
+              <label className="inline-flex items-center gap-1 text-stone-600">
+                열
+                <input
+                  type="number"
+                  min={1}
+                  max={30}
+                  value={pins[e.key].col}
+                  onChange={(ev) => api.setRoomPin(e.key, { ...pins[e.key], col: +ev.target.value })}
+                  className="w-16 px-2 py-1 border border-stone-300 rounded-lg bg-white"
+                />
+              </label>
+              <input
+                type="text"
+                placeholder="이름(예: 과학실)"
+                value={pins[e.key].label ?? ""}
+                onChange={(ev) => api.setRoomPin(e.key, { ...pins[e.key], label: ev.target.value })}
+                className="w-40 px-2 py-1 border border-stone-300 rounded-lg bg-white"
+              />
+              <button
+                onClick={() => api.setRoomPin(e.key, null)}
+                className="px-2 py-1 text-stone-500 hover:text-rose-600 text-xs"
+              >
+                고정 해제
+              </button>
+            </div>
+          ))}
+          <select
+            value=""
+            onChange={(ev) => ev.target.value && api.setRoomPin(ev.target.value, { col: 1 })}
+            className="px-2 py-1.5 border border-stone-300 rounded-lg bg-white text-sm"
+          >
+            <option value="">+ 고정할 과목 추가…</option>
+            {unpinnedEntries.map((e) => (
+              <option key={e.key} value={e.key}>
+                {e.name}
+                {e.kind === "band" ? " (구획)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+      </details>
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-stone-500">

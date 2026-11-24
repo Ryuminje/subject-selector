@@ -107,6 +107,13 @@ export interface SemesterBandInfo {
   bandTimes: Array<Record<string, number>>;
 }
 
+/** 타임별 시간표 엑셀의 "특별실 고정" — 그 과목을 항상 col 번째 열(1부터)에 놓고, 그 열은 고정 과목 전용으로 비워 둡니다. */
+export interface RoomPin {
+  col: number;
+  /** 열 머리글에 붙일 이름(예: 과학실) */
+  label?: string;
+}
+
 /** 학년 한 개분의 전체 상태(프로젝트 JSON 에 학년별로 저장됩니다). */
 export interface TimeAllocGradeState {
   rawText: string;
@@ -121,6 +128,8 @@ export interface TimeAllocGradeState {
   fixedCap: Record<number, number>;
   placement: number[][]; // 과목 idx → 타임 idx 목록
   confirmed: boolean;
+  /** 타임별 시간표 엑셀의 특별실 고정(키 = buildTimetableEntries 의 key). 옛 저장 파일에는 없을 수 있음. */
+  roomPins?: Record<string, RoomPin>;
 }
 
 /** runAssign 결과. 저장하지 않고 훅 상태로만 들고 있습니다. */
