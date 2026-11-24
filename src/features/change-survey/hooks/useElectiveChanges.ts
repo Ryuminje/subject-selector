@@ -4,6 +4,8 @@ import { CHANGE_OFFSETS } from "../../year-data/lib/cohortStore";
 import type { ChangeGradeKey, ElectiveChange, GradeStringArrays, TimetableData } from "../types";
 import type { StudentTimeData } from "../../../types";
 import { normalizeSubject, sameSubject } from "../lib/subjectMatch";
+import { allIdsOf, changeStoreName, type ChangeSemester } from "../lib/semester";
+import { useYearData } from "../../year-data/YearDataContext";
 
 export interface ChangeLogEntry {
   beforeStr: string;
@@ -34,23 +36,28 @@ export function useElectiveChanges(
   /** "다년도 분석"(useStep6Data)과 같은 형태의 이전 학기 이수 과목 기록 — 학번 → 과목명 배열. */
   grade2HistoryData: Record<string, Record<string, string[]>> = {},
   grade3Sem1HistoryData: Record<string, Record<string, string[]>> = {},
+  /** 1학기/2학기 — 저장소 이름이 학기마다 따로다(lib/semester.ts) */
+  semester: ChangeSemester = "s2",
 ) {
+  // 진급으로 학번이 바뀐 학생도 이전 수강과목을 찾을 수 있게, 기초자료 명단의 모든 학번으로 조회한다.
+  const { roster } = useYearData();
+  const n = (field: string) => changeStoreName(semester, field);
   // 학년 자리(2학년/3학년)별 신청·설정은 입학년도 기준으로 보관한다(작업 학년도를 바꿔도 입학년도를 따라감)
-  const [electiveChanges, setElectiveChanges] = useCohortState<ChangeGradeKey, any[]>("change.electiveChanges", CHANGE_OFFSETS, []);
-  const [electiveChangesArbitrary, setElectiveChangesArbitrary] = useCohortState<ChangeGradeKey, any[]>("change.electiveChangesArbitrary", CHANGE_OFFSETS, []);
+  const [electiveChanges, setElectiveChanges] = useCohortState<ChangeGradeKey, any[]>(n("electiveChanges"), CHANGE_OFFSETS, []);
+  const [electiveChangesArbitrary, setElectiveChangesArbitrary] = useCohortState<ChangeGradeKey, any[]>(n("electiveChangesArbitrary"), CHANGE_OFFSETS, []);
   // 학년별로 독립적으로 켜고 끌 수 있도록 학년별 boolean으로 관리한다.
-  const [enableOptimization, setEnableOptimization] = useCohortState<ChangeGradeKey, boolean>("change.enableOptimization", CHANGE_OFFSETS, false);
+  const [enableOptimization, setEnableOptimization] = useCohortState<ChangeGradeKey, boolean>(n("enableOptimization"), CHANGE_OFFSETS, false);
   // 교체 불가 과목(논술·체육+진로처럼 학급 기준으로 들어가는 과목). 학생 단위로 고정한다 —
   // 이 과목을 듣는 학생의 그 타임은 바뀌지 않지만, 같은 타임의 다른 과목을 듣는 학생은 교체할 수 있다.
-  const [lockedSubjects, setLockedSubjects] = useCohortState<ChangeGradeKey, string[]>("change.lockedSubjects", CHANGE_OFFSETS, []);
+  const [lockedSubjects, setLockedSubjects] = useCohortState<ChangeGradeKey, string[]>(n("lockedSubjects"), CHANGE_OFFSETS, []);
 
   // 확정(freeze): 확정된 학생의 최종 스케줄/로그를 얼려두고, 이후 계산은
   // 이 값을 출발점으로 삼아 확정된 학생을 다시 건드리지 않도록 한다.
-  const [confirmedLog, setConfirmedLog] = useCohortState<ChangeGradeKey, Record<string, ChangeLogEntry[]>>("change.confirmedLog", CHANGE_OFFSETS, {});
-  const [confirmedBaseSchedules, setConfirmedBaseSchedules] = useCohortState<ChangeGradeKey, Record<string, Record<string, string>>>("change.confirmedBaseSchedules", CHANGE_OFFSETS, {});
+  const [confirmedLog, setConfirmedLog] = useCohortState<ChangeGradeKey, Record<string, ChangeLogEntry[]>>(n("confirmedLog"), CHANGE_OFFSETS, {});
+  const [confirmedBaseSchedules, setConfirmedBaseSchedules] = useCohortState<ChangeGradeKey, Record<string, Record<string, string>>>(n("confirmedBaseSchedules"), CHANGE_OFFSETS, {});
   // 확정을 여러 번 반복해도(확정→추가→확정→추가…) 매번의 직전 상태를 스택으로
   // 쌓아두고, 확정 취소를 누를 때마다 한 단계씩 그 이전 상태로 되돌아간다.
-  const [confirmHistory, setConfirmHistory] = useCohortState<ChangeGradeKey, PreConfirmSnapshot[]>("change.confirmHistory", CHANGE_OFFSETS, []);
+  const [confirmHistory, setConfirmHistory] = useCohortState<ChangeGradeKey, PreConfirmSnapshot[]>(n("confirmHistory"), CHANGE_OFFSETS, []);
 
   // --- Global Load Balancer (Auto-Balancing) ---
   useEffect(() => {
@@ -325,16 +332,19 @@ export function useElectiveChanges(
       };
       // "다년도 분석"(useStep6Data)과 같은 이전 학기 이수 기록 — 신청후 과목을 예전에 이미
       // 들었으면(2학년: 1학기 기록, 3학년: 2학년 전체 + 3학년 1학기 기록) 잡아냅니다.
-      const completedBeforeOf = (studentId: string): string[] => {
-        if (grade === "grade2") {
-          const dataMap = grade2HistoryData.grade2 || {};
-          return dataMap[String(studentId).trim()] || dataMap[studentId] || [];
+      // 진급으로 학번이 바뀐 학생은 명단의 다른 학번으로도 찾는다.
+      const lookupHistory = (map: Record<string, string[]>, studentId: string): string[] => {
+        for (const id of [String(studentId), ...allIdsOf(String(studentId).trim(), roster)]) {
+          if (map[id]) return map[id];
         }
-        const g2Map = grade2HistoryData.grade3 || {};
-        const g3Map = grade3Sem1HistoryData.grade3 || {};
-        const g2History = g2Map[String(studentId).trim()] || g2Map[studentId] || [];
-        const g3Sem1History = g3Map[String(studentId).trim()] || g3Map[studentId] || [];
-        return [...g2History, ...g3Sem1History];
+        return [];
+      };
+      const completedBeforeOf = (studentId: string): string[] => {
+        if (grade === "grade2") return lookupHistory(grade2HistoryData.grade2 || {}, studentId);
+        return [
+          ...lookupHistory(grade2HistoryData.grade3 || {}, studentId),
+          ...lookupHistory(grade3Sem1HistoryData.grade3 || {}, studentId),
+        ];
       };
       const dupWarningFor = (sched: Record<string, string>, subject: string, excludeSlot: string, studentId: string): string | undefined => {
         const dupSlot = findExistingSlot(sched, subject, excludeSlot);
@@ -747,7 +757,20 @@ export function useElectiveChanges(
     });
 
     return { log: logByGrade, finalSchedules };
-  }, [parsedSampleData, electiveChanges, electiveChangesArbitrary, timetableData, timeSlots, classCols, enableOptimization, confirmedBaseSchedules, grade2HistoryData, grade3Sem1HistoryData, lockedSubjects]);
+  }, [parsedSampleData, electiveChanges, electiveChangesArbitrary, timetableData, timeSlots, classCols, enableOptimization, confirmedBaseSchedules, grade2HistoryData, grade3Sem1HistoryData, lockedSubjects, roster]);
+
+  // 변경이 모두 반영된 뒤 학생별 수강과목(타임 순서 무관) — 1학기 결과를 2학기로 넘길 때 쓴다.
+  // 신청이 있는 학생은 방금 계산한 최종 시간표, 확정된 학생은 확정본, 나머지는 처음 시간표 그대로.
+  const finalSubjects = useMemo(() => {
+    const out: Record<ChangeGradeKey, Record<string, string[]>> = { grade2: {}, grade3: {} };
+    (["grade2", "grade3"] as ChangeGradeKey[]).forEach((g) => {
+      (parsedSampleData[g] || []).forEach((s) => {
+        const sched = pendingResult.finalSchedules[g][s.id] ?? confirmedBaseSchedules[g]?.[s.id] ?? s.timeSlotMap;
+        out[g][s.id] = Object.values(sched).filter(Boolean);
+      });
+    });
+    return out;
+  }, [parsedSampleData, pendingResult, confirmedBaseSchedules]);
 
   // 확정된(얼려둔) 로그와, 지금 표에 남아있는 신청을 계산한 결과를 학년별로 합쳐서 보여준다.
   const adjustmentLogByGrade = useMemo(() => {
@@ -834,6 +857,7 @@ export function useElectiveChanges(
 
   return {
     handleClearConfirmed,
+    finalSubjects,
     electiveChanges, setElectiveChanges,
     electiveChangesArbitrary, setElectiveChangesArbitrary,
     enableOptimization, setEnableOptimization,

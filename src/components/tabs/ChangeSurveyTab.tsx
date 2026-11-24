@@ -13,6 +13,11 @@ import { useYearData } from "../../features/year-data/YearDataContext";
 import { parseSampleBinary } from "../../features/change-survey/hooks/useChangeUploads";
 import type { TimeAllocTransfer } from "../../features/time-allocation/lib/exportTimetable";
 import { excludedIdSet } from "../../features/year-data/lib/roster";
+import { CHANGE_OFFSETS, cohortKey } from "../../features/year-data/lib/cohortStore";
+import { SemesterBar } from "../../features/change-survey/components/SemesterBar";
+import { buildCarryOver, changeStoreName, SEMESTER_LABEL, semesterFromLabel, type ChangeSemester } from "../../features/change-survey/lib/semester";
+import type { ChangeGradeKey, TimetableGradeData } from "../../features/change-survey/types";
+import type { StudentTimeData } from "../../types";
 import { UploadStep } from "../../features/change-survey/components/UploadStep";
 import { TimetableStep } from "../../features/change-survey/components/TimetableStep";
 import { ApplicationStep } from "../../features/change-survey/components/ApplicationStep";
@@ -26,6 +31,8 @@ import { GuideLink } from "@/features/guide/components/GuideLink";
 export function ChangeSurveyTab() {
   const [changeActiveTab, setChangeActiveTab] = useState<"upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis" | "riroschool">("upload");
   const [changeActiveGrade, setChangeActiveGrade] = useState<"grade2" | "grade3">("grade2");
+  // 1학기/2학기 — 시간표·학생 타임·신청·확정이 학기마다 따로 보관된다(lib/semester.ts). 학기 구분이 없던 옛 데이터는 2학기에 들어간다.
+  const [semester, setSemester] = useState<ChangeSemester>("s1");
   const [showOnlyApplicants, setShowOnlyApplicants] = useState(false);
   const [changeRosterTimeSlot, setChangeRosterTimeSlot] = useState("A");
   const [rosterAfterSubjectFilter, setRosterAfterSubjectFilter] = useState<string>("전체");
@@ -33,9 +40,9 @@ export function ChangeSurveyTab() {
 
 
   const {
-    timeSlots, setTimeSlots,
-    classCols, setClassCols,
-    timetableData, setTimetableData,
+    timeSlots,
+    classCols,
+    timetableData,
     handleTimetablePaste,
     addTimeSlot,
     addClassCol,
@@ -43,23 +50,23 @@ export function ChangeSurveyTab() {
     removeClassCol,
     updateTimetableCell,
     clearTimetable,
-  } = useTimetableData(changeActiveGrade);
+  } = useTimetableData(changeActiveGrade, semester);
 
   const {
-    sampleRawData, setSampleRawData,
-    parsedSampleData: rawParsedSampleData, setParsedSampleData,
-    grade2HistoryData, setGrade2HistoryData,
-    grade3Sem1HistoryData, setGrade3Sem1HistoryData,
-    extraUploads, setExtraUploads,
-    changeUploadNames, setChangeUploadNames,
+    sampleRawData,
+    parsedSampleData: rawParsedSampleData,
+    grade2HistoryData,
+    grade3Sem1HistoryData,
+    extraUploads,
+    changeUploadNames,
     handleDeleteSampleUpload,
     handleDeleteExtraUpload,
     handleExtraUpload,
     handleChangeSampleUpload,
-  } = useChangeUploads(changeActiveGrade);
+  } = useChangeUploads(changeActiveGrade, semester);
 
   // 기초자료 학생 명단에서 전출·퇴학으로 표시된 학생은 이 탭의 계산에서 뺀다(업로드한 원본 데이터는 그대로 보존)
-  const { roster } = useYearData();
+  const { roster, workYear, cohortStore, updateCohortStore } = useYearData();
   const excludedIds = useMemo(() => excludedIdSet(roster), [roster]);
   const parsedSampleData = useMemo(
     () => ({
@@ -76,14 +83,45 @@ export function ChangeSurveyTab() {
     lockedSubjects, setLockedSubjects,
     adjustmentLog,
     adjustmentLogByGrade,
-    confirmedBaseSchedules, setConfirmedBaseSchedules,
-    confirmedLog, setConfirmedLog,
-    confirmHistory, setConfirmHistory,
+    confirmedBaseSchedules,
+    confirmedLog,
+    confirmHistory,
     canUndoConfirm,
     handleConfirm,
     handleUndoConfirm,
     handleClearConfirmed,
-  } =useElectiveChanges(changeActiveGrade, parsedSampleData, timetableData, timeSlots, classCols, grade2HistoryData, grade3Sem1HistoryData);
+    finalSubjects,
+  } = useElectiveChanges(changeActiveGrade, parsedSampleData, timetableData, timeSlots, classCols, grade2HistoryData, grade3Sem1HistoryData, semester);
+
+  // 학기·학년 자리를 지정해 저장소에 바로 읽고 쓴다(지금 보는 학기와 다른 학기에도 쓸 수 있게 훅의 setter 를 거치지 않는다).
+  const readGrade = <T,>(sem: ChangeSemester, field: string, grade: ChangeGradeKey, def: T): T => {
+    const v = cohortStore[changeStoreName(sem, field)]?.[cohortKey(workYear, CHANGE_OFFSETS[grade])];
+    return v === undefined ? def : (v as T);
+  };
+  const patchGrade = <T,>(sem: ChangeSemester, field: string, grade: ChangeGradeKey, def: T, fn: (cur: T) => T) =>
+    updateCohortStore(changeStoreName(sem, field), (cur, W) => {
+      const key = cohortKey(W, CHANGE_OFFSETS[grade]);
+      const before = (cur?.[key] === undefined ? def : cur[key]) as T;
+      return { ...(cur ?? {}), [key]: fn(before) };
+    });
+
+  // 1학기 변경 후 수강과목 → 2학기 "이전 수강과목". 2학년 자리는 "2학년 수강과목(1학기)", 3학년 자리는 "3학년 1학기 수강과목" 칸으로 들어간다.
+  const handleCarryOver = () => {
+    const grades = (["grade2", "grade3"] as ChangeGradeKey[]).filter((g) => (parsedSampleData[g] || []).length > 0);
+    if (grades.length === 0) return;
+    const summary = grades.map((g) => `${g === "grade2" ? "2학년" : "3학년"} ${parsedSampleData[g].length}명`).join(", ");
+    if (!window.confirm(`1학기 변경 후 수강과목(${summary})을 2학기 변경의 "이전 수강과목"으로 넘깁니다.\n2학기에 이미 올려 둔 같은 항목이 있으면 바뀝니다. 계속할까요?`)) return;
+    const label = "1학기 변경 결과에서 넘어옴";
+    grades.forEach((g) => {
+      const map = buildCarryOver(finalSubjects[g], parsedSampleData[g], roster);
+      const field = g === "grade2" ? "grade2HistoryData" : "grade3Sem1HistoryData";
+      const flag = g === "grade2" ? "grade2Optional" : "grade3Sem1";
+      patchGrade("s2", field, g, {} as Record<string, string[]>, () => map);
+      patchGrade("s2", "extraUploads", g, { grade2Optional: false, grade3Sem1: false }, (cur) => ({ ...cur, [flag]: true }));
+      patchGrade("s2", "changeUploadNames", g, { timetable: null, grade2Optional: null, grade3Sem1: null } as Record<string, string | null>, (cur) => ({ ...cur, [flag]: label }));
+    });
+    window.alert(`2학기 "이전 수강과목"으로 넘겼습니다(${summary}). 2학기 변경 화면의 1단계에서 확인할 수 있습니다.`);
+  };
 
   const {
     changeParsedCurriculumList, setChangeParsedCurriculumList,
@@ -96,6 +134,7 @@ export function ChangeSurveyTab() {
   if (typeof window !== "undefined") {
     (window as any).getChangeBackup = () => ({
     changeActiveGrade,
+    semester,
     changeParsedCurriculumList,
     changeSubjectMap,
     changeIsCurriculumParsed,
@@ -117,36 +156,47 @@ export function ChangeSurveyTab() {
   });
 
   (window as any).loadChangeBackup = (parsed: any) => {
+    // 학기 구분이 없던 옛 파일의 값은 2학기 자리(옛 이름)에 넣는다. 새 파일은 이어서 불러오는 기초자료(cohortStore)가 1·2학기 모두 다시 채운다.
+    // 훅의 setter 는 지금 보는 학기에 묶여 있어 쓰지 않고 저장소에 직접 쓴다.
+    const putBoth = (field: string, v: Record<string, unknown>) =>
+      updateCohortStore(changeStoreName("s2", field), (cur, W) => {
+        const out: Record<string, unknown> = { ...(cur ?? {}) };
+        (["grade2", "grade3"] as ChangeGradeKey[]).forEach((g) => {
+          if (v[g] !== undefined) out[cohortKey(W, CHANGE_OFFSETS[g])] = v[g];
+        });
+        return out;
+      });
+    setSemester(parsed.semester === "s1" ? "s1" : "s2");
     if (parsed.changeActiveGrade) setChangeActiveGrade(parsed.changeActiveGrade);
     if (parsed.changeParsedCurriculumList) setChangeParsedCurriculumList(parsed.changeParsedCurriculumList);
     if (parsed.changeSubjectMap) setChangeSubjectMap(parsed.changeSubjectMap);
     if (parsed.changeIsCurriculumParsed) setChangeIsCurriculumParsed(parsed.changeIsCurriculumParsed);
     if (parsed.changeHierarchyRules) setChangeHierarchyRules(parsed.changeHierarchyRules);
-    if (parsed.parsedSampleData) setParsedSampleData(parsed.parsedSampleData);
-    if (parsed.sampleRawData) setSampleRawData(parsed.sampleRawData);
-    if (parsed.timetableData) setTimetableData(parsed.timetableData);
-    if (parsed.electiveChanges) setElectiveChanges(parsed.electiveChanges);
-    if (parsed.timeSlots) setTimeSlots(parsed.timeSlots);
-    if (parsed.classCols) setClassCols(parsed.classCols);
+    if (parsed.parsedSampleData) putBoth("parsedSampleData", parsed.parsedSampleData);
+    if (parsed.sampleRawData) putBoth("sampleRawData", parsed.sampleRawData);
+    if (parsed.timetableData) putBoth("timetableData", parsed.timetableData);
+    if (parsed.electiveChanges) putBoth("electiveChanges", parsed.electiveChanges);
+    if (parsed.timeSlots) putBoth("timeSlots", parsed.timeSlots);
+    if (parsed.classCols) putBoth("classCols", parsed.classCols);
     // 교체 불가 과목: 없는 옛 백업은 "지정 없음"으로 초기화해 직전 화면의 지정이 남지 않게 한다
-    setLockedSubjects(parsed.lockedSubjects ?? { grade2: [], grade3: [] });
+    putBoth("lockedSubjects", parsed.lockedSubjects ?? { grade2: [], grade3: [] });
     // 확정 관련 세 필드는 (다른 필드와 달리) 파일에 없으면 메모리에 남은 값을
     // 그대로 두지 않고 명시적으로 "확정 없음" 상태로 초기화한다 — 그래야 확정
     // 기능이 없던(또는 확정을 한 번도 안 한) 옛 백업을 불러왔을 때, 방금 전까지
     // 화면에 떠 있던 확정 상태가 유령처럼 남아있지 않는다.
-    setConfirmedLog(parsed.confirmedLog ?? { grade2: {}, grade3: {} });
-    setConfirmedBaseSchedules(parsed.confirmedBaseSchedules ?? { grade2: {}, grade3: {} });
+    putBoth("confirmedLog", parsed.confirmedLog ?? { grade2: {}, grade3: {} });
+    putBoth("confirmedBaseSchedules", parsed.confirmedBaseSchedules ?? { grade2: {}, grade3: {} });
     if (parsed.confirmHistory) {
       // 새 형식: 확정마다 쌓인 스냅샷 스택을 그대로 복원
-      setConfirmHistory(parsed.confirmHistory);
+      putBoth("confirmHistory", parsed.confirmHistory);
     } else if (parsed.preConfirmSnapshot) {
       // 옛 형식(확정 1회분만 저장): 단일 스냅샷을 스택의 1개짜리 항목으로 변환
-      setConfirmHistory({
+      putBoth("confirmHistory", {
         grade2: parsed.preConfirmSnapshot.grade2 ? [parsed.preConfirmSnapshot.grade2] : [],
         grade3: parsed.preConfirmSnapshot.grade3 ? [parsed.preConfirmSnapshot.grade3] : [],
       });
     } else {
-      setConfirmHistory({ grade2: [], grade3: [] });
+      putBoth("confirmHistory", { grade2: [], grade3: [] });
     }
     if (parsed.grade2HistoryData) {
       if (parsed.grade2HistoryData.grade2 || parsed.grade2HistoryData.grade3) {
@@ -156,11 +206,11 @@ export function ChangeSurveyTab() {
             for (const k in parsed.grade2HistoryData[g]) trimmed[g][k.trim()] = parsed.grade2HistoryData[g][k];
           }
         }
-        setGrade2HistoryData(trimmed);
+        putBoth("grade2HistoryData", trimmed);
       } else {
         const trimmed: Record<string, string[]> = {};
         for (const k in parsed.grade2HistoryData) trimmed[k.trim()] = parsed.grade2HistoryData[k];
-        setGrade2HistoryData({ grade2: trimmed, grade3: trimmed });
+        putBoth("grade2HistoryData", { grade2: trimmed, grade3: trimmed });
       }
     }
     if (parsed.grade3Sem1HistoryData) {
@@ -171,22 +221,22 @@ export function ChangeSurveyTab() {
             for (const k in parsed.grade3Sem1HistoryData[g]) trimmed[g][k.trim()] = parsed.grade3Sem1HistoryData[g][k];
           }
         }
-        setGrade3Sem1HistoryData(trimmed);
+        putBoth("grade3Sem1HistoryData", trimmed);
       } else {
         const trimmed: Record<string, string[]> = {};
         for (const k in parsed.grade3Sem1HistoryData) trimmed[k.trim()] = parsed.grade3Sem1HistoryData[k];
-        setGrade3Sem1HistoryData({ grade2: trimmed, grade3: trimmed });
+        putBoth("grade3Sem1HistoryData", { grade2: trimmed, grade3: trimmed });
       }
     }
     if (parsed.extraUploads) {
       if (parsed.extraUploads.grade2 || parsed.extraUploads.grade3) {
-        setExtraUploads(parsed.extraUploads);
+        putBoth("extraUploads", parsed.extraUploads);
       } else {
-        setExtraUploads({ grade2: parsed.extraUploads, grade3: parsed.extraUploads });
+        putBoth("extraUploads", { grade2: parsed.extraUploads, grade3: parsed.extraUploads });
       }
     }
     if (parsed.changeUploadNames) {
-      setChangeUploadNames(parsed.changeUploadNames);
+      putBoth("changeUploadNames", parsed.changeUploadNames);
     }
   };
   }
@@ -321,14 +371,19 @@ export function ChangeSurveyTab() {
         window.alert("타임 배정 결과를 읽지 못했습니다.");
         return false;
       }
-      const hasData = (rawParsedSampleData[cg] || []).length > 0 || Object.values(timetableData[cg] || {}).some((row) => Object.values(row || {}).some((c) => c?.subject));
-      if (hasData && !window.confirm("이 학년에 이미 올려 둔 학생 데이터·타임별 시간표가 있습니다. 타임 배정 결과로 바꿀까요?")) return false;
-      setSampleRawData((prev) => ({ ...prev, [cg]: p.binary }));
-      setParsedSampleData((prev) => ({ ...prev, [cg]: students }));
-      setChangeUploadNames((prev) => ({ ...prev, [cg]: { ...prev[cg], timetable: p.label } }));
-      setTimeSlots((prev) => ({ ...prev, [cg]: p.timetable.slots }));
-      setClassCols((prev) => ({ ...prev, [cg]: p.timetable.cols }));
-      setTimetableData((prev) => ({ ...prev, [cg]: p.timetable.cells }));
+      // 보낸 학기("1학기"/"2학기")에 받는다. 학기 구분이 없으면 지금 보는 학기에 받는다.
+      const sem = semesterFromLabel(p.semester) ?? semester;
+      const hasData =
+        readGrade<StudentTimeData[]>(sem, "parsedSampleData", cg, []).length > 0 ||
+        Object.values(readGrade<TimetableGradeData>(sem, "timetableData", cg, {})).some((row) => Object.values(row || {}).some((c) => c?.subject));
+      if (hasData && !window.confirm(`${SEMESTER_LABEL[sem]}의 이 학년에 이미 올려 둔 학생 데이터·타임별 시간표가 있습니다. 타임 배정 결과로 바꿀까요?`)) return false;
+      patchGrade<string | null>(sem, "sampleRawData", cg, null, () => p.binary);
+      patchGrade<StudentTimeData[]>(sem, "parsedSampleData", cg, [], () => students);
+      patchGrade(sem, "changeUploadNames", cg, { timetable: null, grade2Optional: null, grade3Sem1: null } as Record<string, string | null>, (cur) => ({ ...cur, timetable: p.label }));
+      patchGrade<string[]>(sem, "timeSlots", cg, [], () => p.timetable.slots);
+      patchGrade<string[]>(sem, "classCols", cg, [], () => p.timetable.cols);
+      patchGrade<TimetableGradeData>(sem, "timetableData", cg, {}, () => p.timetable.cells);
+      setSemester(sem);
       setChangeActiveGrade(cg);
       return true;
     };
@@ -390,6 +445,12 @@ export function ChangeSurveyTab() {
                 <BaseDataNotice
                   grade={changeActiveGrade === "grade2" ? "grade1" : "grade2"}
                   students={(rawParsedSampleData[changeActiveGrade] || []).map((s) => ({ id: s.id, name: s.name }))}
+                />
+                <SemesterBar
+                  semester={semester}
+                  onChange={setSemester}
+                  onCarryOver={handleCarryOver}
+                  hasStudents={(parsedSampleData.grade2.length + parsedSampleData.grade3.length) > 0}
                 />
                 <div className="bg-white/70 backdrop-blur-xl border border-stone-200 rounded-3xl p-8 shadow-xl">
 {changeActiveTab === "upload" && (

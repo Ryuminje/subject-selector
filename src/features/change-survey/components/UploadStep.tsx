@@ -5,6 +5,8 @@ import { Upload, CheckCircle2, Trash2, ChevronRight, File as FileIcon } from "lu
 import { ChangeGradeLabel } from "../../year-data/components/ChangeGradeLabel";
 import type { StudentTimeData } from "../../../types";
 import type { ChangeGradeKey, ChangeActiveTab } from "../types";
+import { useYearData } from "../../year-data/YearDataContext";
+import { countHistoryStudents } from "../lib/semester";
 
 interface UploadStepProps {
   changeActiveGrade: ChangeGradeKey;
@@ -35,6 +37,7 @@ export function UploadStep({
   grade2HistoryData,
   grade3Sem1HistoryData,
 }: UploadStepProps) {
+  const { roster } = useYearData();
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* BasicStep.tsx와 같은 이유로 flex-wrap·break-keep을 둡니다 — 자세한 설명은 그쪽 주석 참고. */}
@@ -187,7 +190,7 @@ export function UploadStep({
                   </span>
                 </div>
                 <span className="inline-block px-2 py-0.5 bg-emerald-500/10 text-emerald-700 text-xs font-semibold rounded border border-emerald-500/20">
-                  {Object.keys(grade2HistoryData[changeActiveGrade] || {}).length}명 파싱 완료
+                  {countHistoryStudents(grade2HistoryData[changeActiveGrade] || {}, roster)}명 파싱 완료
                 </span>
               </div>
               <div className="flex gap-2">
@@ -251,7 +254,7 @@ export function UploadStep({
                   </span>
                 </div>
                 <span className="inline-block px-2 py-0.5 bg-emerald-500/10 text-emerald-700 text-xs font-semibold rounded border border-emerald-500/20">
-                  {Object.keys(grade3Sem1HistoryData[changeActiveGrade] || {}).length}명 파싱 완료
+                  {countHistoryStudents(grade3Sem1HistoryData[changeActiveGrade] || {}, roster)}명 파싱 완료
                 </span>
               </div>
               <div className="flex gap-2">

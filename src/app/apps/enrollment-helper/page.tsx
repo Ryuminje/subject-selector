@@ -79,21 +79,6 @@ export default function EnrollmentHelperPage() {
           </button>
 
           <button
-            onClick={() => setActiveSidebarTab("change")}
-            className={`relative flex items-center px-4 h-[60px] transition-all duration-300 group overflow-hidden bg-white/95 backdrop-blur-xl border-y border-r border-stone-200 rounded-r-2xl shadow-[4px_0_15px_rgba(0,0,0,0.08)] w-16 hover:w-64 ${activeSidebarTab === "change" ? 'border-r-rose-500/60 bg-rose-50' : 'hover:bg-stone-50'}`}
-          >
-            <div className={`w-8 h-8 flex flex-shrink-0 justify-center items-center rounded-xl transition-all duration-300 ${activeSidebarTab === "change" ? 'bg-rose-500/15 text-rose-600 shadow-[0_0_15px_rgba(225,29,72,0.15)]' : 'text-stone-400 group-hover:text-rose-500'}`}>
-              <GitBranch className="w-5 h-5" />
-            </div>
-            <span className={`ml-4 font-medium whitespace-nowrap transition-all duration-300 ${activeSidebarTab === "change" ? 'text-rose-700 opacity-100' : 'text-stone-500 opacity-0 group-hover:opacity-100'}`}>
-              선택과목 변경 탭
-            </span>
-            {activeSidebarTab === "change" && (
-              <div className="absolute left-0 w-1 h-8 bg-rose-500 rounded-r-full shadow-[0_0_10px_rgba(225,29,72,0.4)]" />
-            )}
-          </button>
-
-          <button
             onClick={() => setActiveSidebarTab("main")}
             className={`relative flex items-center px-4 h-[60px] transition-all duration-300 group overflow-hidden bg-white/95 backdrop-blur-xl border-y border-r border-stone-200 rounded-r-2xl shadow-[4px_0_15px_rgba(0,0,0,0.08)] w-16 hover:w-64 ${activeSidebarTab === "main" ? 'border-r-emerald-500/60 bg-emerald-50' : 'hover:bg-stone-50'}`}
           >
@@ -120,6 +105,21 @@ export default function EnrollmentHelperPage() {
             </span>
             {activeSidebarTab === "timealloc" && (
               <div className="absolute left-0 w-1 h-8 bg-amber-500 rounded-r-full shadow-[0_0_10px_rgba(217,119,6,0.4)]" />
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveSidebarTab("change")}
+            className={`relative flex items-center px-4 h-[60px] transition-all duration-300 group overflow-hidden bg-white/95 backdrop-blur-xl border-y border-r border-stone-200 rounded-r-2xl shadow-[4px_0_15px_rgba(0,0,0,0.08)] w-16 hover:w-64 ${activeSidebarTab === "change" ? 'border-r-rose-500/60 bg-rose-50' : 'hover:bg-stone-50'}`}
+          >
+            <div className={`w-8 h-8 flex flex-shrink-0 justify-center items-center rounded-xl transition-all duration-300 ${activeSidebarTab === "change" ? 'bg-rose-500/15 text-rose-600 shadow-[0_0_15px_rgba(225,29,72,0.15)]' : 'text-stone-400 group-hover:text-rose-500'}`}>
+              <GitBranch className="w-5 h-5" />
+            </div>
+            <span className={`ml-4 font-medium whitespace-nowrap transition-all duration-300 ${activeSidebarTab === "change" ? 'text-rose-700 opacity-100' : 'text-stone-500 opacity-0 group-hover:opacity-100'}`}>
+              선택과목 변경 탭
+            </span>
+            {activeSidebarTab === "change" && (
+              <div className="absolute left-0 w-1 h-8 bg-rose-500 rounded-r-full shadow-[0_0_10px_rgba(225,29,72,0.4)]" />
             )}
           </button>
         </nav>
