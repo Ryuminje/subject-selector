@@ -74,7 +74,7 @@ export function ClassOpeningStep({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
         <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
           <CheckCircle2 className="w-6 h-6 text-amber-600" />
-          5단계: 과목 개설 여부 및 학급 분반 추천
+          3단계: 과목 개설 여부 및 학급 분반 추천
         </h2>
         <button
           onClick={handleExportStep5}

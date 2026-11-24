@@ -14,6 +14,8 @@ interface HierarchyStepProps {
   hierarchyRules: { [key in GradeKey]: HierarchyRule[] };
   setHierarchyRules: React.Dispatch<React.SetStateAction<{ [key in GradeKey]: HierarchyRule[] }>>;
   setActiveTab: (tab: string) => void;
+  /** 학년 탭 이름(입학년도 표기) */
+  gradeLabels?: Record<GradeKey, string>;
 }
 
 export function HierarchyStep({
@@ -24,6 +26,7 @@ export function HierarchyStep({
   hierarchyRules,
   setHierarchyRules,
   setActiveTab,
+  gradeLabels,
 }: HierarchyStepProps) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -34,10 +37,10 @@ export function HierarchyStep({
         </h2>
       </div>
 
-      <GradeTabs activeGrade={activeGrade} setActiveGrade={setActiveGrade} />
+      <GradeTabs activeGrade={activeGrade} setActiveGrade={setActiveGrade} labels={gradeLabels} />
 
       <p className="text-stone-600">
-        특정 과목을 수강하기 위해 먼저 들어야 하는 선수 과목 규칙을 설정할 수 있습니다. 1단계에서 분석된 과목들만 선택 가능합니다.
+        특정 과목을 수강하기 위해 먼저 들어야 하는 선수 과목 규칙을 설정할 수 있습니다. 위계 규칙은 모든 입학년도가 같이 씁니다(입학년도 탭은 선택 가능한 과목 목록만 바꿉니다). 1단계에서 분석된 과목들만 선택 가능합니다.
       </p>
 
       {!isCurriculumParsed[activeGrade] || Object.keys(subjectMap[activeGrade]).length === 0 ? (
@@ -120,7 +123,7 @@ export function HierarchyStep({
               onClick={() => setActiveTab("upload")}
               className="px-6 py-3 bg-stone-100 hover:bg-stone-200 text-stone-900 font-medium rounded-xl transition-colors border border-stone-300 flex items-center gap-2"
             >
-              다음 단계(파일 업로드)로 이동
+              다음 단계(진급 학번 명단)로 이동
               <Upload className="w-4 h-4" />
             </button>
           </div>

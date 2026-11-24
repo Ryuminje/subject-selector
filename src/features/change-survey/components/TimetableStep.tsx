@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Settings, Download, Plus, Trash2, Eraser } from "lucide-react";
+import { ChangeGradeLabel } from "../../year-data/components/ChangeGradeLabel";
 import type { ChangeGradeKey, TimetableData, GradeStringArrays } from "../types";
 import { isKnownSubject } from "../lib/subjectMatch";
 
@@ -71,7 +72,7 @@ export function TimetableStep({
                 : "text-stone-900 hover:text-stone-900"
               }`}
           >
-            2학년
+            <ChangeGradeLabel grade="grade2" />
           </button>
           <button
             onClick={() => setChangeActiveGrade("grade3")}
@@ -80,7 +81,7 @@ export function TimetableStep({
                 : "text-stone-900 hover:text-stone-900"
               }`}
           >
-            3학년
+            <ChangeGradeLabel grade="grade3" />
           </button>
         </div>
       </div>

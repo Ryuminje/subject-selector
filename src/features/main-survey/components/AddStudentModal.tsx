@@ -11,11 +11,13 @@ interface AddStudentModalProps {
   rawRows: Record<string, unknown>[];
   /** 성공하면 null, 실패하면 이유를 돌려준다 */
   onAdd: (studentId: string, name: string, selectedKeys: string[]) => string | null;
+  /** 기초자료 명단의 전입생을 가리키면 학번·이름은 고정하고 과목만 체크한다(호출하는 쪽에서 key 로 학생마다 새로 만든다) */
+  initial?: { id: string; name: string } | null;
 }
 
-export function AddStudentModal({ isOpen, onClose, rawRows, onAdd }: AddStudentModalProps) {
-  const [studentId, setStudentId] = useState("");
-  const [name, setName] = useState("");
+export function AddStudentModal({ isOpen, onClose, rawRows, onAdd, initial }: AddStudentModalProps) {
+  const [studentId, setStudentId] = useState(initial?.id ?? "");
+  const [name, setName] = useState(initial?.name ?? "");
   const [checked, setChecked] = useState<string[]>([]);
   const [error, setError] = useState("");
 
@@ -57,7 +59,7 @@ export function AddStudentModal({ isOpen, onClose, rawRows, onAdd }: AddStudentM
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200">
           <h3 className="text-lg font-semibold text-stone-900 flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-emerald-700" /> 전입생 추가
+            <UserPlus className="w-5 h-5 text-emerald-700" /> {initial ? "전입생 과목 입력" : "전입생 추가"}
           </h3>
           <button onClick={close} className="p-1.5 rounded-lg hover:bg-stone-100 text-stone-500" aria-label="닫기"><X className="w-5 h-5" /></button>
         </div>
@@ -66,13 +68,13 @@ export function AddStudentModal({ isOpen, onClose, rawRows, onAdd }: AddStudentM
           <div className="grid grid-cols-2 gap-3">
             <label className="text-sm text-stone-700">
               학번
-              <input value={studentId} onChange={e => setStudentId(e.target.value)} placeholder="예: 20317"
-                className="mt-1 w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input value={studentId} onChange={e => setStudentId(e.target.value)} placeholder="예: 20317" readOnly={!!initial}
+                className="mt-1 w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 read-only:bg-stone-100" />
             </label>
             <label className="text-sm text-stone-700">
               이름
-              <input value={name} onChange={e => setName(e.target.value)}
-                className="mt-1 w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+              <input value={name} onChange={e => setName(e.target.value)} readOnly={!!initial}
+                className="mt-1 w-full px-3 py-2 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 read-only:bg-stone-100" />
             </label>
           </div>
 

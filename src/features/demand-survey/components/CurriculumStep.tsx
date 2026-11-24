@@ -18,6 +18,10 @@ interface CurriculumStepProps {
   setDetailedCategoryEditValue: (value: string) => void;
   handleDetailedCategoryUpdate: (grade: GradeKey, index: number, subjectName: string, newDetailedCategory: string) => void;
   setActiveTab: (tab: string) => void;
+  /** 학년 탭 이름(입학년도 표기) */
+  gradeLabels?: Record<GradeKey, string>;
+  /** 제목 아래에 끼워 넣을 내용(작업 학년도 설정) */
+  afterTitle?: React.ReactNode;
 }
 
 export function CurriculumStep({
@@ -33,6 +37,8 @@ export function CurriculumStep({
   setDetailedCategoryEditValue,
   handleDetailedCategoryUpdate,
   setActiveTab,
+  gradeLabels,
+  afterTitle,
 }: CurriculumStepProps) {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -43,10 +49,12 @@ export function CurriculumStep({
         </h2>
       </div>
 
-      <GradeTabs activeGrade={activeGrade} setActiveGrade={setActiveGrade} />
+      {afterTitle}
+
+      <GradeTabs activeGrade={activeGrade} setActiveGrade={setActiveGrade} labels={gradeLabels} />
 
       <p className="text-stone-600">
-        선택하신 학년의 교육과정 편성표 엑셀 파일을 업로드해 주세요. 3개년 데이터가 모두 포함된 원본 엑셀 파일을 그대로 올리시면 됩니다.
+        선택하신 입학년도의 교육과정 편성표 엑셀 파일을 업로드해 주세요. 입학년도마다 편성표가 다르니 입학년도별로 올립니다. 3개년 데이터가 모두 포함된 원본 엑셀 파일을 그대로 올리시면 됩니다.
       </p>
 
       <button
@@ -83,7 +91,7 @@ export function CurriculumStep({
         <div className="mt-8 p-6 bg-white/70 border border-stone-200 rounded-2xl animate-in fade-in">
           <h3 className="text-xl font-medium text-stone-800 mb-4 flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-700" />
-            추출된 교육과정 데이터 ({activeGrade === "pre1" ? "1학년 탭" : activeGrade === "grade1" ? "2학년 탭" : "3학년 탭"})
+            추출된 교육과정 데이터 ({gradeLabels?.[activeGrade] ?? (activeGrade === "pre1" ? "1학년 탭" : activeGrade === "grade1" ? "2학년 탭" : "3학년 탭")})
           </h3>
           <p className="text-sm text-stone-600 mb-6">
             업로드된 엑셀 파일에서 1~3학년 전체 교육과정을 자동으로 분석했습니다. 내부적으로 기초/사회/과학 과목 매핑도 완료되었습니다.

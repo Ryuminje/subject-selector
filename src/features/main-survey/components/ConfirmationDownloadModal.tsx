@@ -129,7 +129,7 @@ export function ConfirmationDownloadModal({
       onClose();
     } catch (e) {
       console.error(e);
-      setError("문서를 만드는 중 오류가 났습니다. 교육과정 편성표(1단계)가 올라가 있는지 확인해 주세요.");
+      setError("문서를 만드는 중 오류가 났습니다. 교육과정 편성표(기초자료 탭)가 올라가 있는지 확인해 주세요.");
     } finally {
       setBusy(false);
       setProgress("");
@@ -237,7 +237,7 @@ export function ConfirmationDownloadModal({
 
           {selectedSubjectHours.length === 0 && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-              이 학년의 교육과정 편성표(1단계)가 없어 교과군·학점 칸이 비어 나갑니다.
+              이 학년의 교육과정 편성표(기초자료 탭)가 없어 교과군·학점 칸이 비어 나갑니다.
             </p>
           )}
           {error && <p className="text-xs text-rose-600">{error}</p>}

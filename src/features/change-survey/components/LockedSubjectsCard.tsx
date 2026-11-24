@@ -69,7 +69,7 @@ export function LockedSubjectsCard({ subjectOptions, locked, setLocked, gradeLab
               />
             </div>
             <div className="max-h-56 overflow-auto flex flex-wrap gap-2 p-2 bg-white/70 border border-stone-200 rounded-lg">
-              {subjectOptions.length === 0 && <span className="text-sm text-stone-500">과목 목록이 없습니다. 먼저 2단계에서 학생 데이터를 올려 주세요.</span>}
+              {subjectOptions.length === 0 && <span className="text-sm text-stone-500">과목 목록이 없습니다. 먼저 1단계에서 학생 데이터를 올려 주세요.</span>}
               {subjectOptions.length > 0 && shown.length === 0 && <span className="text-sm text-stone-500">검색 결과가 없습니다.</span>}
               {shown.map(s => {
                 const on = isOn(s);

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isExcludedRow } from "../../year-data/lib/roster";
 import * as XLSX from "xlsx-js-style";
 import { downloadEditedSurveyWorkbook, findSurveyLayout, pickSurveySheetName } from "../lib/surveySheet";
 import { applyPromotion, countClasses, hasPromoted, undoPromotion, type PromotionDecision } from "../lib/promotion";
@@ -62,6 +63,8 @@ export function useMainUploads(
   parsedCurriculumList: { [key in GradeKey]: ParsedCurriculumSubject[] },
   subjectMap: { [key in GradeKey]: SubjectMap },
   hierarchyRules: { [key in GradeKey]: HierarchyRule[] },
+  /** 기초자료 학생 명단에서 전출·퇴학으로 표시된 학번들 — 이 학생들의 행은 계산·출력에서 뺀다(원본 행은 그대로 보존) */
+  excludedIds?: ReadonlySet<string>,
 ) {
   const [uploadedFiles, setUploadedFiles] = useState<{ [key in GradeKey]: { name: string, size: number, data: string } | null }>({ pre1: null, grade1: null, grade2: null });
   const [processedData, setProcessedData] = useState<{ [key in GradeKey]: ProcessedStudent[] }>({ pre1: [], grade1: [], grade2: [] });
@@ -558,7 +561,8 @@ export function useMainUploads(
   };
 
   useEffect(() => {
-    const currentData = rawSheetData[activeGrade];
+    const all = rawSheetData[activeGrade];
+    const currentData = excludedIds && excludedIds.size > 0 ? all?.filter((r: Record<string, unknown>) => !isExcludedRow(r, excludedIds)) : all;
     if (currentData && currentData.length > 0) {
       processData(currentData);
     } else {
@@ -566,7 +570,7 @@ export function useMainUploads(
       setSubjectStats(prev => ({ ...prev, [activeGrade]: [] }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeGrade, rawSheetData, subjectMap, hierarchyRules, previousSubjectMap, parsedCurriculumList]);
+  }, [activeGrade, rawSheetData, subjectMap, hierarchyRules, previousSubjectMap, parsedCurriculumList, excludedIds]);
 
   // 전입·전출: 표는 rawSheetData에서 다시 계산되므로 여기만 고치면 통계·출력·저장이 따라온다.
   const removeStudent = (studentId: string) => {
@@ -606,7 +610,8 @@ export function useMainUploads(
   const downloadEditedFile = (includeOldId = false) => {
     const file = uploadedFiles[activeGrade];
     if (!file) return;
-    const err = downloadEditedSurveyWorkbook(file.data, rawSheetData[activeGrade] || [], file.name, { includeOldId });
+    const rows = (rawSheetData[activeGrade] || []).filter((r: Record<string, unknown>) => !(excludedIds && isExcludedRow(r, excludedIds)));
+    const err = downloadEditedSurveyWorkbook(file.data, rows, file.name, { includeOldId });
     if (err) alert(err);
   };
 

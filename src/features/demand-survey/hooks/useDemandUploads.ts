@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isExcludedRow } from "../../year-data/lib/roster";
 import * as XLSX from "xlsx-js-style";
 import type { GradeKey, HierarchyRule, ParsedCurriculumSubject, ProcessedStudent, SubjectCategory, SubjectMap, SubjectStat } from "../../../types";
 
@@ -60,6 +61,8 @@ export function useDemandUploads(
   parsedCurriculumList: { [key in GradeKey]: ParsedCurriculumSubject[] },
   subjectMap: { [key in GradeKey]: SubjectMap },
   hierarchyRules: { [key in GradeKey]: HierarchyRule[] },
+  /** 기초자료 학생 명단에서 전출·퇴학으로 표시된 학번들 — 이 학생들의 행은 계산에서 뺀다(원본 행은 그대로 보존) */
+  excludedIds?: ReadonlySet<string>,
 ) {
   const [uploadedFiles, setUploadedFiles] = useState<{ [key in GradeKey]: { name: string, size: number, data: string } | null }>({ pre1: null, grade1: null, grade2: null });
   const [processedData, setProcessedData] = useState<{ [key in GradeKey]: ProcessedStudent[] }>({ pre1: [], grade1: [], grade2: [] });
@@ -592,7 +595,8 @@ export function useDemandUploads(
   };
 
   useEffect(() => {
-    const currentData = rawSheetData[activeGrade];
+    const all = rawSheetData[activeGrade];
+    const currentData = excludedIds && excludedIds.size > 0 ? all?.filter((r: Record<string, unknown>) => !isExcludedRow(r, excludedIds)) : all;
     if (currentData && currentData.length > 0) {
       processData(currentData);
     } else {
@@ -600,7 +604,7 @@ export function useDemandUploads(
       setSubjectStats(prev => ({ ...prev, [activeGrade]: [] }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeGrade, rawSheetData, subjectMap, hierarchyRules, previousSubjectMap, parsedCurriculumList]);
+  }, [activeGrade, rawSheetData, subjectMap, hierarchyRules, previousSubjectMap, parsedCurriculumList, excludedIds]);
 
   return {
     uploadedFiles, setUploadedFiles,

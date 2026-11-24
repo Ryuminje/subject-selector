@@ -12,7 +12,7 @@ export interface CurriculumCandidate {
   credits: number;
 }
 
-// 6단계 화면과 같은 색: 지정 = 초록, 선택 = 연노랑
+// 4단계 화면과 같은 색: 지정 = 초록, 선택 = 연노랑
 const TYPE_BG: Record<SimType, string> = { 지정: "bg-emerald-500/10", 선택: "bg-amber-50" };
 const CELL = "px-1.5 py-1 text-center border-r border-stone-300";
 // 칸이 표 배경에 묻히도록 평소엔 테두리·배경 없이 글자만 보이고, 마우스를 올리거나 고칠 때만 테두리가 드러납니다.
@@ -148,11 +148,11 @@ export function HoursSimStep({
   };
 
   const importFromStep6 = () => {
-    if (cats.length > 0 && !window.confirm("지금 7단계에서 고친 내용을 지우고 6단계 결과로 다시 채울까요?")) return;
+    if (cats.length > 0 && !window.confirm("지금 5단계에서 고친 내용을 지우고 4단계 결과로 다시 채울까요?")) return;
     const imported = onImport();
     setCats(imported);
-    setActivePlanId(null); // 6단계에서 새로 가져온 표는 저장한 안과 별개입니다.
-    // 가져온 순간의 6단계 표를 「안 비교」의 기준으로 따로 둡니다(이후 6단계가 바뀌어도 기준은 그대로).
+    setActivePlanId(null); // 4단계에서 새로 가져온 표는 저장한 안과 별개입니다.
+    // 가져온 순간의 4단계 표를 「안 비교」의 기준으로 따로 둡니다(이후 4단계가 바뀌어도 기준은 그대로).
     setBaseline({ savedAt: new Date().toISOString(), cats: structuredClone(imported) });
   };
 
@@ -227,7 +227,7 @@ export function HoursSimStep({
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
           <Calculator className="w-6 h-6 text-amber-600" />
-          7단계: 교과별 시수 조정
+          5단계: 교과별 시수 조정
         </h2>
         <div className="flex p-1 bg-stone-100 rounded-xl border border-stone-200">
           {(
@@ -251,10 +251,10 @@ export function HoursSimStep({
         <button
           onClick={importFromStep6}
           disabled={!canImport}
-          title={canImport ? "6단계 표를 복사해 시작합니다" : "6단계에 표시할 데이터가 아직 없습니다"}
+          title={canImport ? "4단계 표를 복사해 시작합니다" : "4단계에 표시할 데이터가 아직 없습니다"}
           className="px-4 py-2 bg-amber-50 hover:bg-amber-100 disabled:opacity-40 text-amber-800 text-sm font-medium rounded-xl border border-amber-300 flex items-center gap-2"
         >
-          <Import className="w-4 h-4" /> 6단계 결과 가져오기
+          <Import className="w-4 h-4" /> 4단계 결과 가져오기
         </button>
         <button
           onClick={exportXlsx}
@@ -282,7 +282,7 @@ export function HoursSimStep({
       ) : (
       <>
       <p className="text-sm text-stone-600">
-        6단계와 따로 쓰는 연습판입니다. 여기서 고친 내용은 6단계나 원래 데이터를 바꾸지 않습니다. 과목을 더하거나 빼고, 구분·학점·반 수를 바꾸면 교과별 시수와 평균이 바로 다시 계산됩니다.
+        4단계와 따로 쓰는 연습판입니다. 여기서 고친 내용은 4단계나 원래 데이터를 바꾸지 않습니다. 과목을 더하거나 빼고, 구분·학점·반 수를 바꾸면 교과별 시수와 평균이 바로 다시 계산됩니다.
       </p>
 
       <div className="bg-white/80 border border-stone-200 rounded-2xl px-4 py-3 flex items-center gap-2 flex-wrap">
@@ -344,7 +344,7 @@ export function HoursSimStep({
 
       {cats.length === 0 ? (
         <div className="py-12 text-center text-sm text-stone-600 bg-stone-50 border border-dashed border-stone-300 rounded-2xl">
-          {canImport ? "「6단계 결과 가져오기」로 시작하거나, 아래에서 교과를 직접 추가하세요." : "아래에서 교과를 직접 추가해 시작하세요. 6단계 데이터가 있으면 그대로 가져올 수도 있습니다."}
+          {canImport ? "「4단계 결과 가져오기」로 시작하거나, 아래에서 교과를 직접 추가하세요." : "아래에서 교과를 직접 추가해 시작하세요. 4단계 데이터가 있으면 그대로 가져올 수도 있습니다."}
         </div>
       ) : (
         <div className="bg-stone-100 rounded-2xl border border-stone-300 overflow-x-auto shadow-inner">

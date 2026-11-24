@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { FileText, Download, FileDown, UserPlus, Trash2 } from "lucide-react";
+import { FileText, Download, FileDown } from "lucide-react";
 import { GradeTabs } from "./GradeTabs";
-import { AddStudentModal } from "./AddStudentModal";
 import { ConfirmationDownloadModal } from "./ConfirmationDownloadModal";
 import type { GradeKey, ProcessedStudent, SelectedSubjectHours, SubjectMap } from "../../../types";
 
@@ -12,10 +11,6 @@ interface PreviewStepProps {
   setActiveGrade: (grade: GradeKey) => void;
   handleExport: () => void;
   activeData: ProcessedStudent[];
-  /** 이 학년의 업로드 원본 행(전입생 추가 때 선택 가능한 과목 목록의 출처) */
-  rawRows: Record<string, unknown>[];
-  onRemoveStudent: (studentId: string) => void;
-  onAddStudent: (studentId: string, name: string, selectedKeys: string[]) => string | null;
   /** 학생별 확인서(.docx)에 선택과목의 교과군·학점을 채우기 위한 이 학년의 편성표 데이터 */
   selectedSubjectHours: SelectedSubjectHours[];
   subjectMap: SubjectMap;
@@ -28,14 +23,10 @@ export function PreviewStep({
   setActiveGrade,
   handleExport,
   activeData,
-  rawRows,
-  onRemoveStudent,
-  onAddStudent,
   selectedSubjectHours,
   subjectMap,
 }: PreviewStepProps) {
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
-  const [isAddOpen, setIsAddOpen] = useState(false);
   const maxSem1 = activeData.length > 0 ? Math.max(4, ...activeData.map(d => d.semester1.length)) : 4;
   const maxSem1_2 = activeData.length > 0 ? Math.max(0, ...activeData.map(d => (d.semester1_2 || []).length)) : 0;
   const maxSem2 = activeData.length > 0 ? Math.max(4, ...activeData.map(d => d.semester2.length)) : 4;
@@ -45,18 +36,9 @@ export function PreviewStep({
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
           <FileText className="w-6 h-6 text-emerald-700" />
-          4단계: 수강신청(본조사) 결과 및 다운로드
+          2단계: 수강신청(본조사) 결과 및 다운로드
         </h2>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* 전입생 추가 — 표는 업로드 원본에서 다시 계산되므로 원본 행을 늘리는 방식 */}
-          <button
-            onClick={() => setIsAddOpen(true)}
-            className="px-6 py-3 bg-white border border-stone-300 text-stone-700 hover:bg-stone-50 font-medium rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50"
-            disabled={rawRows.length === 0}
-          >
-            <UserPlus className="w-4 h-4" />
-            전입생 추가
-          </button>
           {/* 학생별 확인서 — 학생이 자기 신청 내역을 확인하고 서명해 보관하는 서식(.docx) */}
           <button
             onClick={() => setIsConfirmationOpen(true)}
@@ -86,13 +68,6 @@ export function PreviewStep({
         subjectMap={subjectMap}
       />
 
-      <AddStudentModal
-        isOpen={isAddOpen}
-        onClose={() => setIsAddOpen(false)}
-        rawRows={rawRows}
-        onAdd={onAddStudent}
-      />
-
       <GradeTabs activeGrade={activeGrade} setActiveGrade={setActiveGrade} />
 
       {activeData.length === 0 ? (
@@ -115,7 +90,6 @@ export function PreviewStep({
                   <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-white text-center">사회</th>
                   <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-white text-center">과학</th>
                   <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-white">비고(중복)</th>
-                  <th className="px-2 py-2.5 whitespace-nowrap sticky top-0 z-10 bg-white text-center">전출</th>
                 </tr>
               </thead>
               <tbody>
@@ -182,16 +156,6 @@ export function PreviewStep({
                           {category} 과목 이수 필요
                         </span>
                       ))}
-                    </td>
-                    <td className="px-2 py-2.5 text-center">
-                      <button
-                        onClick={() => { if (window.confirm(`${row.studentId} ${row.name} 학생을 목록에서 삭제할까요?\n(전출 처리 — 통계·출력에서도 빠집니다)`)) onRemoveStudent(row.studentId); }}
-                        className="p-1.5 rounded-lg text-stone-400 hover:text-rose-700 hover:bg-rose-50 transition-colors"
-                        aria-label={`${row.name} 삭제`}
-                        title="전출: 목록에서 삭제"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
                     </td>
                   </tr>
                 ))}

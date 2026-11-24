@@ -35,7 +35,7 @@ export function buildCompareWorkbook(baseline: SimBaseline, columns: CompareColu
   const wb = XLSX.utils.book_new();
   for (const m of COMPARE_METRICS) {
     const aoa: (string | number | null)[][] = [
-      ["교과", "교사 수(기준)", "기준(6단계)", ...columns.flatMap((c) => [c.name, ""])],
+      ["교과", "교사 수(기준)", "기준(4단계)", ...columns.flatMap((c) => [c.name, ""])],
       ["", "", "", ...columns.flatMap(() => ["평균", "증감"])],
     ];
     const deltas: (number | null)[][] = [];

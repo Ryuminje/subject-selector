@@ -27,7 +27,7 @@ export function PreviewStep({
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
           <FileText className="w-6 h-6 text-emerald-700" />
-          4단계: 수요조사 결과 및 다운로드
+          2단계: 수요조사 결과 및 다운로드
         </h2>
         <button
           onClick={handleExport}

@@ -15,6 +15,9 @@ import { StudentResultStep } from "../../features/time-allocation/components/Stu
 import { TeacherPlanStep } from "../../features/time-allocation/components/TeacherPlanStep";
 import type { MainSurveySnapshot } from "../../features/time-allocation/lib/fromMainSurvey";
 import { editedSurveyDataUrl } from "../../features/main-survey/lib/surveySheet";
+import { useYearData } from "../../features/year-data/YearDataContext";
+import { BaseDataNotice } from "../../features/year-data/components/BaseDataNotice";
+import { excludedIdSet, isExcludedRow } from "../../features/year-data/lib/roster";
 import { GuideLink } from "@/features/guide/components/GuideLink";
 
 const STEPS = [
@@ -33,6 +36,8 @@ const GRADE_FILE_LABEL: Record<GradeKey, string> = {
 export function TimeAllocationTab() {
   const api = useTimeAllocation();
   const [step, setStep] = React.useState<StepKey | "teacher">("input");
+  const { roster } = useYearData();
+  const excludedIds = React.useMemo(() => excludedIdSet(roster), [roster]);
 
   // 프로젝트 JSON 저장 번들에 합류 (기존 탭들의 handleSaveBackup / handleLoadBackup 가 호출).
   React.useEffect(() => {
@@ -70,8 +75,10 @@ export function TimeAllocationTab() {
     const getMain = (window as unknown as { getMainBackup?: () => MainSurveySnapshot }).getMainBackup;
     const snap = getMain?.();
     const data = snap?.uploadedFiles?.[api.activeGrade]?.data;
-    const rows = snap?.rawSheetData?.[api.activeGrade];
-    if (!data || !rows) return data;
+    const allRows = snap?.rawSheetData?.[api.activeGrade];
+    if (!data || !allRows) return data;
+    // 기초자료 명단에서 전출·퇴학으로 표시된 학생은 내보내는 파일에서도 뺀다
+    const rows = allRows.filter((r) => !isExcludedRow(r, excludedIds));
     return editedSurveyDataUrl(data, rows, { includeOldId: opts?.includeOldId }) ?? data;
   };
 
@@ -86,6 +93,7 @@ export function TimeAllocationTab() {
       main: w.getMainBackup?.() || {},
       change: w.getChangeBackup?.() || {},
       timeAlloc: w.getTimeAllocBackup?.() || {},
+      base: w.getBaseBackup?.() || {},
     };
 
     const jsonString = JSON.stringify(fullBackup, null, 2);
@@ -152,6 +160,7 @@ export function TimeAllocationTab() {
           w.loadMainBackup?.(parsed.main || {});
           w.loadChangeBackup?.(parsed.change || {});
           w.loadTimeAllocBackup?.(parsed.timeAlloc || {});
+          w.loadBaseBackup?.(parsed.base || {});
         } else {
           w.loadDemandBackup?.(parsed);
           w.loadMainBackup?.(parsed);
@@ -229,7 +238,13 @@ export function TimeAllocationTab() {
 
       <div className="px-10 py-6">
         <GradeTabs activeGrade={api.activeGrade} setActiveGrade={api.setActiveGrade} />
-        {step === "input" && <DataInputStep api={api} onLoadFromMain={loadFromMain} onUpdateIds={updateIds} />}
+        {step === "input" && (
+          <BaseDataNotice
+            grade={api.activeGrade}
+            students={(api.state.roster?.students ?? []).map((s) => ({ id: s.id, name: s.name }))}
+          />
+        )}
+        {step === "input" &&<DataInputStep api={api} onLoadFromMain={loadFromMain} onUpdateIds={updateIds} />}
         {step === "alloc" && <AllocationGridStep api={api} fileLabel={GRADE_FILE_LABEL[api.activeGrade]} />}
         {/* 계산기는 끄지 않고 숨기기만 합니다 — 단계를 옮겼다 오면 입력이 지워져 버립니다(실제로 겪음). */}
         <div className={step === "teacher" ? "block" : "hidden"}>

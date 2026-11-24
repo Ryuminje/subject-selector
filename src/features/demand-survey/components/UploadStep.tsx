@@ -37,7 +37,7 @@ export function UploadStep({
       <div>
         <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2 mb-2">
           <Upload className="w-6 h-6 text-rose-700" />
-          3단계: 데이터 파일 업로드
+          1단계: 데이터 파일 업로드
         </h2>
         <p className="text-stone-600 text-sm">
           당해년도 수요조사 설문 파일과 이전 학년의 이수 이력 데이터(선택)를 업로드해 주세요.

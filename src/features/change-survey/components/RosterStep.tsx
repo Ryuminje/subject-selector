@@ -2,6 +2,7 @@
 
 import React, { Fragment } from "react";
 import { Users, Download } from "lucide-react";
+import { ChangeGradeLabel } from "../../year-data/components/ChangeGradeLabel";
 import type { StudentTimeData } from "../../../types";
 import type { ChangeGradeKey, TimetableData, GradeStringArrays } from "../types";
 import { sameSubject } from "../lib/subjectMatch";
@@ -58,7 +59,7 @@ export function RosterStep({
                   : "text-stone-900 hover:text-stone-900"
                 }`}
             >
-              2학년
+              <ChangeGradeLabel grade="grade2" />
             </button>
             <button
               onClick={() => setChangeActiveGrade("grade3")}
@@ -67,7 +68,7 @@ export function RosterStep({
                   : "text-stone-900 hover:text-stone-900"
                 }`}
             >
-              3학년
+              <ChangeGradeLabel grade="grade3" />
             </button>
           </div>
         </div>

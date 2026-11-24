@@ -297,7 +297,7 @@ export function CategorySummaryStep({
             ) : (
               <tr>
                 <td colSpan={18} className="px-4 py-8 text-center text-stone-400">
-                  데이터가 없습니다. 1단계 교육과정 편성표를 업로드해주세요.
+                  데이터가 없습니다. 「기초자료」 탭에서 교육과정 편성표를 입력해 주세요.
                 </td>
               </tr>
             )}

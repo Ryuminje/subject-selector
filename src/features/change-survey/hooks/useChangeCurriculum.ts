@@ -1,7 +1,7 @@
-import { useCallback, useState } from "react";
-import * as XLSX from "xlsx-js-style";
+import { useCallback, useMemo } from "react";
 import type { GradeKey, HierarchyRule, ParsedCurriculumSubject, SubjectCategory, SubjectMap } from "../../../types";
 import type { ChangeGradeKey } from "../types";
+import { useYearData, type PerGrade } from "../../year-data/YearDataContext";
 
 export function normalizeSubjectName(name: string): string {
   if (!name) return "";
@@ -26,11 +26,31 @@ export function normalizeSubjectName(name: string): string {
   return normalized;
 }
 
+/**
+ * 공유 저장소(수요조사·본조사 기준 학년 키)를 선택과목 변경 탭의 학년 키로 보여 주는 어댑터.
+ * 변경 탭의 grade2/grade3(= 내년 2·3학년)는 공유 저장소의 grade1/grade2 와 같은 학년이라 값이 그대로 같습니다.
+ * set 쪽은 변경 탭이 주는 키(grade2/grade3)만 되써서, 없는 키는 건드리지 않습니다.
+ */
+function useChangeView<T>(shared: PerGrade<T>, setShared: React.Dispatch<React.SetStateAction<PerGrade<T>>>) {
+  const view = useMemo<Record<string, T>>(() => ({ grade2: shared.grade1, grade3: shared.grade2 }), [shared]);
+  const setView = useCallback(
+    (u: React.SetStateAction<Record<string, T>>) =>
+      setShared((prev) => {
+        const cur: Record<string, T> = { grade2: prev.grade1, grade3: prev.grade2 };
+        const next = typeof u === "function" ? (u as (p: Record<string, T>) => Record<string, T>)(cur) : u;
+        return { ...prev, grade1: next.grade2 ?? prev.grade1, grade2: next.grade3 ?? prev.grade2 };
+      }),
+    [setShared],
+  );
+  return [view, setView] as const;
+}
+
 export function useChangeCurriculum(changeActiveGrade: ChangeGradeKey) {
-  const [changeParsedCurriculumList, setChangeParsedCurriculumList] = useState<Record<string, ParsedCurriculumSubject[]>>({});
-  const [changeSubjectMap, setChangeSubjectMap] = useState<Record<string, SubjectMap>>({});
-  const [changeIsCurriculumParsed, setChangeIsCurriculumParsed] = useState<Record<string, boolean>>({});
-  const [changeHierarchyRules, setChangeHierarchyRules] = useState<Record<string, HierarchyRule[]>>({});
+  const yd = useYearData();
+  const [changeParsedCurriculumList, setChangeParsedCurriculumList] = useChangeView<ParsedCurriculumSubject[]>(yd.parsedCurriculumList, yd.setParsedCurriculumList);
+  const [changeSubjectMap, setChangeSubjectMap] = useChangeView<SubjectMap>(yd.subjectMap, yd.setSubjectMap);
+  const [changeIsCurriculumParsed, setChangeIsCurriculumParsed] = useChangeView<boolean>(yd.isCurriculumParsed, yd.setIsCurriculumParsed);
+  const [changeHierarchyRules, setChangeHierarchyRules] = useChangeView<HierarchyRule[]>(yd.hierarchyRules, yd.setHierarchyRules);
 
   const handleChangeCurriculumUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -39,134 +59,10 @@ export function useChangeCurriculum(changeActiveGrade: ChangeGradeKey) {
     const reader = new FileReader();
     reader.onload = (evt) => {
       const data = evt.target?.result;
-      if (!data) return;
-
-      const workbook = XLSX.read(data, { type: "binary" });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const json = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-
-      if (sheet['!merges']) {
-        sheet['!merges'].forEach((m: any) => {
-          const val = json[m.s.r]?.[m.s.c];
-          if (val !== undefined) {
-            for (let r = m.s.r; r <= m.e.r; r++) {
-              if (!json[r]) json[r] = [];
-              for (let c = m.s.c; c <= m.e.c; c++) json[r][c] = val;
-            }
-          }
-        });
-      }
-
-      let typeIdx = -1, catIdx = -1, subjIdx = -1, credIdx = -1;
-      let grade1Idx = -1, grade2Idx = -1, grade3Idx = -1;
-
-      for (let r = 0; r < Math.min(6, json.length); r++) {
-        if (json[r]) {
-          for (let c = 0; c < json[r].length; c++) {
-            const val = String(json[r][c] || "").replace(/\s+/g, "");
-            if (val === "1학년" && grade1Idx === -1) grade1Idx = c;
-            if (val === "2학년" && grade2Idx === -1) grade2Idx = c;
-            if (val === "3학년" && grade3Idx === -1) grade3Idx = c;
-
-            if (val.includes("구분") && typeIdx === -1) typeIdx = c;
-            if ((val.includes("교과(군)") || val === "교과군") && catIdx === -1) catIdx = c;
-            if ((val === "과목" || val.includes("과목명")) && subjIdx === -1) subjIdx = c;
-            if (val.includes("운영학점") && credIdx === -1) credIdx = c;
-          }
-        }
-      }
-
-      if (typeIdx === -1) typeIdx = 0;
-      if (catIdx === -1) catIdx = 1;
-      if (subjIdx === -1) subjIdx = 3;
-      if (credIdx === -1) credIdx = 5;
-
-      if (grade1Idx === -1) grade1Idx = 6;
-      if (grade2Idx === -1) grade2Idx = 8;
-      if (grade3Idx === -1) grade3Idx = 10;
-
-      const newParsed: ParsedCurriculumSubject[] = [];
-      const newMap: SubjectMap = {};
-
-      for (let r = 0; r < json.length; r++) {
-        const row = json[r];
-        if (!row) continue;
-
-        const typeStr = String(row[typeIdx] || "").replace(/\s+/g, "");
-        let category = String(row[catIdx] || "").replace(/\s+/g, "");
-        category = category.replace(/\(역사\/도덕포함\)/g, "").trim();
-        const subjectNameRaw = String(row[subjIdx] || "").trim();
-
-        if (subjectNameRaw && subjectNameRaw.length > 1 && subjectNameRaw !== "과목" && !subjectNameRaw.includes("소계") && !subjectNameRaw.includes("합계")) {
-          if (["공통", "일반", "진로", "융합"].includes(subjectNameRaw)) continue;
-
-          let type: "지정" | "선택" | null = null;
-          if (typeStr.includes("지정")) type = "지정";
-          else if (typeStr.includes("선택")) type = "선택";
-
-          if (type) {
-            let sem1_1 = Number(row[grade1Idx]) || 0;
-            let sem1_2 = Number(row[grade1Idx + 1]) || 0;
-            let sem2_1 = Number(row[grade2Idx]) || 0;
-            let sem2_2 = Number(row[grade2Idx + 1]) || 0;
-            let sem3_1 = Number(row[grade3Idx]) || 0;
-            let sem3_2 = Number(row[grade3Idx + 1]) || 0;
-
-            const sems: string[] = [];
-            if (sem1_1) sems.push("1학년 1학기");
-            if (sem1_2) sems.push("1학년 2학기");
-            if (sem2_1) sems.push("2학년 1학기");
-            if (sem2_2) sems.push("2학년 2학기");
-            if (sem3_1) sems.push("3학년 1학기");
-            if (sem3_2) sems.push("3학년 2학기");
-
-            const individualSubjects = subjectNameRaw.split("↔").map(s => s.trim());
-
-            individualSubjects.forEach(sub => {
-              if (sub && sub.length > 1) {
-                const actualCredits = sem1_1 || sem1_2 || sem2_1 || sem2_2 || sem3_1 || sem3_2 || 0;
-                const sem1Val = changeActiveGrade === "grade2" ? sem2_1 : changeActiveGrade === "grade3" ? sem3_1 : 0;
-                const sem2Val = changeActiveGrade === "grade2" ? sem2_2 : changeActiveGrade === "grade3" ? sem3_2 : 0;
-
-                const existing = newParsed.find(p => p.subject === sub);
-                if (existing) {
-                  existing.credits = Math.max(existing.credits, actualCredits);
-                  existing.sem1 = Math.max(existing.sem1, sem1Val);
-                  existing.sem2 = Math.max(existing.sem2, sem2Val);
-
-                  const semsSet = new Set(existing.semesters.split(', ').concat(sems).filter(s => s && s !== "미지정 (엑셀 빈칸)"));
-                  existing.semesters = semsSet.size > 0 ? Array.from(semsSet).join(", ") : "미지정 (엑셀 빈칸)";
-                } else {
-                  newParsed.push({
-                    type,
-                    subject: sub,
-                    category,
-                    credits: actualCredits,
-                    sem1: sem1Val,
-                    sem2: sem2Val,
-                    semesters: sems.length > 0 ? sems.join(", ") : "미지정 (엑셀 빈칸)"
-                  });
-                }
-
-                let broadCat: SubjectCategory = "기타";
-                if (["국어", "수학", "영어"].includes(category)) broadCat = "기초";
-                else if (["사회", "역사", "도덕", "사회(역사/도덕포함)"].includes(category)) broadCat = "사회";
-                else if (["과학"].includes(category)) broadCat = "과학";
-
-                if (type !== "지정") {
-                  newMap[sub] = broadCat;
-                }
-              }
-            });
-          }
-        }
-      }
-
-      setChangeParsedCurriculumList(prev => ({ ...prev, [changeActiveGrade]: newParsed }));
-      setChangeSubjectMap(prev => ({ ...prev, [changeActiveGrade]: newMap }));
-      setChangeIsCurriculumParsed(prev => ({ ...prev, [changeActiveGrade]: true }));
-      alert("교육과정 엑셀 파일이 성공적으로 업로드되었습니다!");
+      if (typeof data !== "string" || !data) return;
+      // 변경 탭의 grade2/grade3 는 공유 저장소의 grade1/grade2 와 같은 학년
+      yd.applyCurriculumFile(data, changeActiveGrade === "grade2" ? "grade1" : "grade2");
+      alert("교육과정 엑셀 파일이 성공적으로 업로드되었습니다! (이 학년의 편성표는 다른 탭에도 같이 반영됩니다)");
     };
     reader.readAsBinaryString(file);
   };

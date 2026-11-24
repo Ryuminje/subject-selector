@@ -1,19 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { X, GraduationCap, Upload, AlertTriangle } from "lucide-react";
+import { X, GraduationCap, AlertTriangle, Database } from "lucide-react";
 import {
   findDuplicateIds,
   isStudentId,
-  parsePromotionFile,
-  parsePromotionText,
   reviewPromotion,
   type PromotionDecision,
-  type PromotionEntry,
   type PromotionReview,
   type RawRow,
   type ReviewRow,
 } from "../lib/promotion";
+import { useYearData } from "../../year-data/YearDataContext";
+import { OPEN_BASE_DATA_EVENT } from "../../year-data/components/BaseDataNotice";
 
 interface PromotionModalProps {
   isOpen: boolean;
@@ -23,47 +22,21 @@ interface PromotionModalProps {
   onApply: (decisions: PromotionDecision[]) => void;
 }
 
+// 진급 명단은 「기초자료」 탭 3단계에서 한 번 올려 두고 여기서는 그 명단으로 점검·적용만 합니다.
 export function PromotionModal({ isOpen, onClose, rawRows, onApply }: PromotionModalProps) {
-  const [text, setText] = useState("");
-  const [entries, setEntries] = useState<PromotionEntry[] | null>(null);
-  const [fileName, setFileName] = useState("");
-  const [error, setError] = useState("");
+  const { promotionEntries } = useYearData();
   // 점검 화면에서 고친 값(진급학번·삭제). 키는 진급 전 학번.
   const [edits, setEdits] = useState<Record<string, { newId: string; remove: boolean }>>({});
 
   const review: PromotionReview | null = useMemo(
-    () => (entries ? reviewPromotion(rawRows, entries) : null),
-    [entries, rawRows],
+    () => (promotionEntries.length > 0 ? reviewPromotion(rawRows, promotionEntries) : null),
+    [promotionEntries, rawRows],
   );
 
   if (!isOpen) return null;
 
-  const reset = () => {
-    setText(""); setEntries(null); setFileName(""); setError(""); setEdits({});
-  };
-  const close = () => { reset(); onClose(); };
-
-  const startReview = (list: PromotionEntry[]) => {
-    if (list.length === 0) {
-      setError("읽을 수 있는 줄이 없습니다. 이전학번·이름·진급학번 순서로, 학번은 숫자 4자리 이상이어야 합니다.");
-      return;
-    }
-    setError("");
-    setEdits({});
-    setEntries(list);
-  };
-
-  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if (!f) return;
-    try {
-      setFileName(f.name);
-      startReview(parsePromotionFile(await f.arrayBuffer()));
-    } catch {
-      setError("파일을 읽지 못했습니다. 엑셀(.xlsx/.xls) 또는 CSV 파일인지 확인해 주세요.");
-    }
-  };
+  const close = () => { setEdits({}); onClose(); };
+  const openBaseData = () => { close(); window.dispatchEvent(new Event(OPEN_BASE_DATA_EVENT)); };
 
   // 현재 값 = 점검 결과 + 사용자가 고친 값
   const rows: ReviewRow[] = (review?.rows ?? []).map(r => ({ ...r, ...(edits[r.key] ?? {}) }));
@@ -97,28 +70,15 @@ export function PromotionModal({ isOpen, onClose, rawRows, onApply }: PromotionM
           {!review ? (
             <>
               <p className="text-sm text-stone-600">
-                진급 명단을 <b>이전학번 · 이름 · 진급학번</b> 순서로 올려 주세요. 적용하면 4단계 표, 반편성, 타임 배정이 모두 진급학번 기준으로 바뀝니다.
+                진급 학번 명단이 아직 없습니다. 「기초자료」 탭 3단계에서 <b>이전학번 · 이름 · 진급학번</b> 명단을 한 번 올려 두면,
+                여기서 그 명단으로 점검하고 적용할 수 있습니다. 적용하면 2단계 표, 반편성, 타임 배정이 모두 진급학번 기준으로 바뀝니다.
               </p>
-              <label className="flex items-center justify-center gap-2 border-2 border-dashed border-stone-300 hover:border-emerald-400 rounded-xl p-6 cursor-pointer text-stone-700">
-                <Upload className="w-5 h-5 text-emerald-700" />
-                <span className="text-sm font-medium">엑셀 / CSV 파일 선택</span>
-                <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={onFile} />
-              </label>
-              <div className="text-center text-xs text-stone-500">또는 엑셀에서 복사해 붙여넣기</div>
-              <textarea
-                value={text}
-                onChange={e => setText(e.target.value)}
-                rows={6}
-                placeholder={"20101\t가나다\t30101\n20102\t나다라\t30102"}
-                className="w-full px-3 py-2 border border-stone-300 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
               <div className="flex justify-end">
                 <button
-                  onClick={() => startReview(parsePromotionText(text))}
-                  disabled={!text.trim()}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50"
+                  onClick={openBaseData}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
                 >
-                  붙여넣은 내용 점검
+                  <Database className="w-4 h-4" /> 기초자료 탭 열기
                 </button>
               </div>
             </>
@@ -130,7 +90,7 @@ export function PromotionModal({ isOpen, onClose, rawRows, onApply }: PromotionM
                 <span className="px-3 py-1 rounded-lg bg-stone-50 text-stone-700 border border-stone-200">
                   명단에만 있는 학생 {review.unusedEntries.length}명
                 </span>
-                {fileName && <span className="px-3 py-1 text-stone-500">{fileName}</span>}
+                <span className="px-3 py-1 text-stone-500">기초자료 탭의 명단 {promotionEntries.length}명 기준</span>
               </div>
 
               {attention.length > 0 && (
@@ -204,12 +164,11 @@ export function PromotionModal({ isOpen, onClose, rawRows, onApply }: PromotionM
               )}
             </>
           )}
-          {error && <p className="text-sm text-rose-700 font-medium">{error}</p>}
         </div>
 
         <div className="flex justify-between gap-2 px-6 py-4 border-t border-stone-200">
-          <button onClick={review ? reset : close} className="px-4 py-2 rounded-xl border border-stone-300 text-stone-700 hover:bg-stone-50">
-            {review ? "다시 선택" : "취소"}
+          <button onClick={close} className="px-4 py-2 rounded-xl border border-stone-300 text-stone-700 hover:bg-stone-50">
+            취소
           </button>
           {review && (
             <button onClick={apply} disabled={!canApply} className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50">

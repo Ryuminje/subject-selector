@@ -1,16 +1,27 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Settings, FileText, GitBranch, CalendarClock } from "lucide-react";
+import { Settings, FileText, GitBranch, CalendarClock, Database } from "lucide-react";
+import { BaseDataTab } from "@/components/tabs/BaseDataTab";
+import { OPEN_BASE_DATA_EVENT } from "@/features/year-data/components/BaseDataNotice";
 import { DemandSurveyTab } from "@/components/tabs/DemandSurveyTab";
 import { ChangeSurveyTab } from "@/components/tabs/ChangeSurveyTab";
 import { MainSurveyTab } from "@/components/tabs/MainSurveyTab";
 import { TimeAllocationTab } from "@/components/tabs/TimeAllocationTab";
+import { YearDataProvider } from "@/features/year-data/YearDataContext";
 
 export default function EnrollmentHelperPage() {
-  const [activeSidebarTab, setActiveSidebarTab] = useState<"survey" | "main" | "change" | "timealloc">("survey");
+  const [activeSidebarTab, setActiveSidebarTab] = useState<"base" | "survey" | "main" | "change" | "timealloc">("base");
+
+  // 다른 탭 맨 위의 「기초자료 탭 열기」 버튼이 보내는 신호
+  useEffect(() => {
+    const open = () => setActiveSidebarTab("base");
+    window.addEventListener(OPEN_BASE_DATA_EVENT, open);
+    return () => window.removeEventListener(OPEN_BASE_DATA_EVENT, open);
+  }, []);
 
   return (
+    <YearDataProvider>
     <div className="flex min-h-screen bg-orange-50 text-stone-900 selection:bg-amber-300/40 font-sans">
       {/* Background Gradients */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
@@ -36,6 +47,21 @@ export default function EnrollmentHelperPage() {
 
         {/* Navigation Tabs */}
         <nav className="flex flex-col gap-4 pointer-events-auto">
+
+          <button
+            onClick={() => setActiveSidebarTab("base")}
+            className={`relative flex items-center px-4 h-[60px] transition-all duration-300 group overflow-hidden bg-white/95 backdrop-blur-xl border-y border-r border-stone-200 rounded-r-2xl shadow-[4px_0_15px_rgba(0,0,0,0.08)] w-16 hover:w-64 ${activeSidebarTab === "base" ? 'border-r-sky-500/60 bg-sky-50' : 'hover:bg-stone-50'}`}
+          >
+            <div className={`w-8 h-8 flex flex-shrink-0 justify-center items-center rounded-xl transition-all duration-300 ${activeSidebarTab === "base" ? 'bg-sky-500/15 text-sky-600 shadow-[0_0_15px_rgba(14,165,233,0.15)]' : 'text-stone-400 group-hover:text-sky-600'}`}>
+              <Database className="w-5 h-5" />
+            </div>
+            <span className={`ml-4 font-medium whitespace-nowrap transition-all duration-300 ${activeSidebarTab === "base" ? 'text-sky-700 opacity-100' : 'text-stone-500 opacity-0 group-hover:opacity-100'}`}>
+              기초자료 입력 탭
+            </span>
+            {activeSidebarTab === "base" && (
+              <div className="absolute left-0 w-1 h-8 bg-sky-500 rounded-r-full shadow-[0_0_10px_rgba(14,165,233,0.4)]" />
+            )}
+          </button>
 
           <button
             onClick={() => setActiveSidebarTab("survey")}
@@ -101,6 +127,9 @@ export default function EnrollmentHelperPage() {
 
       {/* Main Content Area */}
       <main className="flex-1 relative z-10 overflow-x-hidden overflow-y-auto ml-16 transition-none">
+        <div className={activeSidebarTab === "base" ? "block" : "hidden"}>
+          <BaseDataTab />
+        </div>
         <div className={activeSidebarTab === "survey" ? "block" : "hidden"}>
           <DemandSurveyTab />
         </div>
@@ -115,5 +144,6 @@ export default function EnrollmentHelperPage() {
         </div>
       </main>
     </div>
+    </YearDataProvider>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import { Upload, FileText, Settings, Download, Save, FolderOpen, Users } from "lucide-react";
 import { useTimetableData } from "../../features/change-survey/hooks/useTimetableData";
 import { useChangeCurriculum } from "../../features/change-survey/hooks/useChangeCurriculum";
@@ -8,7 +8,9 @@ import { useChangeUploads } from "../../features/change-survey/hooks/useChangeUp
 import { useElectiveChanges } from "../../features/change-survey/hooks/useElectiveChanges";
 import { useStep6Data } from "../../features/change-survey/hooks/useStep6Data";
 import { useChangeExports } from "../../features/change-survey/hooks/useChangeExports";
-import { BasicStep } from "../../features/change-survey/components/BasicStep";
+import { BaseDataNotice } from "../../features/year-data/components/BaseDataNotice";
+import { useYearData } from "../../features/year-data/YearDataContext";
+import { excludedIdSet } from "../../features/year-data/lib/roster";
 import { UploadStep } from "../../features/change-survey/components/UploadStep";
 import { TimetableStep } from "../../features/change-survey/components/TimetableStep";
 import { ApplicationStep } from "../../features/change-survey/components/ApplicationStep";
@@ -20,7 +22,7 @@ import { subjectOptionsOf } from "../../features/change-survey/lib/subjectMatch"
 import { GuideLink } from "@/features/guide/components/GuideLink";
 
 export function ChangeSurveyTab() {
-  const [changeActiveTab, setChangeActiveTab] = useState<"basic" | "upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis" | "riroschool">("basic");
+  const [changeActiveTab, setChangeActiveTab] = useState<"upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis" | "riroschool">("upload");
   const [changeActiveGrade, setChangeActiveGrade] = useState<"grade2" | "grade3">("grade2");
   const [showOnlyApplicants, setShowOnlyApplicants] = useState(false);
   const [changeRosterTimeSlot, setChangeRosterTimeSlot] = useState("A");
@@ -43,7 +45,7 @@ export function ChangeSurveyTab() {
 
   const {
     sampleRawData, setSampleRawData,
-    parsedSampleData, setParsedSampleData,
+    parsedSampleData: rawParsedSampleData, setParsedSampleData,
     grade2HistoryData, setGrade2HistoryData,
     grade3Sem1HistoryData, setGrade3Sem1HistoryData,
     extraUploads, setExtraUploads,
@@ -53,6 +55,17 @@ export function ChangeSurveyTab() {
     handleExtraUpload,
     handleChangeSampleUpload,
   } = useChangeUploads(changeActiveGrade);
+
+  // 기초자료 학생 명단에서 전출·퇴학으로 표시된 학생은 이 탭의 계산에서 뺀다(업로드한 원본 데이터는 그대로 보존)
+  const { roster } = useYearData();
+  const excludedIds = useMemo(() => excludedIdSet(roster), [roster]);
+  const parsedSampleData = useMemo(
+    () => ({
+      grade2: rawParsedSampleData.grade2.filter((s) => !excludedIds.has(s.id)),
+      grade3: rawParsedSampleData.grade3.filter((s) => !excludedIds.has(s.id)),
+    }),
+    [rawParsedSampleData, excludedIds],
+  );
 
   const {
     electiveChanges, setElectiveChanges,
@@ -75,7 +88,6 @@ export function ChangeSurveyTab() {
     changeSubjectMap, setChangeSubjectMap,
     changeIsCurriculumParsed, setChangeIsCurriculumParsed,
     changeHierarchyRules, setChangeHierarchyRules,
-    handleChangeCurriculumUpload,
     getChangeSubjectCategory,
   } = useChangeCurriculum(changeActiveGrade);
 
@@ -86,7 +98,7 @@ export function ChangeSurveyTab() {
     changeSubjectMap,
     changeIsCurriculumParsed,
     changeHierarchyRules,
-    parsedSampleData,
+    parsedSampleData: rawParsedSampleData,
     timetableData,
     electiveChanges,
     timeSlots,
@@ -185,7 +197,8 @@ export function ChangeSurveyTab() {
       demand: (window as any).getDemandBackup?.() || {},
       main: (window as any).getMainBackup?.() || {},
       change: (window as any).getChangeBackup?.() || {},
-      timeAlloc: (window as any).getTimeAllocBackup?.() || {}
+      timeAlloc: (window as any).getTimeAllocBackup?.() || {},
+      base: (window as any).getBaseBackup?.() || {}
     };
     
     const jsonString = JSON.stringify(fullBackup, null, 2);
@@ -247,6 +260,7 @@ export function ChangeSurveyTab() {
           (window as any).loadMainBackup?.(parsed.main || {});
           (window as any).loadChangeBackup?.(parsed.change || {});
           (window as any).loadTimeAllocBackup?.(parsed.timeAlloc || {});
+          (window as any).loadBaseBackup?.(parsed.base || {});
         } else {
           (window as any).loadDemandBackup?.(parsed);
           (window as any).loadMainBackup?.(parsed);
@@ -332,14 +346,13 @@ export function ChangeSurveyTab() {
           
           <div className="w-full">
             <div className="flex gap-2 p-1 bg-stone-100/80 backdrop-blur-md rounded-2xl border border-stone-200 w-fit overflow-x-auto max-w-[calc(100vw-120px)] scrollbar-hide">
-                  <button onClick={() => setChangeActiveTab('basic')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'basic' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>기초자료 입력</span></div></button>
-                  <button onClick={() => setChangeActiveTab('upload')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'upload' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span><div className="flex items-center gap-1.5"><Upload className="w-4 h-4" /><span>데이터 업로드</span></div></button>
-                  <button onClick={() => setChangeActiveTab('timetable')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'timetable' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>타임별 시간표 입력</span></div></button>
-                  <button onClick={() => setChangeActiveTab('roster')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'roster' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span><div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>타임별 학생 명단</span></div></button>
-                  <button onClick={() => setChangeActiveTab('application')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'application' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>선택과목 변경 데이터 입력</span></div></button>
-                  <button onClick={() => setChangeActiveTab('roster_after')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'roster_after' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span><div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>변경 후 타임별 학생 명단</span></div></button>
-                  <button onClick={() => setChangeActiveTab('analysis')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'analysis' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">7단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>다년도 분석</span></div></button>
-                  <button onClick={() => setChangeActiveTab('riroschool')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'riroschool' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">8단계</span><div className="flex items-center gap-1.5"><Download className="w-4 h-4" /><span>리로스쿨용 파일</span></div></button>
+                  <button onClick={() => setChangeActiveTab('upload')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'upload' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span><div className="flex items-center gap-1.5"><Upload className="w-4 h-4" /><span>데이터 업로드</span></div></button>
+                  <button onClick={() => setChangeActiveTab('timetable')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'timetable' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>타임별 시간표 입력</span></div></button>
+                  <button onClick={() => setChangeActiveTab('roster')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'roster' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span><div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>타임별 학생 명단</span></div></button>
+                  <button onClick={() => setChangeActiveTab('application')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'application' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>선택과목 변경 데이터 입력</span></div></button>
+                  <button onClick={() => setChangeActiveTab('roster_after')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'roster_after' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span><div className="flex items-center gap-1.5"><Users className="w-4 h-4" /><span>변경 후 타임별 학생 명단</span></div></button>
+                  <button onClick={() => setChangeActiveTab('analysis')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'analysis' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>다년도 분석</span></div></button>
+                  <button onClick={() => setChangeActiveTab('riroschool')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${changeActiveTab === 'riroschool' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">7단계</span><div className="flex items-center gap-1.5"><Download className="w-4 h-4" /><span>리로스쿨용 파일</span></div></button>
                 </div>
           </div>
         </header>
@@ -348,21 +361,12 @@ export function ChangeSurveyTab() {
         <div className="flex-1 overflow-y-auto p-4 pb-24">
           <div className="w-full mx-auto">
 
+                {/* 변경 탭의 grade2/grade3 는 기초자료(공유 저장소)의 grade1/grade2 와 같은 학년 */}
+                <BaseDataNotice
+                  grade={changeActiveGrade === "grade2" ? "grade1" : "grade2"}
+                  students={(rawParsedSampleData[changeActiveGrade] || []).map((s) => ({ id: s.id, name: s.name }))}
+                />
                 <div className="bg-white/70 backdrop-blur-xl border border-stone-200 rounded-3xl p-8 shadow-xl">
-                                    {changeActiveTab === "basic" && (
-                    <BasicStep
-                      changeActiveGrade={changeActiveGrade}
-                      setChangeActiveGrade={setChangeActiveGrade}
-                      handleChangeCurriculumUpload={handleChangeCurriculumUpload}
-                      changeIsCurriculumParsed={changeIsCurriculumParsed}
-                      changeParsedCurriculumList={changeParsedCurriculumList}
-                      changeSubjectMap={changeSubjectMap}
-                      changeHierarchyRules={changeHierarchyRules}
-                      setChangeHierarchyRules={setChangeHierarchyRules}
-                      setChangeActiveTab={setChangeActiveTab}
-                    />
-                  )}
-
 {changeActiveTab === "upload" && (
                     <UploadStep
                       changeActiveGrade={changeActiveGrade}

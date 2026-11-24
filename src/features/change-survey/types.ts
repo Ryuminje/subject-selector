@@ -38,7 +38,6 @@ export interface Step6Row {
 }
 
 export type ChangeActiveTab =
-  | "basic"
   | "upload"
   | "timetable"
   | "roster"

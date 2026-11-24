@@ -15,7 +15,7 @@ function Delta({ d }: { d: number | null }) {
   return d > 0 ? <span className="text-red-600 font-medium">▲ {d.toFixed(1)}</span> : <span className="text-blue-600 font-medium">▼ {Math.abs(d).toFixed(1)}</span>;
 }
 
-/** 7단계 「안 비교」 — 기준(6단계에서 가져온 표)과 저장한 안들의 교과별 교사 1인당 평균시수를 나란히 봅니다. */
+/** 5단계 「안 비교」 — 기준(4단계에서 가져온 표)과 저장한 안들의 교과별 교사 1인당 평균시수를 나란히 봅니다. */
 export function HoursCompareView({
   baseline,
   plans,
@@ -37,15 +37,15 @@ export function HoursCompareView({
   if (!baseline) {
     return (
       <div className="py-12 px-6 text-center bg-stone-50 border border-dashed border-stone-300 rounded-2xl flex flex-col items-center gap-3">
-        <p className="text-sm text-stone-700">비교의 기준이 없습니다. 기준은 「6단계 결과 가져오기」를 누른 순간의 6단계 표입니다.</p>
+        <p className="text-sm text-stone-700">비교의 기준이 없습니다. 기준은 「4단계 결과 가져오기」를 누른 순간의 4단계 표입니다.</p>
         <button
           onClick={onRebase}
           disabled={!canRebase}
           className="px-4 py-2 bg-amber-50 hover:bg-amber-100 disabled:opacity-40 text-amber-800 text-sm font-medium rounded-xl border border-amber-300 flex items-center gap-2"
         >
-          <RefreshCw className="w-4 h-4" /> 지금 6단계로 기준 잡기
+          <RefreshCw className="w-4 h-4" /> 지금 4단계로 기준 잡기
         </button>
-        {!canRebase && <p className="text-xs text-stone-500">6단계에 표시할 데이터가 아직 없습니다.</p>}
+        {!canRebase && <p className="text-xs text-stone-500">4단계에 표시할 데이터가 아직 없습니다.</p>}
       </div>
     );
   }
@@ -99,10 +99,10 @@ export function HoursCompareView({
           지금 표(저장 안 해도 됨)
         </label>
         <span className="ml-auto text-xs text-stone-500">
-          기준: {new Date(baseline.savedAt).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" })}에 가져온 6단계
+          기준: {new Date(baseline.savedAt).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" })}에 가져온 4단계
         </span>
         <button
-          onClick={() => window.confirm("지금 6단계 표로 비교 기준을 다시 잡을까요? 7단계 표와 저장한 안은 그대로입니다.") && onRebase()}
+          onClick={() => window.confirm("지금 4단계 표로 비교 기준을 다시 잡을까요? 5단계 표와 저장한 안은 그대로입니다.") && onRebase()}
           disabled={!canRebase}
           className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 disabled:opacity-40 text-stone-700 text-xs rounded-lg border border-stone-300 flex items-center gap-1"
         >
@@ -121,7 +121,7 @@ export function HoursCompareView({
               <tr>
                 <th rowSpan={2} className="px-3 py-2 border-r border-stone-300">교과</th>
                 <th rowSpan={2} className="px-3 py-2 border-r border-stone-300">교사 수</th>
-                <th rowSpan={2} className="px-3 py-2 border-r border-stone-300 bg-amber-50">기준<br />(6단계)</th>
+                <th rowSpan={2} className="px-3 py-2 border-r border-stone-300 bg-amber-50">기준<br />(4단계)</th>
                 {columns.map((c) => (
                   <th key={c.key} colSpan={2} className="px-3 py-2 border-r border-b border-stone-300">{c.name}</th>
                 ))}

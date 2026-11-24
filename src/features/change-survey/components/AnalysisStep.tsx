@@ -2,6 +2,7 @@
 
 import React from "react";
 import { FileText, Download } from "lucide-react";
+import { ChangeGradeLabel } from "../../year-data/components/ChangeGradeLabel";
 import type { ChangeGradeKey, GradeStringArrays, Step6Row } from "../types";
 
 type AdjustmentLog = Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary' }[]>;
@@ -39,11 +40,11 @@ export function AnalysisStep({
             </h2>
             <div className="flex items-center gap-2 bg-stone-100 px-3 py-1.5 rounded-lg border border-stone-300 text-xs font-medium mt-1">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-500/50 border border-amber-500"></span>
-              <span className="text-amber-700">학생 직접 변경자 (5단계 수동 신청 반영)</span>
+              <span className="text-amber-700">학생 직접 변경자 (4단계 수동 신청 반영)</span>
             </div>
           </div>
           <p className="text-stone-600 text-sm mt-1 mb-4 ml-8">
-            * 위계성 검사는 '수요조사' 탭의 2단계에서 설정한 위계 규칙을 공유하여 그대로 적용합니다.
+            * 위계성 검사는 「기초자료」 탭에서 설정한 위계 규칙을 그대로 적용합니다.
           </p>
         </div>
 
@@ -74,7 +75,7 @@ export function AnalysisStep({
                   : "text-stone-900 hover:text-stone-900"
                 }`}
             >
-              2학년
+              <ChangeGradeLabel grade="grade2" />
             </button>
             <button
               onClick={() => setChangeActiveGrade("grade3")}
@@ -83,7 +84,7 @@ export function AnalysisStep({
                   : "text-stone-900 hover:text-stone-900"
                 }`}
             >
-              3학년
+              <ChangeGradeLabel grade="grade3" />
             </button>
           </div>
         </div>

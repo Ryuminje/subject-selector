@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Upload, CheckCircle2, Trash2, ChevronRight, File as FileIcon } from "lucide-react";
+import { ChangeGradeLabel } from "../../year-data/components/ChangeGradeLabel";
 import type { StudentTimeData } from "../../../types";
 import type { ChangeGradeKey, ChangeActiveTab } from "../types";
 
@@ -51,7 +52,7 @@ export function UploadStep({
                 : "text-stone-900 hover:text-stone-900"
               }`}
           >
-            2학년
+            <ChangeGradeLabel grade="grade2" />
           </button>
           <button
             onClick={() => setChangeActiveGrade("grade3")}
@@ -60,7 +61,7 @@ export function UploadStep({
                 : "text-stone-900 hover:text-stone-900"
               }`}
           >
-            3학년
+            <ChangeGradeLabel grade="grade3" />
           </button>
         </div>
       </div>

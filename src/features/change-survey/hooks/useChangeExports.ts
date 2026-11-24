@@ -512,7 +512,7 @@ export function useChangeExports(
     const adjustmentLog = adjustmentLogByGrade[grade];
     const rawData = sampleRawData[grade];
     if (!rawData) {
-      alert("원본 엑셀 데이터가 없습니다. 2단계에서 파일을 다시 업로드해주세요.");
+      alert("원본 엑셀 데이터가 없습니다. 1단계에서 파일을 다시 업로드해주세요.");
       return;
     }
 

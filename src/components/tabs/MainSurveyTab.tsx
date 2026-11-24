@@ -1,12 +1,14 @@
 "use client";
 
 import React, { useState, useRef, useMemo } from "react";
-import { Upload, FileText, Settings, CheckCircle2, Save, FolderOpen, GitBranch, Calculator } from "lucide-react";
+import { Upload, FileText, CheckCircle2, Save, FolderOpen, Calculator } from "lucide-react";
 import { useMainCurriculum } from "../../features/main-survey/hooks/useMainCurriculum";
 import { useMainUploads } from "../../features/main-survey/hooks/useMainUploads";
 import { useMainClassSummary } from "../../features/main-survey/hooks/useMainClassSummary";
-import { CurriculumStep } from "../../features/main-survey/components/CurriculumStep";
-import { HierarchyStep } from "../../features/main-survey/components/HierarchyStep";
+import { BaseDataNotice } from "../../features/year-data/components/BaseDataNotice";
+import { AddStudentModal } from "../../features/main-survey/components/AddStudentModal";
+import { useYearData } from "../../features/year-data/YearDataContext";
+import { excludedIdSet, fileStudentsFromRows, isExcludedRow } from "../../features/year-data/lib/roster";
 import { UploadStep } from "../../features/main-survey/components/UploadStep";
 import { PreviewStep } from "../../features/main-survey/components/PreviewStep";
 import { ClassOpeningStep } from "../../features/main-survey/components/ClassOpeningStep";
@@ -17,9 +19,13 @@ import type { GradeKey } from "../../types";
 import { GuideLink } from "@/features/guide/components/GuideLink";
 
 export function MainSurveyTab() {
-  const [activeTab, setActiveTab] = useState("curriculum");
+  // 교육과정 편성표·위계는 「기초자료」 탭에서 한 번만 입력하므로 이 탭은 데이터 업로드부터 시작합니다.
+  const [activeTab, setActiveTab] = useState("upload");
   const [activeGrade, setActiveGrade] = useState<GradeKey>("grade1");
-  const [isExampleModalOpen, setIsExampleModalOpen] = useState(false);
+  // 기초자료 학생 명단: 전출·퇴학은 이 탭의 계산에서 빼고, 전입생은 명단에서 골라 과목만 입력한다
+  const { roster } = useYearData();
+  const excludedIds = useMemo(() => excludedIdSet(roster), [roster]);
+  const [addTarget, setAddTarget] = useState<{ id: string; name: string } | null>(null);
 
   const {
     parsedCurriculumList, setParsedCurriculumList,
@@ -28,10 +34,6 @@ export function MainSurveyTab() {
     hierarchyRules, setHierarchyRules,
     designatedSubjects, setDesignatedSubjects,
     selectedSubjectHours, setSelectedSubjectHours,
-    editingDetailedCategory, setEditingDetailedCategory,
-    detailedCategoryEditValue, setDetailedCategoryEditValue,
-    handleCurriculumUpload,
-    handleDetailedCategoryUpdate,
   } = useMainCurriculum(activeGrade);
 
   const {
@@ -42,7 +44,6 @@ export function MainSurveyTab() {
     previousSubjectMap, setPreviousSubjectMap,
     subjectStats, setSubjectStats,
     totalClasses, setTotalClasses,
-    removeStudent,
     addStudent,
     downloadEditedFile,
     applyPromotionDecisions,
@@ -52,7 +53,7 @@ export function MainSurveyTab() {
     handlePrevHistoryFileUpload,
     handleRemoveFile,
     handleRemovePrevHistoryFile,
-  } = useMainUploads(activeGrade, parsedCurriculumList, subjectMap, hierarchyRules);
+  } = useMainUploads(activeGrade, parsedCurriculumList, subjectMap, hierarchyRules, excludedIds);
 
   const [standardClassSize, setStandardClassSize] = useState<{ [key in GradeKey]: number }>({ pre1: 25, grade1: 25, grade2: 25 });
   const [manualClassCounts, setManualClassCounts] = useState<{ [subjectKey: string]: number }>({});
@@ -132,7 +133,8 @@ export function MainSurveyTab() {
       demand: (window as any).getDemandBackup?.() || {},
       main: (window as any).getMainBackup?.() || {},
       change: (window as any).getChangeBackup?.() || {},
-      timeAlloc: (window as any).getTimeAllocBackup?.() || {}
+      timeAlloc: (window as any).getTimeAllocBackup?.() || {},
+      base: (window as any).getBaseBackup?.() || {}
     };
     
     const jsonString = JSON.stringify(fullBackup, null, 2);
@@ -194,6 +196,7 @@ export function MainSurveyTab() {
           (window as any).loadMainBackup?.(parsed.main || {});
           (window as any).loadChangeBackup?.(parsed.change || {});
           (window as any).loadTimeAllocBackup?.(parsed.timeAlloc || {});
+          (window as any).loadBaseBackup?.(parsed.base || {});
         } else {
           (window as any).loadDemandBackup?.(parsed);
           (window as any).loadMainBackup?.(parsed);
@@ -283,13 +286,11 @@ export function MainSurveyTab() {
           
           <div className="w-full">
             <div className="flex gap-2 p-1 bg-stone-100/80 backdrop-blur-md rounded-2xl border border-stone-200 w-fit overflow-x-auto max-w-[calc(100vw-120px)] scrollbar-hide">
-                  <button onClick={() => setActiveTab('curriculum')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'curriculum' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span><div className="flex items-center gap-1.5"><Settings className="w-4 h-4" /><span>교육과정 편성표 입력</span></div></button>
-                  <button onClick={() => setActiveTab('hierarchy')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'hierarchy' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span><div className="flex items-center gap-1.5"><GitBranch className="w-4 h-4" /><span>과목 위계 설정</span></div></button>
-                  <button onClick={() => setActiveTab('upload')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'upload' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span><div className="flex items-center gap-1.5"><Upload className="w-4 h-4" /><span>데이터 업로드</span></div></button>
-                  <button onClick={() => setActiveTab('preview')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'preview' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>수강신청(본조사) 결과</span></div></button>
-                  <button onClick={() => setActiveTab('classOpening')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'classOpening' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span><div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /><span>과목 개설 여부</span></div></button>
-                  <button onClick={() => setActiveTab('categorySummary')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'categorySummary' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">6단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>교과(군)별 시수 정리</span></div></button>
-                  <button onClick={() => setActiveTab('hoursSim')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'hoursSim' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">7단계</span><div className="flex items-center gap-1.5"><Calculator className="w-4 h-4" /><span>교과별 시수 조정</span></div></button>
+                  <button onClick={() => setActiveTab('upload')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'upload' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">1단계</span><div className="flex items-center gap-1.5"><Upload className="w-4 h-4" /><span>데이터 업로드</span></div></button>
+                  <button onClick={() => setActiveTab('preview')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'preview' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">2단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>수강신청(본조사) 결과</span></div></button>
+                  <button onClick={() => setActiveTab('classOpening')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'classOpening' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">3단계</span><div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /><span>과목 개설 여부</span></div></button>
+                  <button onClick={() => setActiveTab('categorySummary')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'categorySummary' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">4단계</span><div className="flex items-center gap-1.5"><FileText className="w-4 h-4" /><span>교과(군)별 시수 정리</span></div></button>
+                  <button onClick={() => setActiveTab('hoursSim')} className={`flex flex-col items-center gap-0.5 px-5 py-2 rounded-xl font-medium transition-all duration-300 whitespace-nowrap shrink-0 ${activeTab === 'hoursSim' ? 'bg-white text-stone-900 shadow-md border border-stone-200' : 'text-stone-500 hover:text-stone-800 hover:bg-white/70'}`}><span className="text-[10px] tracking-wider font-semibold opacity-50">5단계</span><div className="flex items-center gap-1.5"><Calculator className="w-4 h-4" /><span>교과별 시수 조정</span></div></button>
                 </div>
           </div>
         </header>
@@ -298,34 +299,13 @@ export function MainSurveyTab() {
         <div className="flex-1 overflow-y-auto p-4 pb-24">
           <div className="w-full mx-auto">
 
+                <BaseDataNotice
+                  grade={activeGrade}
+                  students={fileStudentsFromRows(rawSheetData[activeGrade] || [])}
+                  defaultBasis={isPromoted ? "new" : "old"}
+                  onEnterSubjects={setAddTarget}
+                />
                 <div className="bg-white/70 backdrop-blur-xl border border-stone-200 rounded-3xl p-8 shadow-xl">
-                  {activeTab === "curriculum" && (
-                    <CurriculumStep
-                      activeGrade={activeGrade}
-                      setActiveGrade={setActiveGrade}
-                      setIsExampleModalOpen={setIsExampleModalOpen}
-                      handleCurriculumUpload={handleCurriculumUpload}
-                      isCurriculumParsed={isCurriculumParsed}
-                      parsedCurriculumList={parsedCurriculumList}
-                      editingDetailedCategory={editingDetailedCategory}
-                      setEditingDetailedCategory={setEditingDetailedCategory}
-                      detailedCategoryEditValue={detailedCategoryEditValue}
-                      setDetailedCategoryEditValue={setDetailedCategoryEditValue}
-                      handleDetailedCategoryUpdate={handleDetailedCategoryUpdate}
-                      setActiveTab={setActiveTab}
-                    />
-                  )}
-                  {activeTab === "hierarchy" && (
-                    <HierarchyStep
-                      activeGrade={activeGrade}
-                      setActiveGrade={setActiveGrade}
-                      isCurriculumParsed={isCurriculumParsed}
-                      subjectMap={subjectMap}
-                      hierarchyRules={hierarchyRules}
-                      setHierarchyRules={setHierarchyRules}
-                      setActiveTab={setActiveTab}
-                    />
-                  )}
                   {activeTab === "upload" && (
                     <UploadStep
                       activeGrade={activeGrade}
@@ -334,7 +314,7 @@ export function MainSurveyTab() {
                       handleFileUpload={handleFileUpload}
                       handleRemoveFile={handleRemoveFile}
                       handleDownloadEdited={downloadEditedFile}
-                      rawRows={rawSheetData[activeGrade] || []}
+                      rawRows={(rawSheetData[activeGrade] || []).filter((r: Record<string, unknown>) => !isExcludedRow(r, excludedIds))}
                       onApplyPromotion={applyPromotionDecisions}
                       onUndoPromotion={undoPromotionAll}
                       isPromoted={isPromoted}
@@ -352,9 +332,6 @@ export function MainSurveyTab() {
                       setActiveGrade={setActiveGrade}
                       handleExport={handleExport}
                       activeData={activeData}
-                      rawRows={rawSheetData[activeGrade] || []}
-                      onRemoveStudent={removeStudent}
-                      onAddStudent={addStudent}
                       selectedSubjectHours={selectedSubjectHours[activeGrade]}
                       subjectMap={subjectMap[activeGrade]}
                     />
@@ -412,5 +389,13 @@ export function MainSurveyTab() {
 
           </div>
         </div>
+      <AddStudentModal
+        key={addTarget?.id ?? "none"}
+        isOpen={!!addTarget}
+        onClose={() => setAddTarget(null)}
+        rawRows={rawSheetData[activeGrade] || []}
+        onAdd={addStudent}
+        initial={addTarget}
+      />
       </> );
 }
