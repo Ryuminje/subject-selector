@@ -8,6 +8,7 @@ import { studentRowsBySemester, studentsTSV, timeLabel, type StudentRowsContext 
 import { buildSectionLabels } from "../lib/assign";
 import { exportStudentTimesXlsx } from "../lib/exportExcel";
 import { exportRiroschoolXlsx } from "../lib/exportRiroschool";
+import { timetableForTransfer, type TimeAllocTransfer } from "../lib/exportTimetable";
 
 interface Props {
   api: TimeAllocationApi;
@@ -92,6 +93,41 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
     }
   };
 
+  // 선택과목 변경 탭으로 직접 보낸다 — 엑셀을 내려받아 다시 올릴 필요 없이, 같은 내용의 변경용 엑셀과 타임별 시간표를 넘긴다.
+  const sendToChange = () => {
+    if (api.activeGrade === "pre1") {
+      setMsg("예비 1학년(입학 예정자)은 선택과목 변경 대상이 아닙니다. 현 1학년·2학년에서 보내세요.");
+      return;
+    }
+    const data = getMainFileData?.({ includeOldId: false });
+    if (!data) {
+      setMsg("본조사 탭에 업로드된 원본 엑셀이 없습니다. 본조사 탭에서 파일을 먼저 올리세요.");
+      return;
+    }
+    const send = (window as unknown as { receiveTimeAllocation?: (p: TimeAllocTransfer) => boolean }).receiveTimeAllocation;
+    if (!send) {
+      setMsg("선택과목 변경 탭을 찾을 수 없습니다.");
+      return;
+    }
+    try {
+      const r = exportRiroschoolXlsx(data, rowsCtx, assign, "", sectionLabels, { includeBands: true, semester: exportSemester, output: "binary" });
+      if (!r.binary) throw new Error("엑셀 내용을 만들지 못했습니다.");
+      const gradeNo = { pre1: 1, grade1: 2, grade2: 3 }[api.activeGrade];
+      const timetable = timetableForTransfer(rowsCtx, state.placement, { gradeNo, includeBands: true, semester: exportSemester, pins: state.roomPins });
+      const ok = send({
+        grade: api.activeGrade,
+        semester: exportSemester,
+        label: `타임 배정에서 가져옴 (${fileLabel}${exportSemester ? ` · ${exportSemester}` : ""})`,
+        binary: r.binary,
+        timetable,
+      });
+      setMsg(ok ? `선택과목 변경 탭으로 보냈습니다 (학생 ${r.rows}명 · 타임 ${timetable.slots.length}개).` : "보내지 않았습니다.");
+    } catch (e) {
+      console.error(e);
+      setMsg((e as Error).message || "보내는 중 오류가 발생했습니다.");
+    }
+  };
+
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <h2 className="text-2xl font-semibold text-stone-900 flex items-center gap-2">
@@ -119,6 +155,13 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
           className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl"
         >
           <Download className="w-4 h-4" /> 선택과목 변경용 엑셀
+        </button>
+        <button
+          onClick={sendToChange}
+          title="선택과목 변경 탭으로 학생별 타임과 타임별 시간표를 바로 보냅니다(엑셀을 내려받아 다시 올릴 필요 없음). 아래에서 고른 학기 기준입니다."
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-sm font-semibold rounded-xl"
+        >
+          선택과목 변경 탭으로 보내기
         </button>
         {multiSemester && (
           <label className="inline-flex items-center gap-1.5 text-sm text-stone-700" title="학기마다 같은 타임 문자(A, B…)를 쓰므로 변경용 파일에는 한 학기만 담습니다">

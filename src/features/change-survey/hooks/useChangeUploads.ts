@@ -4,6 +4,50 @@ import * as XLSX from "xlsx-js-style";
 import type { StudentTimeData } from "../../../types";
 import type { ChangeGradeKey } from "../types";
 
+/**
+ * 타임별 선택과목 엑셀(2행 머리글, 학번 B열·이름 C열, 과목 열 H열부터 값 = 타임 문자) → 학생별 타임 맵.
+ * 파일 업로드와 "타임 배정에서 직접 받기"가 같은 해석을 쓴다. 읽을 수 없으면 null.
+ */
+export function parseSampleBinary(bstr: string): StudentTimeData[] | null {
+  const wb = XLSX.read(bstr, { type: "binary" });
+  const sheetName = wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+
+  const json = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+  if (json.length < 2) return null;
+
+  const subjectHeaders = json[1];
+  const students: StudentTimeData[] = [];
+
+  // H열(0-indexed 7)부터가 보통 첫 과목 열입니다(A순번~G과목수 = 7칸). 다만 학교마다
+  // H열에 "반배정" 결과 열을 하나 더 끼워 넣는 경우가 있어, 그 헤더면 과목 열이 아니라고
+  // 보고 I열(8)부터 읽습니다.
+  const startCol = String(subjectHeaders[7] || "").trim() === "반배정" ? 8 : 7;
+
+  for (let r = 2; r < json.length; r++) {
+    const row = json[r];
+    // 학번 칸이 "합계"인 행(있을 수도 없을 수도 있음)은 학생이 아니라 집계 행이므로 건너뜁니다.
+    if (!row || row.length === 0 || !row[1] || String(row[1]).trim() === '합계') continue;
+
+    const id = String(row[1]).trim();
+    const name = String(row[2] || "");
+
+    const timeSlotMap: Record<string, string> = {};
+    for (let c = startCol; c < row.length; c++) {
+      const timeVal = row[c];
+      if (timeVal !== undefined && timeVal !== null && subjectHeaders[c]) {
+        const timeKey = String(timeVal).trim();
+        if (timeKey) {
+          timeSlotMap[timeKey] = String(subjectHeaders[c]).trim();
+        }
+      }
+    }
+
+    students.push({ id, name, timeSlotMap });
+  }
+  return students;
+}
+
 export function useChangeUploads(changeActiveGrade: ChangeGradeKey) {
   // 학년 자리(2학년/3학년)별 데이터는 입학년도 기준으로 보관한다(작업 학년도를 바꿔도 입학년도를 따라감 — year-data/useCohortState)
   const [sampleRawData, setSampleRawData] = useCohortState<ChangeGradeKey, string | null>("change.sampleRawData", CHANGE_OFFSETS, null);
@@ -112,42 +156,8 @@ export function useChangeUploads(changeActiveGrade: ChangeGradeKey) {
     reader.onload = (evt) => {
       const bstr = evt.target?.result as string;
       setSampleRawData(prev => ({ ...prev, [changeActiveGrade]: bstr }));
-      const wb = XLSX.read(bstr, { type: "binary" });
-      const sheetName = wb.SheetNames[0];
-      const sheet = wb.Sheets[sheetName];
-
-      const json = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
-      if (json.length < 2) return;
-
-      const subjectHeaders = json[1];
-      const students: StudentTimeData[] = [];
-
-      // H열(0-indexed 7)부터가 보통 첫 과목 열입니다(A순번~G과목수 = 7칸). 다만 학교마다
-      // H열에 "반배정" 결과 열을 하나 더 끼워 넣는 경우가 있어, 그 헤더면 과목 열이 아니라고
-      // 보고 I열(8)부터 읽습니다.
-      const startCol = String(subjectHeaders[7] || "").trim() === "반배정" ? 8 : 7;
-
-      for (let r = 2; r < json.length; r++) {
-        const row = json[r];
-        // 학번 칸이 "합계"인 행(있을 수도 없을 수도 있음)은 학생이 아니라 집계 행이므로 건너뜁니다.
-        if (!row || row.length === 0 || !row[1] || String(row[1]).trim() === '합계') continue;
-
-        const id = String(row[1]).trim();
-        const name = String(row[2] || "");
-
-        const timeSlotMap: Record<string, string> = {};
-        for (let c = startCol; c < row.length; c++) {
-          const timeVal = row[c];
-          if (timeVal !== undefined && timeVal !== null && subjectHeaders[c]) {
-            const timeKey = String(timeVal).trim();
-            if (timeKey) {
-              timeSlotMap[timeKey] = String(subjectHeaders[c]).trim();
-            }
-          }
-        }
-
-        students.push({ id, name, timeSlotMap });
-      }
+      const students = parseSampleBinary(bstr);
+      if (!students) return;
 
       setParsedSampleData(prev => ({
         ...prev,

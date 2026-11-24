@@ -193,13 +193,22 @@ export function buildTimetableEntries(
   return entries;
 }
 
-export function exportTimetableXlsx(
-  ctx: TimetableCtx,
-  placement: number[][],
-  fileName: string,
-  opts: TimetableOptions,
-): { times: number; cols: number; moved: number; released: string[] } {
+/** 타임 × 열 시간표의 배치 결과(엑셀과 선택과목 변경 탭 전달이 같이 쓴다) */
+interface TimetableLayout {
+  entries: TimetableEntry[];
+  items: Item[];
+  /** grid[타임][열] = items 인덱스(-1 이면 빈칸) */
+  grid: number[][];
+  /** 내용이 있는 타임만 */
+  times: { t: number; row: number[] }[];
+  cols: number;
+  moved: number;
+  released: string[];
+  colLabel: Map<number, string>;
+  title: string;
+}
 
+function layoutTimetable(ctx: TimetableCtx, placement: number[][], opts: TimetableOptions): TimetableLayout {
   const entries = buildTimetableEntries(ctx, placement, opts);
 
   // 시간표 칸: 선택과목은 한 타임에 한 칸(교사가 여럿이면 한 칸에 같이 적음). 구획은 반마다 따로 수업이 열리므로
@@ -267,6 +276,51 @@ export function exportTimetableXlsx(
     const label = it.pinCol !== undefined && it.key ? pins[it.key]?.label?.trim() : "";
     if (label && !colLabel.has(it.pinCol!)) colLabel.set(it.pinCol!, label);
   });
+  return { entries, items, grid, times, cols, moved, released, colLabel, title };
+}
+
+/** 선택과목 변경 탭의 "타임별 시간표 입력"에 그대로 넣을 수 있는 모양(교사명은 비워 둠) */
+export interface TransferTimetable {
+  /** 타임 문자 목록(A, B, …) */
+  slots: string[];
+  /** 열 이름(2-1, 2-2 …, 특별실 이름이 있으면 "2-3 (과학실)") */
+  cols: string[];
+  cells: Record<string, Record<string, { subject: string; teacher: string }>>;
+}
+
+/** 타임 배정 탭 → 선택과목 변경 탭으로 보내는 한 벌(변경 탭이 window.receiveTimeAllocation 으로 받음) */
+export interface TimeAllocTransfer {
+  grade: "pre1" | "grade1" | "grade2";
+  /** 어느 학기의 배정인지(없으면 연간) */
+  semester?: string;
+  /** 변경 탭의 "업로드한 파일" 자리에 표시할 이름 */
+  label: string;
+  /** "선택과목 변경용 엑셀"과 같은 내용(바이너리 문자열) — 변경 탭이 업로드한 파일처럼 해석·보관한다 */
+  binary: string;
+  timetable: TransferTimetable;
+}
+
+export function timetableForTransfer(ctx: TimetableCtx, placement: number[][], opts: TimetableOptions): TransferTimetable {
+  const L = layoutTimetable(ctx, placement, opts);
+  const slots = L.times.map(({ t }) => LETTERS[(ctx.startLetter + t) % 26]);
+  const cols = Array.from({ length: L.cols }, (_, i) => `${opts.gradeNo}-${i + 1}${L.colLabel.has(i) ? ` (${L.colLabel.get(i)})` : ""}`);
+  const cells: TransferTimetable["cells"] = {};
+  L.times.forEach(({ row }, ti) => {
+    cells[slots[ti]] = {};
+    row.forEach((idx, c) => {
+      if (idx >= 0) cells[slots[ti]][cols[c]] = { subject: L.items[idx].name, teacher: "" };
+    });
+  });
+  return { slots, cols, cells };
+}
+
+export function exportTimetableXlsx(
+  ctx: TimetableCtx,
+  placement: number[][],
+  fileName: string,
+  opts: TimetableOptions,
+): { times: number; cols: number; moved: number; released: string[] } {
+  const { entries, items, times, cols, moved, released, colLabel, title } = layoutTimetable(ctx, placement, opts);
 
   const aoa: string[][] = [
     [title],

@@ -21,8 +21,10 @@ export interface RiroschoolResult {
   rows: number;
   /** 타임 문자를 채운 칸 수 */
   filled: number;
-  /** 신청했지만 배정이 없어 원본 값을 그대로 둔 칸 수 */
+  /** 신청했지만 배정이 없어 원본 값을 그대로 둔 칸 수(변경용 파일은 비움) */
   unassigned: number;
+  /** output: "binary" 일 때 엑셀 내용(바이너리 문자열) */
+  binary?: string;
 }
 
 export function exportRiroschoolXlsx(
@@ -37,6 +39,8 @@ export function exportRiroschoolXlsx(
     /** "1학기"/"2학기" 처럼 학기를 고르면 그 학기(와 1~2학기 과목)만 남기고 다른 학기 과목 칸은 비운다.
      *  학기마다 같은 타임 문자(A, B…)를 쓰므로, 한 파일에 섞이면 변경 탭이 서로 덮어쓰는 걸 막기 위함. */
     semester?: string;
+    /** "binary" 면 파일을 저장하지 않고 결과에 엑셀 내용(binary)을 담아 돌려준다 */
+    output?: "file" | "binary";
   } = {},
 ): RiroschoolResult {
   const base64 = fileDataUrl.slice(fileDataUrl.indexOf(",") + 1);
@@ -124,6 +128,8 @@ export function exportRiroschoolXlsx(
       const t = assign.byStudent[i].get(subjIdx);
       if (t === undefined) {
         res.unassigned++;
+        // 선택과목 변경용 파일은 변경 탭이 모든 칸을 타임 문자로 읽으므로, 배정이 없는 과목의 원본 표시(1)를 비워 가짜 타임 "1"이 생기지 않게 한다
+        if (opts.includeBands) ws[XLSX.utils.encode_cell({ r, c })] = { t: "s", v: "" };
         return;
       }
       const label = sectionLabels?.get(`${i}|${subjIdx}`) ?? timeLabel(ctx, t);
@@ -168,6 +174,10 @@ export function exportRiroschoolXlsx(
     ws["!ref"] = XLSX.utils.encode_range({ s: range.s, e: { r: range.e.r, c: c0 - 1 } });
   }
 
+  if (opts.output === "binary") {
+    // 파일로 저장하지 않고 엑셀 내용(바이너리 문자열)을 돌려준다 — 선택과목 변경 탭이 업로드한 파일처럼 그대로 받는다
+    return { ...res, binary: XLSX.write(wb, { type: "binary", bookType: "xlsx" }) as string };
+  }
   XLSX.writeFile(wb, fileName.endsWith(".xlsx") ? fileName : `${fileName}.xlsx`);
   return res;
 }

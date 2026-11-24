@@ -10,6 +10,8 @@ import { useStep6Data } from "../../features/change-survey/hooks/useStep6Data";
 import { useChangeExports } from "../../features/change-survey/hooks/useChangeExports";
 import { BaseDataNotice } from "../../features/year-data/components/BaseDataNotice";
 import { useYearData } from "../../features/year-data/YearDataContext";
+import { parseSampleBinary } from "../../features/change-survey/hooks/useChangeUploads";
+import type { TimeAllocTransfer } from "../../features/time-allocation/lib/exportTimetable";
 import { excludedIdSet } from "../../features/year-data/lib/roster";
 import { UploadStep } from "../../features/change-survey/components/UploadStep";
 import { TimetableStep } from "../../features/change-survey/components/TimetableStep";
@@ -308,6 +310,29 @@ export function ChangeSurveyTab() {
     electiveChangesArbitrary,
     step6Data,
   );
+
+  // 타임(구획) 배정 탭의 "선택과목 변경 탭으로 보내기"가 부르는 함수 — 파일을 내려받아 다시 올리지 않고 같은 내용을 바로 받는다.
+  // 학생별 타임(업로드한 파일과 같은 해석)·타임별 시간표·원본 엑셀(리로스쿨용 파일 만들 때 씀)을 한 번에 채운다.
+  if (typeof window !== "undefined") {
+    (window as unknown as { receiveTimeAllocation?: (p: TimeAllocTransfer) => boolean }).receiveTimeAllocation = (p) => {
+      const cg: "grade2" | "grade3" = p.grade === "grade1" ? "grade2" : "grade3";
+      const students = parseSampleBinary(p.binary);
+      if (!students) {
+        window.alert("타임 배정 결과를 읽지 못했습니다.");
+        return false;
+      }
+      const hasData = (rawParsedSampleData[cg] || []).length > 0 || Object.values(timetableData[cg] || {}).some((row) => Object.values(row || {}).some((c) => c?.subject));
+      if (hasData && !window.confirm("이 학년에 이미 올려 둔 학생 데이터·타임별 시간표가 있습니다. 타임 배정 결과로 바꿀까요?")) return false;
+      setSampleRawData((prev) => ({ ...prev, [cg]: p.binary }));
+      setParsedSampleData((prev) => ({ ...prev, [cg]: students }));
+      setChangeUploadNames((prev) => ({ ...prev, [cg]: { ...prev[cg], timetable: p.label } }));
+      setTimeSlots((prev) => ({ ...prev, [cg]: p.timetable.slots }));
+      setClassCols((prev) => ({ ...prev, [cg]: p.timetable.cols }));
+      setTimetableData((prev) => ({ ...prev, [cg]: p.timetable.cells }));
+      setChangeActiveGrade(cg);
+      return true;
+    };
+  }
 
   return ( <>
         {/* Global Header */}
