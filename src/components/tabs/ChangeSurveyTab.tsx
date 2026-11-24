@@ -66,7 +66,7 @@ export function ChangeSurveyTab() {
   } = useChangeUploads(changeActiveGrade, semester);
 
   // 기초자료 학생 명단에서 전출·퇴학으로 표시된 학생은 이 탭의 계산에서 뺀다(업로드한 원본 데이터는 그대로 보존)
-  const { roster, workYear, cohortStore, updateCohortStore } = useYearData();
+  const { roster, workYear, cohortStore, updateCohortStore, setCohortStore } = useYearData();
   const excludedIds = useMemo(() => excludedIdSet(roster), [roster]);
   const parsedSampleData = useMemo(
     () => ({
@@ -167,6 +167,10 @@ export function ChangeSurveyTab() {
         return out;
       });
     setSemester(parsed.semester === "s1" ? "s1" : "s2");
+    // 학기 구분이 없던 옛 파일에는 1학기 데이터가 없다 — 불러오기 전 작업의 1학기 데이터가 남아 섞이지 않게 비운다(새 파일은 cohortStore 가 통째로 덮어쓴다).
+    if (!parsed.semester) {
+      setCohortStore((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => !k.startsWith("change.s1."))));
+    }
     if (parsed.changeActiveGrade) setChangeActiveGrade(parsed.changeActiveGrade);
     if (parsed.changeParsedCurriculumList) setChangeParsedCurriculumList(parsed.changeParsedCurriculumList);
     if (parsed.changeSubjectMap) setChangeSubjectMap(parsed.changeSubjectMap);
