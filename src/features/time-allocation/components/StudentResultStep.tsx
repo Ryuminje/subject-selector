@@ -23,6 +23,9 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
   const [msg, setMsg] = useState<string>("");
   // 진급 학번을 적용한 학생이 있을 때만 보이는 옵션 — 내보내기에 옛 학번 열을 덧붙인다
   const [withOldId, setWithOldId] = useState(false);
+  // 선택과목 변경용 엑셀에 담을 학기. 학기마다 같은 타임 문자를 써서 한 파일에 섞이면 변경 탭이 덮어쓰므로
+  // 학기가 여럿이면 하나를 고른다(기본: 마지막 학기). "" 는 전체.
+  const [changeSemester, setChangeSemester] = useState<string | null>(null);
 
   // 분반이 타임 수보다 많아 겹친(A1/A2) 칸의 라벨 — 학생 루프 밖에서 한 번만 계산해 아래
   // 화면·TSV·Excel·리로스쿨 내보내기가 전부 같은 값을 공유합니다. 데이터가 없으면 빈 맵
@@ -46,6 +49,9 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
     bySemester: ctx.bySemester,
   };
   const multiSemester = semesterKeys.length > 1;
+  const exportSemester = multiSemester
+    ? (changeSemester ?? semesterKeys[semesterKeys.length - 1])
+    : undefined;
 
   const copyTsv = async () => {
     try {
@@ -61,14 +67,21 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
     setMsg("엑셀 파일을 내려받았습니다.");
   };
 
-  const exportRiro = () => {
-    const data = getMainFileData?.({ includeOldId: withOldId });
+  // forChange: 선택과목 변경 탭에 올릴 파일 — 논술·체육 + 진로 같은 구획(반 고정 공통과목) 열까지 덧붙인다.
+  // 변경 탭은 머리글이 있는 모든 열의 값을 타임 문자로 읽으므로 "이전학번" 열은 넣지 않는다.
+  const exportRiro = (forChange = false) => {
+    const data = getMainFileData?.({ includeOldId: forChange ? false : withOldId });
     if (!data) {
       setMsg("본조사 탭에 업로드된 원본 엑셀이 없습니다. 본조사 탭에서 파일을 먼저 올리세요.");
       return;
     }
     try {
-      const r = exportRiroschoolXlsx(data, rowsCtx, assign, `${fileLabel}_리로스쿨_업로드용`, sectionLabels);
+      const r = exportRiroschoolXlsx(
+        data, rowsCtx, assign,
+        `${fileLabel}_${forChange ? `선택과목변경용${exportSemester ? `_${exportSemester}` : ""}` : "리로스쿨_업로드용"}`,
+        sectionLabels,
+        { includeBands: forChange, semester: forChange ? exportSemester : undefined },
+      );
       setMsg(
         `리로스쿨용 엑셀을 내려받았습니다 (학생 ${r.rows}명 · ${r.filled}칸 채움` +
           (r.unassigned ? ` · 미배정 ${r.unassigned}칸은 원본 값 유지)` : ")"),
@@ -94,12 +107,33 @@ export function StudentResultStep({ api, fileLabel, getMainFileData }: Props) {
           <Download className="w-4 h-4" /> Excel 내보내기
         </button>
         <button
-          onClick={exportRiro}
+          onClick={() => exportRiro(false)}
           title="본조사 원본 파일의 선택 표시(1)를 배정된 타임 문자로 바꿔 내려받습니다."
           className="inline-flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-semibold rounded-xl"
         >
           <Download className="w-4 h-4" /> 리로스쿨용 엑셀
         </button>
+        <button
+          onClick={() => exportRiro(true)}
+          title="리로스쿨용 엑셀에 논술·체육 + 진로 같은 구획(반 고정 공통과목) 열을 더한 파일입니다. 선택과목 변경 탭의 2단계에 올려 쓰세요."
+          className="inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl"
+        >
+          <Download className="w-4 h-4" /> 선택과목 변경용 엑셀
+        </button>
+        {multiSemester && (
+          <label className="inline-flex items-center gap-1.5 text-sm text-stone-700" title="학기마다 같은 타임 문자(A, B…)를 쓰므로 변경용 파일에는 한 학기만 담습니다">
+            내보낼 학기
+            <select
+              value={exportSemester}
+              onChange={(e) => setChangeSemester(e.target.value)}
+              className="px-2 py-1.5 border border-stone-300 rounded-lg bg-white text-sm"
+            >
+              {semesterKeys.map((k) => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <button
           onClick={copyTsv}
           className="inline-flex items-center gap-1.5 px-4 py-2 bg-stone-200 hover:bg-stone-300 text-stone-800 text-sm font-semibold rounded-xl"
