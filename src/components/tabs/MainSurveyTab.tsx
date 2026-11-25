@@ -9,9 +9,8 @@ import { BaseDataNotice } from "../../features/year-data/components/BaseDataNoti
 import { AddStudentModal } from "../../features/main-survey/components/AddStudentModal";
 import { useYearData } from "../../features/year-data/YearDataContext";
 import { useCohortState, usePrefixedCohortMap } from "../../features/year-data/useCohortState";
-import { GRADE_OFFSETS, KEY_PREFIX_BY_GRADE, KEY_PREFIX_BY_LABEL } from "../../features/year-data/lib/cohortStore";
+import { GRADE_OFFSETS, KEY_PREFIX_BY_GRADE, KEY_PREFIX_BY_LABEL, roundKeyOfGradeKey } from "../../features/year-data/lib/cohortStore";
 import { DemandCarryOver } from "../../features/main-survey/components/DemandCarryOver";
-import { cohortOfGradeKey } from "../../features/year-data/lib/cohortCurriculum";
 import { outcomeKey } from "../../features/year-data/lib/demandOutcome";
 import { excludedIdSet, fileStudentsFromRows, isExcludedRow } from "../../features/year-data/lib/roster";
 import { UploadStep } from "../../features/main-survey/components/UploadStep";
@@ -31,7 +30,7 @@ export function MainSurveyTab() {
   const { roster, demandResults, workYear } = useYearData();
   // 수요조사에서 가져온 과목별 결과(3단계 과목 개설 여부 표의 비교 열에 쓴다)
   const demandOutcomes = useMemo(() => {
-    const r = demandResults[String(cohortOfGradeKey(workYear, activeGrade))];
+    const r = demandResults[roundKeyOfGradeKey(workYear, activeGrade)];
     return r ? new Map(r.outcomes.map((o) => [outcomeKey(o.semester, o.subject), o])) : undefined;
   }, [demandResults, workYear, activeGrade]);
   const excludedIds = useMemo(() => excludedIdSet(roster), [roster]);

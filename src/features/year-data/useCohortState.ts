@@ -1,13 +1,13 @@
 "use client";
 
 // 기존 useState<{ pre1; grade1; grade2 }> 를 그대로 바꿔 끼울 수 있는 "입학년도 기준" 상태 훅.
-// 화면(학년 자리) 값은 작업 학년도에서 계산하고, 실제 데이터는 공유 저장소(cohortStore)에 입학년도별로 보관됩니다.
-// 그래서 작업 학년도를 바꿔도 데이터가 입학년도를 따라가고, 보는 범위 밖으로 밀려난 입학년도의 데이터도 남습니다.
+// 화면(학년 자리) 값은 작업 학년도에서 계산하고, 실제 데이터는 공유 저장소(cohortStore)에 수강신청 회차(입학년도.신청학년)별로 보관됩니다.
+// 그래서 작업 학년도를 올리면 같은 입학생이 새 회차(빈 상태)를 보고, 지난 회차의 데이터는 남아 작업 학년도를 되돌리면 다시 보입니다.
 
 import { useCallback, useMemo, useState } from "react";
 import type { GradeKey } from "../../types";
 import { useYearData } from "./YearDataContext";
-import { buildView, writeView, GRADE_OFFSETS } from "./lib/cohortStore";
+import { buildView, writeView, cohortKey, GRADE_OFFSETS } from "./lib/cohortStore";
 
 /** 학년 자리(K)마다 하나씩 값을 갖는 상태. name 은 저장소의 이름(저장 파일에도 이 이름으로 들어감), offsets 는 학년 자리 → 몇 해 전 입학생. */
 export function useCohortState<K extends string, T>(
@@ -50,7 +50,7 @@ export function usePrefixedCohortMap<V>(
     (m: Record<string, unknown> | undefined, W: number) => {
       const out: Record<string, V> = {};
       (Object.keys(GRADE_OFFSETS) as GradeKey[]).forEach((g) => {
-        const sub = m?.[String(W - GRADE_OFFSETS[g])] as Record<string, V> | undefined;
+        const sub = m?.[cohortKey(W, GRADE_OFFSETS[g])] as Record<string, V> | undefined;
         if (sub) Object.entries(sub).forEach(([k, v]) => (out[`${prefixes[g]}_${k}`] = v));
       });
       return out;
@@ -72,7 +72,7 @@ export function usePrefixedCohortMap<V>(
           Object.entries(next).forEach(([k, v]) => {
             if (k.startsWith(pre)) nextSub[k.slice(pre.length)] = v;
           });
-          const key = String(W - GRADE_OFFSETS[g]);
+          const key = cohortKey(W, GRADE_OFFSETS[g]);
           const curSub = (cur?.[key] ?? {}) as Record<string, V>;
           const same = Object.keys(nextSub).length === Object.keys(curSub).length && Object.entries(nextSub).every(([k, v]) => curSub[k] === v);
           if (!same) {

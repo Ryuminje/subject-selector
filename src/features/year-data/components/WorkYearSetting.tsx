@@ -4,26 +4,21 @@
 // 이 값으로 예비 1학년/1학년/2학년이 어느 입학년도 학생인지 정해지고, 해가 바뀌면 이 값만 올립니다.
 
 import { useYearData } from "../YearDataContext";
-import { storedCohortYears } from "../lib/cohortStore";
+import { parseRoundKey, storedRounds } from "../lib/cohortStore";
 
 // 학년 탭 이름 계산은 lib/gradeLabels 한 곳에 두고, 기존 import 경로(여기서)도 그대로 쓸 수 있게 다시 내보낸다
 export { cohortLabels } from "../lib/gradeLabels";
 
 export function WorkYearSetting() {
-  const { workYear, setWorkYear, cohorts, roster, demandResults, cohortStore } = useYearData();
+  const { workYear, setWorkYear, demandResults, cohortStore } = useYearData();
 
-  // 보관된 입학년도: 편성표·학생 명단·수요조사 결과·각 탭 데이터 중 하나라도 있는 입학년도(지난 입학생 포함)
-  const years = new Set<number>(storedCohortYears(cohortStore));
-  Object.keys(cohorts).forEach((c) => years.add(Number(c)));
-  Object.keys(demandResults).forEach((c) => years.add(Number(c)));
-  roster.forEach((s) => years.add(s.cohort));
-  const archive = [...years].filter((y) => !Number.isNaN(y)).sort((a, b) => b - a);
-  const stateOf = (y: number) => {
-    const g = workYear - y;
-    if (g === 0) return "예비 1학년";
-    if (g >= 1 && g <= 2) return `현 ${g}학년`;
-    return g < 0 ? "입학 전" : "지난 입학생";
-  };
+  // 보관된 수강신청 회차: 각 탭 데이터·수요조사 결과가 하나라도 있는 (입학년도, 신청 학년). 회차의 작업 학년도 = 입학년도 + 신청 학년 − 1
+  const roundKeys = storedRounds(cohortStore);
+  Object.keys(demandResults).forEach((k) => parseRoundKey(k) && roundKeys.add(k));
+  const archive = [...roundKeys]
+    .map((k) => ({ key: k, ...parseRoundKey(k)! }))
+    .map((r) => ({ ...r, year: r.cohort + r.grade - 1 }))
+    .sort((a, b) => b.year - a.year || b.cohort - a.cohort);
 
   return (
     <div className="space-y-2">
@@ -41,30 +36,31 @@ export function WorkYearSetting() {
       </label>
       <span>
         수강신청을 받는 해입니다. {workYear}학년도 입학생 = 예비 1학년, {workYear - 1}학년도 입학생 = 현 1학년, {workYear - 2}학년도 입학생 = 현 2학년.
-        해가 바뀌면 이 값만 한 해 올리면 되고, 입학년도별로 보관된 자료(편성표·학생 명단·올린 설문·배정 결과)는 그대로 이어집니다.
+        해가 바뀌면 이 값만 한 해 올리면 됩니다. 편성표·학생 명단은 그대로 이어지고, 같은 입학생이 한 학년 위 과목을 신청하는 새 수강신청이 되므로
+        설문·신청·타임 배정·변경 자료는 비어 있는 채로 시작합니다. 지난 자료는 보관되며, 작업 학년도를 되돌리면 다시 보입니다.
       </span>
     </div>
     {archive.length > 0 && (
       <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 bg-white/70 border border-stone-200 rounded-xl text-sm text-stone-700">
-        <span className="font-semibold">보관된 입학년도</span>
-        {archive.map((y) => {
-          const g = workYear - y;
-          const inView = g >= 0 && g <= 2;
+        <span className="font-semibold">보관된 수강신청 자료</span>
+        {archive.map((r) => {
+          const inView = r.year === workYear;
+          // 화면에는 1~3학년 과목 신청만 나온다(그 밖의 회차는 보관만)
+          const viewable = r.grade >= 1 && r.grade <= 3;
           return (
             <button
-              key={y}
-              disabled={inView}
-              // 그 입학생이 현 2학년(지난 입학생은 볼 수 있는 가장 위 학년)으로 보이도록 작업 학년도를 맞춘다
-              onClick={() => setWorkYear(y > workYear ? y : y + 2)}
-              title={inView ? "지금 이 탭들에서 보이는 입학생입니다" : `작업 학년도를 ${y > workYear ? y : y + 2}로 바꿔 이 입학생이 보이게 합니다`}
-              className={`px-3 py-1 rounded-lg border ${inView ? "bg-emerald-50 border-emerald-200 text-emerald-800 cursor-default" : "bg-white border-stone-300 hover:bg-amber-50"}`}
+              key={r.key}
+              disabled={inView || !viewable}
+              onClick={() => setWorkYear(r.year)}
+              title={inView ? "지금 이 탭들에서 보이는 자료입니다" : viewable ? `작업 학년도를 ${r.year}로 바꿔 이 자료가 보이게 합니다` : "화면에서 볼 수 없는 회차입니다"}
+              className={`px-3 py-1 rounded-lg border ${inView ? "bg-emerald-50 border-emerald-200 text-emerald-800 cursor-default" : "bg-white border-stone-300 hover:bg-amber-50 disabled:opacity-50 disabled:hover:bg-white"}`}
             >
-              {y}학년도 입학생 · {stateOf(y)}
-              {!inView && <span className="ml-1 text-xs text-stone-500">(보기)</span>}
+              {r.cohort}학년도 입학생 · {r.grade}학년 과목 신청({r.year}학년도)
+              {!inView && viewable && <span className="ml-1 text-xs text-stone-500">(보기)</span>}
             </button>
           );
         })}
-        <span className="text-xs text-stone-500">보이지 않는 입학년도를 누르면 작업 학년도가 바뀌어 모든 탭에 그 입학생이 나타납니다.</span>
+        <span className="text-xs text-stone-500">다른 회차를 누르면 작업 학년도가 바뀌어 모든 탭에 그 회차의 자료가 나타납니다.</span>
       </div>
     )}
     </div>

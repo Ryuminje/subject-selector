@@ -15,7 +15,7 @@ import { WorkYearSetting, cohortLabels } from "../../features/year-data/componen
 import { useYearData } from "../../features/year-data/YearDataContext";
 import { mergeRoster, sanitizeRoster } from "../../features/year-data/lib/roster";
 import { sanitizeCohorts } from "../../features/year-data/lib/cohortCurriculum";
-import { sanitizeCohortStore } from "../../features/year-data/lib/cohortStore";
+import { hasLegacyRoundKeys, migrateRoundKeys, sanitizeCohortStore } from "../../features/year-data/lib/cohortStore";
 import type { HierarchyRule } from "../../types";
 import type { PromotionEntry } from "../../features/main-survey/lib/promotion";
 import type { GradeKey } from "../../types";
@@ -66,14 +66,22 @@ export function BaseDataTab() {
     w.getBaseBackup = () => ({ workYear, roster, cohorts, hierarchy, demandResults, cohortStore });
     w.loadBaseBackup = (p) => {
       const b = (p ?? {}) as { workYear?: number; roster?: unknown; promotionEntries?: PromotionEntry[]; cohorts?: unknown; hierarchy?: HierarchyRule[]; demandResults?: unknown; cohortStore?: unknown };
-      // 각 탭의 학년 자리별 데이터(입학년도 기준 저장소). 없는 옛 파일은 각 탭 백업의 학년별 값이 이미 채워 둔 상태를 그대로 둔다.
-      if (b.cohortStore && typeof b.cohortStore === "object") setCohortStore(sanitizeCohortStore(b.cohortStore));
+      // 저장 파일의 작업 학년도 — 옛 형식(입학년도만 키로 쓴) 자료를 어느 학년 회차로 옮길지 정하는 기준
+      let fileWy = typeof b.workYear === "number" && b.workYear > 2000 ? b.workYear : workYear;
+      // 옛 형식(입학년도만 키로 쓴) 파일은 자료를 어느 학년도에 입력했는지 파일에 없다. 저장 당시 작업 학년도와 다를 수 있어(예: 올려 본 뒤 저장) 직접 확인한다.
+      if (hasLegacyRoundKeys(b.cohortStore, b.demandResults)) {
+        const ans = Number(window.prompt(`옛 형식의 저장 파일입니다. 이 자료를 입력한 작업 학년도(수강신청을 받은 해)를 적어 주세요.\n(파일에 적힌 작업 학년도: ${fileWy})`, String(fileWy)));
+        if (Number.isFinite(ans) && ans > 2000 && ans < 2100) fileWy = Math.round(ans);
+        b.workYear = fileWy; // 자료가 있는 해로 화면을 맞춘다
+      }
+      // 각 탭의 학년 자리별 데이터(수강신청 회차 기준 저장소). 없는 옛 파일은 각 탭 백업의 학년별 값이 이미 채워 둔 상태를 그대로 둔다.
+      if (b.cohortStore && typeof b.cohortStore === "object") setCohortStore(sanitizeCohortStore(b.cohortStore, fileWy));
       // 본조사로 가져온 수요조사 결과(없는 옛 파일은 그대로 둔다)
-      if (b.demandResults && typeof b.demandResults === "object") setDemandResults(b.demandResults as typeof demandResults);
+      if (b.demandResults && typeof b.demandResults === "object") setDemandResults(migrateRoundKeys(b.demandResults as typeof demandResults, fileWy));
       // 입학년도 편성표·공통 위계(새 형식). 없는 옛 파일은 각 탭 백업의 학년별 값이 이미 채워 둔 상태를 그대로 둔다.
       if (b.cohorts && typeof b.cohorts === "object") setCohorts(sanitizeCohorts(b.cohorts));
       if (Array.isArray(b.hierarchy)) setHierarchy(b.hierarchy);
-      const wy = typeof b.workYear === "number" && b.workYear > 2000 ? b.workYear : workYear;
+      const wy = fileWy;
       if (typeof b.workYear === "number" && b.workYear > 2000) setWorkYear(b.workYear);
       if (Array.isArray(b.roster)) setRoster(sanitizeRoster(b.roster));
       else if (Array.isArray(b.promotionEntries)) {

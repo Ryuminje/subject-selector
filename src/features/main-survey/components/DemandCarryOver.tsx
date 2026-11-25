@@ -2,14 +2,15 @@
 
 // 본조사 탭 맨 위 — 수요조사에서 정한 과목 개설 여부(폐강·반 수)를 본조사로 가져와 보여 줍니다.
 //  · 폐강된 과목에 본조사 신청이 있으면 경고
-//  · 본조사 3단계(과목 개설 여부) 표에 "수요조사 결과" 비교 열(가져온 값은 입학년도별로 저장·불러오기 됨)
+//  · 본조사 3단계(과목 개설 여부) 표에 "수요조사 결과" 비교 열(가져온 값은 수강신청 회차(입학년도·신청 학년)별로 저장·불러오기 됨)
 // 가져오기는 누른 순간의 수요조사 결과를 복사합니다(수요조사를 고치면 "바뀌었습니다" 안내가 뜨고 다시 가져오면 됩니다).
 
 import { useState } from "react";
 import { AlertTriangle, ClipboardList, RefreshCw } from "lucide-react";
 import type { GradeKey, SubjectStat } from "../../../types";
 import { useYearData } from "../../year-data/YearDataContext";
-import { GRADES, cohortOfGradeKey } from "../../year-data/lib/cohortCurriculum";
+import { GRADES } from "../../year-data/lib/cohortCurriculum";
+import { roundKeyOfGradeKey } from "../../year-data/lib/cohortStore";
 import {
   closedWithApplicants,
   computeDemandOutcomes,
@@ -29,7 +30,7 @@ const readDemand = (): DemandBackupLike | null =>
 export function DemandCarryOver({ grade, mainStats }: { grade: GradeKey; mainStats: SubjectStat[] }) {
   const { demandResults, setDemandResults, workYear } = useYearData();
   const [open, setOpen] = useState(false);
-  const key = String(cohortOfGradeKey(workYear, grade));
+  const key = roundKeyOfGradeKey(workYear, grade);
   const saved = demandResults[key];
 
   const d = readDemand();
@@ -43,7 +44,7 @@ export function DemandCarryOver({ grade, mainStats }: { grade: GradeKey; mainSta
       const stats = dd?.subjectStats?.[g] ?? [];
       if (!stats.length) continue;
       const size = dd?.standardClassSize?.[g] ?? 25;
-      next[String(cohortOfGradeKey(workYear, g))] = {
+      next[roundKeyOfGradeKey(workYear, g)] = {
         importedAt: Date.now(),
         standardClassSize: size,
         outcomes: computeDemandOutcomes(g, stats, size, dd?.manualStep5Classes ?? {}),
