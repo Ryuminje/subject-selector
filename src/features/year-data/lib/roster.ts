@@ -268,6 +268,8 @@ export function fileStudentsFromRows(rows: Record<string, unknown>[]): FileStude
     const id = idKey ? String(r[idKey] ?? "").trim() : "";
     const name = nameKey ? String(r[nameKey] ?? "").trim() : "";
     if ((!id && !name) || /합계|총계/.test(id + name)) continue;
+    // 학번 칸이 숫자 4자리 이상이 아니면 학생이 아니라 요약 줄(예: 인원수 "186")이다 — 업로드 파서(/^\d{4,}/)와 같은 기준
+    if (!/^\d{4,}/.test(id)) continue;
     out.push({ id, name });
   }
   return out;
