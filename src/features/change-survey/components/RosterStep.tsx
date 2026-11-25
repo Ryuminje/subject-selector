@@ -6,6 +6,7 @@ import { ChangeGradeLabel } from "../../year-data/components/ChangeGradeLabel";
 import type { StudentTimeData } from "../../../types";
 import type { ChangeGradeKey, TimetableData, GradeStringArrays } from "../types";
 import { sameSubject } from "../lib/subjectMatch";
+import { splitIntoColumns } from "../lib/sectionSplit";
 
 interface RosterStepProps {
   changeActiveGrade: ChangeGradeKey;
@@ -242,16 +243,10 @@ export function RosterStep({
                             return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
                           });
                           const cols = bases[base];
-
-                          const baseCount = Math.floor(students.length / cols.length);
-                          const remainder = students.length % cols.length;
-
-                          let sIdx = 0;
-                          cols.forEach((colObj, idx) => {
-                            const count = baseCount + (idx < remainder ? 1 : 0);
-                            const assigned = students.slice(sIdx, sIdx + count);
-                            colStudents[`${slot}-${colObj.col}`].push(...assigned);
-                            sIdx += count;
+                          // 타임 배정에서 온 분반 번호(B1/B2)가 있으면 그 반에, 없으면 학번순으로 같은 인원씩
+                          const split = splitIntoColumns(students, cols, (s) => s.sections?.[slot]);
+                          cols.forEach((colObj) => {
+                            colStudents[`${slot}-${colObj.col}`].push(...split[colObj.col]);
                           });
                         });
                       });

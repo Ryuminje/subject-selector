@@ -35,6 +35,8 @@ export interface StudentTimeData {
   id: string;
   name: string;
   timeSlotMap: Record<string, string>;
+  /** 타임 → 분반 번호(1부터). 한 타임에 같은 과목의 반이 여럿일 때만 있다(타임 배정의 "B1"/"B2"). 없으면 반 구분 정보 없음. */
+  sections?: Record<string, number>;
 }
 
 export interface SubjectStat {

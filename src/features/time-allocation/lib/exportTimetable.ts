@@ -23,6 +23,8 @@ interface Item {
   times: number[];
   /** 특별실로 고정된 열(0부터). 없으면 일반 배치 */
   pinCol?: number;
+  /** 같은 타임에 분반이 여럿인 과목을 칸으로 나눴을 때(선택과목 변경 탭 전달용): 몇 번째 칸인지(0부터)와 타임별 분반 수 */
+  sectionLane?: { lane: number; counts: Map<number, number> };
 }
 
 /** 타임마다 가장 많이 놓인 칸 수 = 필요한 최소 열 수 */
@@ -150,6 +152,8 @@ export interface TimetableOptions {
   semester?: string;
   /** 특별실 고정 — 항목 키 → 열 번호(1부터)와 이름. 그 열은 고정한 과목만 쓰고 나머지 과목은 다른 열에 놓는다. */
   pins?: Record<string, RoomPin>;
+  /** 같은 타임에 분반이 여럿인 선택과목을 분반 수만큼 칸으로 나눈다(선택과목 변경 탭 전달용). 기본은 한 칸. */
+  sectionLanes?: boolean;
 }
 
 /** 시간표의 한 항목 = 과목 하나(또는 구획 하나). */
@@ -168,7 +172,7 @@ export interface TimetableEntry {
 export function buildTimetableEntries(
   ctx: TimetableCtx,
   placement: number[][],
-  opts: { includeBands: boolean; semester?: string },
+  opts: { includeBands: boolean; semester?: string; sectionLanes?: boolean },
 ): TimetableEntry[] {
   const keep = (sem: string) => !opts.semester || !sem || sem === "1~2학기" || sem === opts.semester;
   const entries: TimetableEntry[] = [];
@@ -176,7 +180,8 @@ export function buildTimetableEntries(
     if (!keep(s.semester ?? "")) return;
     const count = new Map<number, number>();
     (placement[s.idx] ?? []).forEach((t) => count.set(t, (count.get(t) ?? 0) + 1));
-    if (count.size) entries.push({ key: `${s.semester ?? ""}|${s.name}`, name: s.name, kind: "subject", count, lanes: 1 });
+    // 선택과목은 보통 한 타임에 한 칸(교사가 여럿이면 한 칸에 같이 적음). sectionLanes 면 분반이 가장 많은 타임에 맞춰 칸을 나눈다.
+    if (count.size) entries.push({ key: `${s.semester ?? ""}|${s.name}`, name: s.name, kind: "subject", count, lanes: opts.sectionLanes ? Math.max(...count.values()) : 1 });
   });
   if (opts.includeBands) {
     ctx.semesterKeys.forEach((key) => {
@@ -217,9 +222,16 @@ function layoutTimetable(ctx: TimetableCtx, placement: number[][], opts: Timetab
   const items: Item[] = [];
   entries.forEach((e) => {
     for (let j = 0; j < e.lanes; j++) {
-      const times = [...e.count].filter(([, n]) => e.kind !== "band" || n > j).map(([t]) => t).sort((a, b) => a - b);
+      // 칸 j 는 그 타임의 반(분반) 수가 j 보다 큰 타임에만 놓인다 — 한 칸짜리(lanes 1)는 모든 타임이 해당
+      const times = [...e.count].filter(([, n]) => n > j).map(([t]) => t).sort((a, b) => a - b);
       const pin = pins[e.key];
-      items.push({ name: e.name, key: e.key, times, pinCol: pin ? Math.max(1, pin.col) - 1 + j : undefined });
+      items.push({
+        name: e.name,
+        key: e.key,
+        times,
+        pinCol: pin ? Math.max(1, pin.col) - 1 + j : undefined,
+        sectionLane: e.kind === "subject" && e.lanes > 1 ? { lane: j, counts: e.count } : undefined,
+      });
     }
   });
 
@@ -265,6 +277,38 @@ function layoutTimetable(ctx: TimetableCtx, placement: number[][], opts: Timetab
       : sweepColumns(freeItems, freeCols.length, ctx.numTimes);
     rows.forEach((row, t) => row.forEach((k, c) => k >= 0 && (grid[t][freeCols[c]] = freeIdx[k])));
   }
+
+  // 분반으로 나눈 칸(현대사회와 윤리1·2)은 이웃한 열에 놓는다. 위 배치는 "같은 과목이 모든 타임에서 같은 열"만 맞추므로, 한 타임에 칸이 가득 차면
+  // 둘째 칸이 남은 맨 끝 열로 밀려 멀리 떨어진다. 둘째 칸이 있는 열 전체를 첫째 칸의 바로 오른쪽으로 옮긴다(열 통째로 옮기므로
+  // 그 열의 다른 과목도 같은 열을 유지한다). 특별실 고정 열은 제자리에 둔다.
+  if (opts.sectionLanes) {
+    const order = freeCols.slice(); // order[k] = 자유 열 자리 k 에 지금 놓인 열(원래 열 번호)
+    const dominantCol = (item: number): number => {
+      const cnt = new Map<number, number>();
+      grid.forEach((row) => row.forEach((x, c) => x === item && cnt.set(c, (cnt.get(c) ?? 0) + 1)));
+      return [...cnt].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? -1;
+    };
+    const groups = new Map<string, number[]>();
+    items.forEach((it, i) => {
+      if (!it.sectionLane || it.pinCol !== undefined || !it.key) return;
+      groups.set(it.key, [...(groups.get(it.key) ?? []), i]);
+    });
+    groups.forEach((idxs) => {
+      idxs.sort((a, b) => items[a].sectionLane!.lane - items[b].sectionLane!.lane);
+      for (let n = 1; n < idxs.length; n++) {
+        const prev = dominantCol(idxs[n - 1]);
+        const mine = dominantCol(idxs[n]);
+        const from = order.indexOf(mine);
+        if (prev < 0 || mine < 0 || from < 0 || order.indexOf(prev) < 0 || mine === prev) continue;
+        order.splice(from, 1);
+        order.splice(order.indexOf(prev) + 1, 0, mine);
+      }
+    });
+    if (order.some((c, k) => c !== freeCols[k])) {
+      const before = grid.map((row) => row.slice());
+      order.forEach((from, k) => grid.forEach((row, t) => (row[freeCols[k]] = before[t][from])));
+    }
+  }
   const moved = items.filter((_, i) => new Set(grid.map((row) => row.indexOf(i)).filter((c) => c >= 0)).size > 1).length;
 
   const times = grid.map((row, t) => ({ t, row })).filter((x) => x.row.some((i) => i >= 0));
@@ -301,14 +345,20 @@ export interface TimeAllocTransfer {
 }
 
 export function timetableForTransfer(ctx: TimetableCtx, placement: number[][], opts: TimetableOptions): TransferTimetable {
-  const L = layoutTimetable(ctx, placement, opts);
+  // 같은 타임에 분반이 여럿인 선택과목은 칸을 나눠 "현대사회와 윤리1", "현대사회와 윤리2"처럼 넣는다(변경 탭은 이름 끝의 숫자를
+  // 분반 번호로 읽는다). 분반이 하나뿐인 타임은 이름 그대로.
+  const L = layoutTimetable(ctx, placement, { ...opts, sectionLanes: true });
   const slots = L.times.map(({ t }) => LETTERS[(ctx.startLetter + t) % 26]);
   const cols = Array.from({ length: L.cols }, (_, i) => `${opts.gradeNo}-${i + 1}${L.colLabel.has(i) ? ` (${L.colLabel.get(i)})` : ""}`);
   const cells: TransferTimetable["cells"] = {};
-  L.times.forEach(({ row }, ti) => {
+  L.times.forEach(({ t, row }, ti) => {
     cells[slots[ti]] = {};
     row.forEach((idx, c) => {
-      if (idx >= 0) cells[slots[ti]][cols[c]] = { subject: L.items[idx].name, teacher: "" };
+      if (idx < 0) return;
+      const it = L.items[idx];
+      const sl = it.sectionLane;
+      const split = sl && (sl.counts.get(t) ?? 1) > 1;
+      cells[slots[ti]][cols[c]] = { subject: split ? `${it.name}${sl!.lane + 1}` : it.name, teacher: "" };
     });
   });
   return { slots, cols, cells };

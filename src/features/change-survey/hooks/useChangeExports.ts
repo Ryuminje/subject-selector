@@ -2,6 +2,7 @@ import * as XLSX from "xlsx-js-style";
 import type { ChangeGradeKey, GradeStringArrays, Step6Row, TimetableData } from "../types";
 import type { StudentTimeData } from "../../../types";
 import { sameSubject } from "../lib/subjectMatch";
+import { splitIntoColumns } from "../lib/sectionSplit";
 
 interface AdjustmentLogEntry {
   beforeStr: string;
@@ -108,7 +109,8 @@ export function useChangeExports(
 
         if (matchedBase) {
           if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
-          studentsByBase[matchedBase].push(student);
+          // 과목을 바꾸지 않은 학생만 처음 분반 번호를 유지한다
+          studentsByBase[matchedBase].push(effectiveSubject === chosenSubject ? student : { ...student, sections: undefined });
         }
       });
 
@@ -121,22 +123,12 @@ export function useChangeExports(
         });
 
         const group = subjectGroups[base];
-        const numClasses = group.length;
-        if (numClasses === 0) return;
+        if (group.length === 0) return;
 
-        const baseSize = Math.floor(students.length / numClasses);
-        let remainder = students.length % numClasses;
-
-        let studentIndex = 0;
+        // 타임 배정에서 온 분반 번호(B1/B2)가 있으면 그 반에, 없으면 학번순으로 같은 인원씩
+        const split = splitIntoColumns(students, group, (s) => s.sections?.[timeSlot]);
         group.forEach(classInfo => {
-          let classSize = baseSize;
-          if (remainder > 0) {
-            classSize += 1;
-            remainder -= 1;
-          }
-          const assigned = students.slice(studentIndex, studentIndex + classSize);
-          colStudents[classInfo.col] = assigned;
-          studentIndex += classSize;
+          colStudents[classInfo.col] = split[classInfo.col];
         });
       });
 
@@ -303,7 +295,8 @@ export function useChangeExports(
 
         if (matchedBase) {
           if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
-          studentsByBase[matchedBase].push(student);
+          // 과목을 바꾸지 않은 학생만 처음 분반 번호를 유지한다
+          studentsByBase[matchedBase].push(effectiveSubject === chosenSubject ? student : { ...student, sections: undefined });
         }
       });
 
@@ -316,22 +309,12 @@ export function useChangeExports(
         });
 
         const group = subjectGroups[base];
-        const numClasses = group.length;
-        if (numClasses === 0) return;
+        if (group.length === 0) return;
 
-        const baseSize = Math.floor(students.length / numClasses);
-        let remainder = students.length % numClasses;
-
-        let studentIndex = 0;
+        // 타임 배정에서 온 분반 번호(B1/B2)가 있으면 그 반에, 없으면 학번순으로 같은 인원씩
+        const split = splitIntoColumns(students, group, (s) => s.sections?.[timeSlot]);
         group.forEach(classInfo => {
-          let classSize = baseSize;
-          if (remainder > 0) {
-            classSize += 1;
-            remainder -= 1;
-          }
-          const assigned = students.slice(studentIndex, studentIndex + classSize);
-          colStudents[classInfo.col] = assigned;
-          studentIndex += classSize;
+          colStudents[classInfo.col] = split[classInfo.col];
         });
       });
 

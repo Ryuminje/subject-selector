@@ -34,17 +34,23 @@ export function parseSampleBinary(bstr: string): StudentTimeData[] | null {
     const name = String(row[2] || "");
 
     const timeSlotMap: Record<string, string> = {};
+    // 타임 배정에서 같은 타임에 분반이 둘 이상인 과목은 칸 값이 "B1"/"B2"(타임 문자 + 분반 번호)로 온다.
+    // 타임은 "B"로, 분반 번호는 따로(sections) 보관한다 — 그래야 학생이 B타임에서 빠지지 않고 알맞은 반에 들어간다.
+    const sections: Record<string, number> = {};
     for (let c = startCol; c < row.length; c++) {
       const timeVal = row[c];
       if (timeVal !== undefined && timeVal !== null && subjectHeaders[c]) {
         const timeKey = String(timeVal).trim();
         if (timeKey) {
-          timeSlotMap[timeKey] = String(subjectHeaders[c]).trim();
+          const m = /^([A-Za-z])(\d+)$/.exec(timeKey);
+          const slot = m ? m[1].toUpperCase() : timeKey;
+          timeSlotMap[slot] = String(subjectHeaders[c]).trim();
+          if (m) sections[slot] = Number(m[2]);
         }
       }
     }
 
-    students.push({ id, name, timeSlotMap });
+    students.push({ id, name, timeSlotMap, ...(Object.keys(sections).length > 0 ? { sections } : {}) });
   }
   return students;
 }

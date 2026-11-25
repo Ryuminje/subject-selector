@@ -6,6 +6,7 @@ import { ChangeGradeLabel } from "../../year-data/components/ChangeGradeLabel";
 import type { StudentTimeData } from "../../../types";
 import type { ChangeGradeKey, TimetableData, GradeStringArrays } from "../types";
 import { sameSubject } from "../lib/subjectMatch";
+import { splitIntoColumns } from "../lib/sectionSplit";
 
 type AdjustmentLog = Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary' }[]>;
 
@@ -312,7 +313,9 @@ export function RosterAfterStep({
 
                           if (matchedBase) {
                             if (!studentsByBase[matchedBase]) studentsByBase[matchedBase] = [];
-                            studentsByBase[matchedBase].push({ ...student, isModified, modifiedSource });
+                            // 과목을 바꾸지 않은 학생만 처음 분반 번호를 유지한다(바꿔 들어온 학생은 인원이 적은 반으로)
+                            const sec = effectiveSubject === chosenSubject ? student.sections?.[slot] : undefined;
+                            studentsByBase[matchedBase].push({ ...student, isModified, modifiedSource, __sec: sec });
                           }
                         });
 
@@ -321,16 +324,9 @@ export function RosterAfterStep({
                             return a.id.localeCompare(b.id, undefined, { numeric: true });
                           });
                           const cols = bases[base];
-
-                          const baseCount = Math.floor(students.length / cols.length);
-                          const remainder = students.length % cols.length;
-
-                          let sIdx = 0;
-                          cols.forEach((colObj, idx) => {
-                            const count = baseCount + (idx < remainder ? 1 : 0);
-                            const assigned = students.slice(sIdx, sIdx + count);
-                            colStudents[`${slot}-${colObj.col}`].push(...assigned);
-                            sIdx += count;
+                          const split = splitIntoColumns(students, cols, (s) => s.__sec as number | undefined);
+                          cols.forEach((colObj) => {
+                            colStudents[`${slot}-${colObj.col}`].push(...split[colObj.col]);
                           });
                         });
                       });
