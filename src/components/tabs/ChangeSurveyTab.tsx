@@ -28,6 +28,7 @@ import { AnalysisStep } from "../../features/change-survey/components/AnalysisSt
 import { RiroschoolStep } from "../../features/change-survey/components/RiroschoolStep";
 import { subjectOptionsOf } from "../../features/change-survey/lib/subjectMatch";
 import { GuideLink } from "@/features/guide/components/GuideLink";
+import { WorkYearSelect } from "../../features/year-data/components/WorkYearSelect";
 
 export function ChangeSurveyTab() {
   const [changeActiveTab, setChangeActiveTab] = useState<"upload" | "timetable" | "roster" | "application" | "roster_after" | "analysis" | "riroschool">("upload");
@@ -446,6 +447,7 @@ export function ChangeSurveyTab() {
                 ref={fileInputRef}
                 onChange={handleLoadBackup}
               />
+              <WorkYearSelect />
               <GuideLink slug="enrollment" className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-stone-50 text-stone-700 text-sm font-medium rounded-xl transition-all border border-stone-300 shadow-sm whitespace-nowrap" />
               <button
                 onClick={() => fileInputRef.current?.click()}

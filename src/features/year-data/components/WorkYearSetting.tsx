@@ -23,19 +23,9 @@ export function WorkYearSetting() {
   return (
     <div className="space-y-2">
     <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900">
-      <label className="font-semibold flex items-center gap-2">
-        작업 학년도
-        <input
-          type="number"
-          value={workYear}
-          min={2000}
-          max={2100}
-          onChange={(e) => setWorkYear(Math.round(+e.target.value) || workYear)}
-          className="w-24 px-2 py-1 border border-amber-300 rounded-lg bg-white"
-        />
-      </label>
+      <span className="font-semibold whitespace-nowrap">작업 학년도 {workYear}</span>
       <span>
-        수강신청을 받는 해입니다. {workYear}학년도 입학생 = 예비 1학년, {workYear - 1}학년도 입학생 = 현 1학년, {workYear - 2}학년도 입학생 = 현 2학년.
+        수강신청을 받는 해입니다(바꾸려면 오른쪽 위 「작업 학년도」 목록에서 고르세요). {workYear}학년도 입학생 = 예비 1학년, {workYear - 1}학년도 입학생 = 현 1학년, {workYear - 2}학년도 입학생 = 현 2학년.
         해가 바뀌면 이 값만 한 해 올리면 됩니다. 편성표·학생 명단은 그대로 이어지고, 같은 입학생이 한 학년 위 과목을 신청하는 새 수강신청이 되므로
         설문·신청·타임 배정·변경 자료는 비어 있는 채로 시작합니다. 지난 자료는 보관되며, 작업 학년도를 되돌리면 다시 보입니다.
       </span>

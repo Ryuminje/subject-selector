@@ -20,6 +20,7 @@ import type { HierarchyRule } from "../../types";
 import type { PromotionEntry } from "../../features/main-survey/lib/promotion";
 import type { GradeKey } from "../../types";
 import { GuideLink } from "@/features/guide/components/GuideLink";
+import { WorkYearSelect } from "../../features/year-data/components/WorkYearSelect";
 
 type BaseTab = "curriculum" | "hierarchy" | "promotion";
 
@@ -189,6 +190,7 @@ export function BaseDataTab() {
           <h1 className="text-2xl font-extrabold tracking-tight text-stone-900 break-keep">명신고등학교 기초자료 입력</h1>
           <div className="flex flex-wrap gap-2 min-w-0 sm:shrink-0">
             <input type="file" accept=".json" className="hidden" ref={fileInputRef} onChange={handleLoadBackup} />
+            <WorkYearSelect />
             <GuideLink
               slug="enrollment"
               className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-stone-50 text-stone-700 text-sm font-medium rounded-xl transition-all border border-stone-300 shadow-sm whitespace-nowrap"
