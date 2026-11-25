@@ -3,6 +3,8 @@ import type { ChangeGradeKey, GradeStringArrays, Step6Row, TimetableData } from 
 import type { StudentTimeData } from "../../../types";
 import { sameSubject } from "../lib/subjectMatch";
 import { splitIntoColumns } from "../lib/sectionSplit";
+import { displayIdOf, makeIdLookup, sortForDisplay, type IdMode, type SortMode } from "../lib/rosterView";
+import type { RosterStudent } from "../../year-data/lib/roster";
 
 interface AdjustmentLogEntry {
   beforeStr: string;
@@ -30,7 +32,10 @@ export function useChangeExports(
   electiveChanges: Record<string, any[]>,
   electiveChangesArbitrary: Record<string, any[]>,
   step6Data: Step6Row[],
+  /** 타임별 명단 엑셀의 학번 기준·정렬(화면과 같은 설정). 반 배치에는 영향이 없다. */
+  rosterView: { idMode: IdMode; sortMode: SortMode; roster: RosterStudent[]; cohort?: number } = { idMode: "file", sortMode: "id", roster: [] },
 ) {
+  const idLookup = makeIdLookup(rosterView.roster, rosterView.cohort);
   const handleExportRoster = (isAfter: boolean) => {
     const wb = XLSX.utils.book_new();
     const grade = changeActiveGrade;
@@ -132,6 +137,12 @@ export function useChangeExports(
         });
       });
 
+      // 반 배치는 위에서 끝났다. 칸 안의 순서와 학번만 화면에서 고른 기준으로 바꾼다.
+      const idOf = (s: { id: string }) => displayIdOf(s.id, idLookup, rosterView.idMode);
+      Object.keys(colStudents).forEach(k => {
+        colStudents[k] = sortForDisplay(colStudents[k], idOf, rosterView.sortMode);
+      });
+
       const maxRows = Math.max(0, ...Object.values(colStudents).map(arr => arr.length));
       const wsData: any[][] = [];
 
@@ -164,7 +175,7 @@ export function useChangeExports(
         cols.forEach(col => {
           const student = colStudents[col][i];
           if (student) {
-            dataRow.push(student.id, student.name);
+            dataRow.push(idOf(student), student.name);
           } else {
             dataRow.push("", "");
           }

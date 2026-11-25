@@ -1,12 +1,16 @@
 "use client";
 
-import React, { Fragment } from "react";
+import React, { Fragment, useMemo } from "react";
 import { Users, Download } from "lucide-react";
 import { ChangeGradeLabel } from "../../year-data/components/ChangeGradeLabel";
 import type { StudentTimeData } from "../../../types";
 import type { ChangeGradeKey, TimetableData, GradeStringArrays } from "../types";
 import { sameSubject } from "../lib/subjectMatch";
 import { splitIntoColumns } from "../lib/sectionSplit";
+import { diagnoseIds, displayIdOf, makeIdLookup, sortForDisplay, type IdMode, type SortMode } from "../lib/rosterView";
+import { RosterViewControls } from "./RosterViewControls";
+import { CHANGE_OFFSETS } from "../../year-data/lib/cohortStore";
+import { useYearData } from "../../year-data/YearDataContext";
 
 type AdjustmentLog = Record<string, { beforeStr: string; afterStr: string; status: 'success' | 'failed'; reason?: string; source?: 'applicant' | 'arbitrary' }[]>;
 
@@ -24,6 +28,11 @@ interface RosterAfterStepProps {
   setChangeRosterTimeSlot: (v: string) => void;
   parsedSampleData: { grade2: StudentTimeData[]; grade3: StudentTimeData[] };
   adjustmentLog: AdjustmentLog;
+  /** 학번 기준(어느 학년 때 학번으로 볼지)과 정렬 — 표시와 엑셀만 바뀌고 반 배치는 그대로 */
+  idMode: IdMode;
+  setIdMode: (m: IdMode) => void;
+  sortMode: SortMode;
+  setSortMode: (m: SortMode) => void;
 }
 
 export function RosterAfterStep({
@@ -40,7 +49,14 @@ export function RosterAfterStep({
   setChangeRosterTimeSlot,
   parsedSampleData,
   adjustmentLog,
+  idMode,
+  setIdMode,
+  sortMode,
+  setSortMode,
 }: RosterAfterStepProps) {
+  const { roster, workYear } = useYearData();
+  // 학번이 입학년도를 넘어 겹칠 수 있어, 지금 보는 학생들의 입학년도 안에서만 찾는다
+  const idLookup = useMemo(() => makeIdLookup(roster, workYear - CHANGE_OFFSETS[changeActiveGrade]), [roster, workYear, changeActiveGrade]);
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* BasicStep.tsx와 같은 이유로 flex-wrap·break-keep을 둡니다 — 자세한 설명은 그쪽 주석 참고. */}
@@ -63,6 +79,7 @@ export function RosterAfterStep({
         </div>
 
         <div className="flex items-center gap-4 flex-wrap">
+          <RosterViewControls grade={changeActiveGrade} idMode={idMode} setIdMode={setIdMode} sortMode={sortMode} setSortMode={setSortMode} missing={{ ...diagnoseIds((parsedSampleData[changeActiveGrade] || []).map((s) => s.id), idLookup, idMode), total: (parsedSampleData[changeActiveGrade] || []).length }} />
           <button
             onClick={handleExportAttendanceRoster}
             className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-medium rounded-lg shadow-md transition-all whitespace-nowrap"
@@ -331,6 +348,11 @@ export function RosterAfterStep({
                         });
                       });
 
+                      // 반 배치는 위에서 끝났다. 칸 안의 순서만 고른 기준(학번 기준·정렬)으로 다시 세운다.
+                      Object.keys(colStudents).forEach(k => {
+                        colStudents[k] = sortForDisplay(colStudents[k], (s) => displayIdOf(s.id, idLookup, idMode), sortMode);
+                      });
+
                       let maxStudents = 0;
                       displayCols.forEach(c => {
                         if (colStudents[`${c.slot}-${c.col}`].length > maxStudents) maxStudents = colStudents[`${c.slot}-${c.col}`].length;
@@ -351,7 +373,7 @@ export function RosterAfterStep({
                               return (
                                 <Fragment key={`${c.slot}-${c.col}-${r}`}>
                                   <td className={`px-2 py-1.5 border-r border-stone-300 text-center border-r-slate-800/30 text-xs ${isModified ? (student.modifiedSource === 'applicant' ? 'bg-amber-500/10 text-amber-700 font-bold' : 'bg-emerald-500/10 text-emerald-700 font-bold') : 'text-stone-900'}`}>
-                                    {student ? student.id : ""}
+                                    {student ? displayIdOf(student.id, idLookup, idMode) : ""}
                                   </td>
                                   <td
                                     className={`px-2 py-1.5 border-r border-stone-300 text-center text-xs ${isModified ? (student.modifiedSource === 'applicant' ? 'bg-amber-500/10 text-amber-700 font-bold cursor-help' : 'bg-emerald-500/10 text-emerald-700 font-bold cursor-help') : 'text-stone-900 font-medium'}`}

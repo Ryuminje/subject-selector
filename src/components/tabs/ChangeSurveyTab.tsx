@@ -27,6 +27,7 @@ import { RosterAfterStep } from "../../features/change-survey/components/RosterA
 import { AnalysisStep } from "../../features/change-survey/components/AnalysisStep";
 import { RiroschoolStep } from "../../features/change-survey/components/RiroschoolStep";
 import { subjectOptionsOf } from "../../features/change-survey/lib/subjectMatch";
+import type { IdMode, SortMode } from "../../features/change-survey/lib/rosterView";
 import { GuideLink } from "@/features/guide/components/GuideLink";
 import { WorkYearSelect } from "../../features/year-data/components/WorkYearSelect";
 
@@ -39,6 +40,9 @@ export function ChangeSurveyTab() {
   const [changeRosterTimeSlot, setChangeRosterTimeSlot] = useState("A");
   const [rosterAfterSubjectFilter, setRosterAfterSubjectFilter] = useState<string>("전체");
   const [rosterSubjectFilter, setRosterSubjectFilter] = useState<string>("전체");
+  // 타임별 학생 명단(3·5단계)과 그 엑셀의 학번 기준·정렬(표시만 바뀌고 반 배치는 그대로) — 화면 설정이라 저장하지 않는다
+  const [rosterIdMode, setRosterIdMode] = useState<IdMode>("file");
+  const [rosterSortMode, setRosterSortMode] = useState<SortMode>("id");
 
 
   const {
@@ -115,7 +119,8 @@ export function ChangeSurveyTab() {
     if (!window.confirm(`1학기 변경 후 수강과목(${summary})을 2학기 변경의 "이전 수강과목"으로 넘깁니다.\n2학기에 이미 올려 둔 같은 항목이 있으면 바뀝니다. 계속할까요?`)) return;
     const label = "1학기 변경 결과에서 넘어옴";
     grades.forEach((g) => {
-      const map = buildCarryOver(finalSubjects[g], parsedSampleData[g], roster);
+      // 학번이 입학년도를 넘어 겹칠 수 있어, 이 자리 학생들의 입학년도 명단으로만 같은 학생의 다른 학번을 찾는다
+      const map = buildCarryOver(finalSubjects[g], parsedSampleData[g], roster.filter((r) => r.cohort === workYear - CHANGE_OFFSETS[g]));
       const field = g === "grade2" ? "grade2HistoryData" : "grade3Sem1HistoryData";
       const flag = g === "grade2" ? "grade2Optional" : "grade3Sem1";
       patchGrade("s2", field, g, {} as Record<string, string[]>, () => map);
@@ -400,6 +405,7 @@ export function ChangeSurveyTab() {
     electiveChanges,
     electiveChangesArbitrary,
     step6Data,
+    { idMode: rosterIdMode, sortMode: rosterSortMode, roster, cohort: workYear - CHANGE_OFFSETS[changeActiveGrade] },
   );
 
   // 타임(구획) 배정 탭의 "선택과목 변경 탭으로 보내기"가 부르는 함수 — 파일을 내려받아 다시 올리지 않고 같은 내용을 바로 받는다.
@@ -573,6 +579,10 @@ export function ChangeSurveyTab() {
                       setChangeRosterTimeSlot={setChangeRosterTimeSlot}
                       parsedSampleData={parsedSampleData}
                       adjustmentLog={adjustmentLog}
+                      idMode={rosterIdMode}
+                      setIdMode={setRosterIdMode}
+                      sortMode={rosterSortMode}
+                      setSortMode={setRosterSortMode}
                     />
                   )}
 
@@ -590,6 +600,10 @@ export function ChangeSurveyTab() {
                       changeRosterTimeSlot={changeRosterTimeSlot}
                       setChangeRosterTimeSlot={setChangeRosterTimeSlot}
                       parsedSampleData={parsedSampleData}
+                      idMode={rosterIdMode}
+                      setIdMode={setRosterIdMode}
+                      sortMode={rosterSortMode}
+                      setSortMode={setRosterSortMode}
                     />
                   )}
                   {changeActiveTab === "analysis" && (
