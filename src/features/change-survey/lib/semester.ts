@@ -28,7 +28,7 @@ export function allIdsOf(id: string, roster: RosterStudent[]): string[] {
 }
 
 /** 이전 수강과목 맵의 학생 수 — 같은 학생이 진급 전후 학번으로 두 번 들어 있어도 한 명으로 센다 */
-export function countHistoryStudents(map: Record<string, string[]>, roster: RosterStudent[]): number {
+export function countHistoryStudents(map: Record<string, unknown>, roster: RosterStudent[]): number {
   const seen = new Set<string>();
   for (const id of Object.keys(map)) {
     const hit = roster.find((r) => r.ids[1] === id || r.ids[2] === id || r.ids[3] === id);

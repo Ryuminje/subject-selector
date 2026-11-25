@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import { Upload, FileText, Settings, Download, Save, FolderOpen, Users } from "lucide-react";
 import { useTimetableData } from "../../features/change-survey/hooks/useTimetableData";
 import { useChangeCurriculum } from "../../features/change-survey/hooks/useChangeCurriculum";
@@ -14,6 +14,7 @@ import { parseSampleBinary } from "../../features/change-survey/hooks/useChangeU
 import type { TimeAllocTransfer } from "../../features/time-allocation/lib/exportTimetable";
 import { excludedIdSet } from "../../features/year-data/lib/roster";
 import { CHANGE_OFFSETS, cohortKey } from "../../features/year-data/lib/cohortStore";
+import { collectPreviousRounds, describePreviousRounds } from "../../features/year-data/lib/previousRounds";
 import { SemesterBar } from "../../features/change-survey/components/SemesterBar";
 import { buildCarryOver, changeStoreName, SEMESTER_LABEL, semesterFromLabel, type ChangeSemester } from "../../features/change-survey/lib/semester";
 import type { ChangeGradeKey, TimetableGradeData } from "../../features/change-survey/types";
@@ -66,7 +67,7 @@ export function ChangeSurveyTab() {
   } = useChangeUploads(changeActiveGrade, semester);
 
   // 기초자료 학생 명단에서 전출·퇴학으로 표시된 학생은 이 탭의 계산에서 뺀다(업로드한 원본 데이터는 그대로 보존)
-  const { roster, workYear, cohortStore, updateCohortStore, setCohortStore } = useYearData();
+  const { roster, workYear, cohortStore, updateCohortStore, setCohortStore, demandResults } = useYearData();
   const excludedIds = useMemo(() => excludedIdSet(roster), [roster]);
   const parsedSampleData = useMemo(
     () => ({
@@ -121,6 +122,41 @@ export function ChangeSurveyTab() {
       patchGrade("s2", "changeUploadNames", g, { timetable: null, grade2Optional: null, grade3Sem1: null } as Record<string, string | null>, (cur) => ({ ...cur, [flag]: label }));
     });
     window.alert(`2학기 "이전 수강과목"으로 넘겼습니다(${summary}). 2학기 변경 화면의 1단계에서 확인할 수 있습니다.`);
+  };
+
+  // 지금 보는 학기의 "변경 후" 결과(5단계 변경 후 타임별 학생 명단과 같은 값)를 수강신청 회차별로 저장해 둔다.
+  // 다음 회차(작업 학년도를 올린 뒤)가 이 값을 이전 수강과목으로 가져온다(lib/previousRounds). 값이 같으면 다시 쓰지 않는다.
+  useEffect(() => {
+    (["grade2", "grade3"] as ChangeGradeKey[]).forEach((g) => {
+      const next = finalSubjects[g];
+      updateCohortStore(changeStoreName(semester, "finalSubjects"), (cur, W) => {
+        const key = cohortKey(W, CHANGE_OFFSETS[g]);
+        const before = cur?.[key] as Record<string, string[]> | undefined;
+        if (Object.keys(next).length === 0 && (!before || Object.keys(before).length === 0)) return cur;
+        if (JSON.stringify(before ?? {}) === JSON.stringify(next)) return cur;
+        return { ...(cur ?? {}), [key]: next };
+      });
+    });
+  }, [finalSubjects, semester, updateCohortStore]);
+
+  // 3학년 자리의 "2학년 수강과목" — 같은 입학생의 2학년 회차 결과(변경 후 결과 → 없으면 본조사 신청)로 채운다. 1·2학기 모두 같은 값.
+  const handleImportPreviousSecondGrade = () => {
+    const r = collectPreviousRounds({ store: cohortStore, roster, demandResults, cohort: workYear - CHANGE_OFFSETS.grade3, grades: [2] });
+    const detail = describePreviousRounds(r);
+    if (r.students === 0) {
+      window.alert(`가져올 2학년 회차 자료가 없습니다.\n${detail}`);
+      return;
+    }
+    const existing = Object.keys(grade2HistoryData.grade3 || {}).length;
+    if (existing > 0 && !window.confirm(`이미 올려 둔 2학년 수강과목이 있습니다. 지난 수강신청 회차 결과로 바꿀까요?\n(${detail})`)) return;
+    const map: Record<string, string[]> = Object.fromEntries(Object.entries(r.map).map(([id, v]) => [id, v.subjects]));
+    const label = "지난 수강신청 회차에서 가져옴";
+    (["s1", "s2"] as ChangeSemester[]).forEach((sem) => {
+      patchGrade(sem, "grade2HistoryData", "grade3", {} as Record<string, string[]>, () => map);
+      patchGrade(sem, "extraUploads", "grade3", { grade2Optional: false, grade3Sem1: false }, (cur) => ({ ...cur, grade2Optional: true }));
+      patchGrade(sem, "changeUploadNames", "grade3", { timetable: null, grade2Optional: null, grade3Sem1: null } as Record<string, string | null>, (cur) => ({ ...cur, grade2Optional: label }));
+    });
+    window.alert(`3학년 자리의 2학년 수강과목으로 ${r.students}명, 과목 ${r.subjectCount}개를 가져왔습니다.\n${detail}`);
   };
 
   const {
@@ -471,6 +507,7 @@ export function ChangeSurveyTab() {
                       setChangeActiveTab={setChangeActiveTab}
                       grade2HistoryData={grade2HistoryData}
                       grade3Sem1HistoryData={grade3Sem1HistoryData}
+                      onImportPreviousSecondGrade={handleImportPreviousSecondGrade}
                     />
                   )}
 

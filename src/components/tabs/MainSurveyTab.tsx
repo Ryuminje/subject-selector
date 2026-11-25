@@ -62,6 +62,7 @@ export function MainSurveyTab() {
     handlePrevHistoryFileUpload,
     handleRemoveFile,
     handleRemovePrevHistoryFile,
+    previousRoundsPreview, previousRoundsDescription, importPreviousRounds,
   } = useMainUploads(activeGrade, parsedCurriculumList, subjectMap, hierarchyRules, excludedIds);
 
   // 학년 자리별 값은 입학년도 기준으로 보관(작업 학년도를 바꿔도 입학년도를 따라감)
@@ -335,6 +336,7 @@ export function MainSurveyTab() {
                       handleRemovePrevHistoryFile={handleRemovePrevHistoryFile}
                       previousSubjectMap={previousSubjectMap}
                       processedData={processedData}
+                      previousRounds={{ preview: previousRoundsPreview, description: previousRoundsDescription, onImport: importPreviousRounds }}
                     />
                   )}
                   {activeTab === "preview" && (

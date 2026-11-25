@@ -21,6 +21,8 @@ interface UploadStepProps {
   setChangeActiveTab: (tab: ChangeActiveTab) => void;
   grade2HistoryData: Record<string, Record<string, string[]>>;
   grade3Sem1HistoryData: Record<string, Record<string, string[]>>;
+  /** 3학년 자리의 2학년 수강과목을 같은 입학생의 지난(2학년) 수강신청 회차 결과로 채운다 */
+  onImportPreviousSecondGrade: () => void;
 }
 
 export function UploadStep({
@@ -36,6 +38,7 @@ export function UploadStep({
   setChangeActiveTab,
   grade2HistoryData,
   grade3Sem1HistoryData,
+  onImportPreviousSecondGrade,
 }: UploadStepProps) {
   const { roster } = useYearData();
   return (
@@ -173,6 +176,14 @@ export function UploadStep({
             }
           }}
         >
+          {changeActiveGrade === "grade3" && (
+            <button
+              onClick={onImportPreviousSecondGrade}
+              className="mb-3 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium"
+            >
+              지난 수강신청 회차(2학년)에서 가져오기
+            </button>
+          )}
           {extraUploads[changeActiveGrade]?.grade2Optional ? (
             <>
               <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mb-4">

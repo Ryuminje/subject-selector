@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { isExcludedRow } from "../../year-data/lib/roster";
 import { useCohortState } from "../../year-data/useCohortState";
+import { usePreviousRoundsImport } from "../../year-data/usePreviousRoundsImport";
 import { GRADE_OFFSETS } from "../../year-data/lib/cohortStore";
 import * as XLSX from "xlsx-js-style";
 import type { GradeKey, HierarchyRule, ParsedCurriculumSubject, ProcessedStudent, SubjectCategory, SubjectMap, SubjectStat } from "../../../types";
@@ -72,6 +73,8 @@ export function useDemandUploads(
   const [rawSheetData, setRawSheetData] = useCohortState<GradeKey, any[]>("demand.rawSheetData", GRADE_OFFSETS, []);
   const [previousHistoryFiles, setPreviousHistoryFiles] = useCohortState<GradeKey, { name: string, size: number, data: string } | null>("demand.previousHistoryFiles", GRADE_OFFSETS, null);
   const [previousSubjectMap, setPreviousSubjectMap] = useCohortState<GradeKey, { [studentId: string]: { name: string, subjects: string[] } }>("demand.previousSubjectMap", GRADE_OFFSETS, {});
+  // 지난 수강신청 회차 결과를 이전 수강과목으로 가져오는 버튼(업로드 단계)
+  const previousRounds = usePreviousRoundsImport(activeGrade, previousSubjectMap, setPreviousSubjectMap, setPreviousHistoryFiles);
   const [subjectStats, setSubjectStats] = useCohortState<GradeKey, SubjectStat[]>("demand.subjectStats", GRADE_OFFSETS, []);
   const [totalClasses, setTotalClasses] = useCohortState<GradeKey, number>("demand.totalClasses", GRADE_OFFSETS, 10);
 
@@ -622,5 +625,6 @@ export function useDemandUploads(
     handleRemoveFile,
     handleRemovePrevHistoryFile,
     getSubjectCategory,
+    ...previousRounds,
   };
 }

@@ -4,8 +4,13 @@ import React from "react";
 import { Upload, File as FileIcon, Trash2 } from "lucide-react";
 import { GradeTabs } from "./GradeTabs";
 import type { GradeKey, ProcessedStudent } from "../../../types";
+import { PreviousRoundsButton, type PreviousRoundsProps } from "../../year-data/components/PreviousRoundsButton";
+import { useYearData } from "../../year-data/YearDataContext";
+import { countHistoryStudents } from "../../change-survey/lib/semester";
 
 interface UploadStepProps {
+  /** 지난 수강신청 회차에서 이전 수강과목 가져오기(1학년 과목 신청이면 preview 가 null) */
+  previousRounds: PreviousRoundsProps;
   activeGrade: GradeKey;
   setActiveGrade: (grade: GradeKey) => void;
   uploadedFiles: { [key in GradeKey]: { name: string, size: number, data: string } | null };
@@ -31,7 +36,9 @@ export function UploadStep({
   handleRemovePrevHistoryFile,
   previousSubjectMap,
   processedData,
+  previousRounds,
 }: UploadStepProps) {
+  const { roster } = useYearData();
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div>
@@ -126,6 +133,8 @@ export function UploadStep({
             이전 학년 이수 이력 파일 (선택)
           </h3>
 
+          <PreviousRoundsButton {...previousRounds} />
+
           {!previousHistoryFiles[activeGrade] ? (
             <div
               className="border-2 border-dashed border-stone-300 hover:border-amber-500/50 bg-stone-50 rounded-2xl p-12 text-center transition-all duration-300 group cursor-pointer relative"
@@ -168,10 +177,10 @@ export function UploadStep({
                     {previousHistoryFiles[activeGrade]?.name}
                   </h4>
                   <p className="text-xs text-stone-600 mt-1">
-                    {(previousHistoryFiles[activeGrade]!.size / 1024).toFixed(1)} KB
+                    {previousHistoryFiles[activeGrade]!.size > 0 ? `${(previousHistoryFiles[activeGrade]!.size / 1024).toFixed(1)} KB` : "파일 없음 — 저장된 지난 회차 결과"}
                   </p>
                   <span className="inline-block mt-2 px-2 py-0.5 bg-emerald-500/10 text-emerald-700 text-xs font-semibold rounded border border-emerald-500/20">
-                    총 {Object.keys(previousSubjectMap[activeGrade] || {}).length}명 연동 완료
+                    총 {countHistoryStudents(previousSubjectMap[activeGrade] || {}, roster)}명 연동 완료
                   </span>
                 </div>
               </div>
