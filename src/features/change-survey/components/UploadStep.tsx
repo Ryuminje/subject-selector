@@ -7,6 +7,7 @@ import type { StudentTimeData } from "../../../types";
 import type { ChangeGradeKey, ChangeActiveTab } from "../types";
 import { useYearData } from "../../year-data/YearDataContext";
 import { countHistoryStudents } from "../lib/semester";
+import { CHANGE_OFFSETS } from "../../year-data/lib/cohortStore";
 
 interface UploadStepProps {
   changeActiveGrade: ChangeGradeKey;
@@ -40,7 +41,9 @@ export function UploadStep({
   grade3Sem1HistoryData,
   onImportPreviousSecondGrade,
 }: UploadStepProps) {
-  const { roster } = useYearData();
+  const { roster: allRoster, workYear } = useYearData();
+  // 학번이 입학년도를 넘어 겹칠 수 있어, 이 자리 학생들의 입학년도 명단으로만 센다
+  const roster = allRoster.filter((r) => r.cohort === workYear - CHANGE_OFFSETS[changeActiveGrade]);
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* BasicStep.tsx와 같은 이유로 flex-wrap·break-keep을 둡니다 — 자세한 설명은 그쪽 주석 참고. */}

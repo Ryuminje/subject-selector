@@ -9,6 +9,7 @@ import type { GradeKey, ProcessedStudent } from "../../../types";
 import { PreviousRoundsButton, type PreviousRoundsProps } from "../../year-data/components/PreviousRoundsButton";
 import { useYearData } from "../../year-data/YearDataContext";
 import { countHistoryStudents } from "../../change-survey/lib/semester";
+import { cohortOfGradeKey } from "../../year-data/lib/cohortCurriculum";
 
 interface UploadStepProps {
   /** 지난 수강신청 회차에서 이전 수강과목 가져오기(1학년 과목 신청이면 preview 가 null) */
@@ -53,7 +54,9 @@ export function UploadStep({
   processedData,
   previousRounds,
 }: UploadStepProps) {
-  const { roster } = useYearData();
+  const { roster: allRoster, workYear } = useYearData();
+  // 학번이 입학년도를 넘어 겹칠 수 있어, 이 학년 자리 학생들의 입학년도 명단으로만 센다
+  const roster = allRoster.filter((r) => r.cohort === cohortOfGradeKey(workYear, activeGrade));
   const [isPromotionOpen, setIsPromotionOpen] = useState(false);
   const [withOldId, setWithOldId] = useState(false);
   return (

@@ -48,8 +48,9 @@ interface Args {
 const nonEmpty = (m: unknown): m is Record<string, string[]> => !!m && typeof m === "object" && Object.keys(m as object).length > 0;
 
 export function collectPreviousRounds({ store, roster, demandResults, cohort, grades }: Args): PreviousRoundsResult {
+  // 학번은 입학년도가 다른 학생끼리 겹칠 수 있어(같은 3학년 학번을 다른 해 졸업생이 쓴다) 이 입학년도 학생만으로 찾는다
   const byId = new Map<string, RosterStudent>();
-  for (const s of roster) for (const id of Object.values(s.ids)) if (id) byId.set(id, s);
+  for (const s of roster) if (s.cohort === cohort) for (const id of Object.values(s.ids)) if (id) byId.set(id, s);
 
   interface Entry { name: string; ids: Set<string>; subjects: Map<string, string> }
   const entries = new Map<string, Entry>();

@@ -40,7 +40,7 @@ export function useElectiveChanges(
   semester: ChangeSemester = "s2",
 ) {
   // 진급으로 학번이 바뀐 학생도 이전 수강과목을 찾을 수 있게, 기초자료 명단의 모든 학번으로 조회한다.
-  const { roster } = useYearData();
+  const { roster, workYear } = useYearData();
   const n = (field: string) => changeStoreName(semester, field);
   // 학년 자리(2학년/3학년)별 신청·설정은 입학년도 기준으로 보관한다(작업 학년도를 바꿔도 입학년도를 따라감)
   const [electiveChanges, setElectiveChanges] = useCohortState<ChangeGradeKey, any[]>(n("electiveChanges"), CHANGE_OFFSETS, []);
@@ -334,7 +334,9 @@ export function useElectiveChanges(
       // 들었으면(2학년: 1학기 기록, 3학년: 2학년 전체 + 3학년 1학기 기록) 잡아냅니다.
       // 진급으로 학번이 바뀐 학생은 명단의 다른 학번으로도 찾는다.
       const lookupHistory = (map: Record<string, string[]>, studentId: string): string[] => {
-        for (const id of [String(studentId), ...allIdsOf(String(studentId).trim(), roster)]) {
+        // 학번이 입학년도를 넘어 겹칠 수 있어, 이 학년 자리 학생들의 입학년도 명단으로만 다른 학번을 찾는다
+        const cohortRoster = roster.filter((r) => r.cohort === workYear - CHANGE_OFFSETS[grade]);
+        for (const id of [String(studentId), ...allIdsOf(String(studentId).trim(), cohortRoster)]) {
           if (map[id]) return map[id];
         }
         return [];
@@ -757,7 +759,7 @@ export function useElectiveChanges(
     });
 
     return { log: logByGrade, finalSchedules };
-  }, [parsedSampleData, electiveChanges, electiveChangesArbitrary, timetableData, timeSlots, classCols, enableOptimization, confirmedBaseSchedules, grade2HistoryData, grade3Sem1HistoryData, lockedSubjects, roster]);
+  }, [parsedSampleData, electiveChanges, electiveChangesArbitrary, timetableData, timeSlots, classCols, enableOptimization, confirmedBaseSchedules, grade2HistoryData, grade3Sem1HistoryData, lockedSubjects, roster, workYear]);
 
   // 변경이 모두 반영된 뒤 학생별 수강과목(타임 순서 무관) — 1학기 결과를 2학기로 넘길 때 쓴다.
   // 신청이 있는 학생은 방금 계산한 최종 시간표, 확정된 학생은 확정본, 나머지는 처음 시간표 그대로.
